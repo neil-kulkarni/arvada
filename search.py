@@ -6,15 +6,22 @@ TERMINALS = ['"A"', '"B"']
 NONTERMINALS = ['a', 'b']
 SYMBOLS = TERMINALS + NONTERMINALS
 
-def parser_matches_examples(parser, examples):
+def parser_matches_examples(parser, positive, negative):
     """
-    Returns if all the examples belong to the parser.
+    Returns if all the positive examples belong to the parser and none of
+    the negative examples belong to the parser.
     """
-    for example in examples:
+    for example in positive:
         try:
             parser.parse(example)
         except:
             return False
+    for example in negative:
+        try:
+            parser.parse(example)
+            return False
+        except:
+            pass
     return True
 
 def generate_grammar_parser():
@@ -38,7 +45,7 @@ def generate_grammar_string():
     and MAX_NONTERMINALS <= 26. This constraint is not overly restrictive
     due to the exponential nature of this problem.
     """
-    for num_rules in range(1, MAX_RULE_SIZE + 1):
+    for num_rules in range(1, MAX_RULES + 1):
         for grammar_body in generate_fixed_size_grammar_string(num_rules):
             start_nonterminal = grammar_body[0]
             grammar = 'start: %s\n%s\n' % (start_nonterminal, grammar_body)
@@ -115,14 +122,24 @@ def postprocess(grammar):
 # start: a
 # a: a "A"
 # a: "B"
-examples = ['B' + 'A'*i for i in range(10)]
+positive_examples = ['B' + 'A'*i for i in range(10)]
+negative_examples = ['A' + 'B'*i for i in range(10)]
 
 # Generate all possible grammars of size two
-# This should contain the appropriate example grammar
-parsers = [p for p in generate_grammar_parser()]
-matching_grammars = [p[1] for p in parsers if parser_matches_examples(p[0], examples)]
-for matching_grammar in matching_grammars:
-    print(matching_grammar)
+# Store the grammars that match the example grammar in matching_grammars
+count, matching_grammars = 0, []
+for p, g in generate_grammar_parser():
+    print(count)
+    print(g)
+    if parser_matches_examples(p, positive_examples, negative_examples):
+        matching_grammars.append(g)
+        print('Success')
+    print()
+    count += 1
+
+print('Grammars that matched the input examples:')
+for g in matching_grammars:
+    print(g)
     print()
 
 # Example Grammar and Usage
