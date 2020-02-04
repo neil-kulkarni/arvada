@@ -5,21 +5,18 @@ class Grammar():
     Object representing a string-representation of a context-free grammar.
     This class is intended to be used with the Lark module.
     """
-    def __init__(self, terminals, nonterminals, start):
+    def __init__(self, start):
         """
         Requires that terminals be wrapped in double quotes.
-        Terminals and nonterminals must be unique.
-        Start must be a nonterminal.
         Rules is a mapping of rule start name to Rule object.
         """
-        self.T = terminals
-        self.N = nonterminals
-        self.start = start
-
         # Add the first rule pointing a dummy start nonterminal to start
         start_rule = Rule('start')
         start_rule.add_body([start])
         self.rules = {'start':start_rule}
+
+        # Optionally store a log that created the grammar
+        self.log = None
 
         # Define cacheable values and their dirty bits
         self.cached_str = ""
@@ -27,21 +24,16 @@ class Grammar():
         self.cached_parser = None
         self.cached_parser_valid = False
 
-    def add_rule(self, rule_start, rule_body):
-        """
-        Requires the elements in rule_body to be terminals or nonterminals.
-        Requires rule_start to be a nonterminal.
-        """
+    def add_rule(self, rule):
         self.cached_str_valid = False
         self.cached_parser_valid = False
 
-        if rule_start in self.rules:
-            rule = self.rules[rule_start]
-            rule.add_body(rule_body)
+        if rule.start in self.rules:
+            saved_rule = self.rules[rule.start]
+            for rule_body in rule.bodies:
+                saved_rule.add_body(rule_body)
         else:
-            rule = Rule(rule_start)
-            rule.add_body(rule_body)
-            self.rules[rule_start] = rule
+            self.rules[rule.start] = rule
 
     def parser(self):
         if self.cached_parser_valid:
@@ -62,9 +54,15 @@ class Grammar():
 class Rule():
     """
     Object representing the string-represenation of a rule of a CFG.
+    There is always an associated grammar with every rule.
     This class is intended to be used with the Lark module.
     """
     def __init__(self, start):
+        """
+        Start must be a nonterminal.
+        Each body is a sequence of terminals and nonterminals.
+        If there are multiple bodies, they will be connected via the | op.
+        """
         self.start = start
         self.bodies = []
         self.cached_str = ""
@@ -73,6 +71,7 @@ class Rule():
     def add_body(self, body):
         self.cache_valid = False
         self.bodies.append(body)
+        return self
 
     def __str__(self):
         if self.cache_valid:
@@ -89,9 +88,8 @@ class Rule():
         return ' '.join(body)
 
 # Example grammar with nonterminals T1, T2 and terminals a, b
-# grammar = Grammar(['"a"', '"b"'], ['T' + str(i) for i in range(1, 3)], 'T1')
-# grammar.add_rule('T1', ['"a"', 'T2'])
-# grammar.add_rule('T1', ['"b"', 'T2'])
-# grammar.add_rule('T2', ['"b"'])
+# grammar = Grammar('T1')
+# grammar.add_rule(Rule('T1').add_body(['"a"', 'T2']).add_body(['"b"', 'T2']))
+# grammar.add_rule(Rule('T2').add_body(['"b"']))
 # parser = grammar.parser()
 # print(parser.parse("ab").pretty())
