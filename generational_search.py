@@ -69,13 +69,17 @@ def perturb_log():
     log_index = random.randint(0, len(LOG) - 1)
     (id, n, choice) = LOG[log_index]
     new_choice = random.randint(0, n - 1)
-    if id == "loc5" and new_choice > choice:
-        # Number of rules has increased, so duplicate random rule
+    if id == "loc5":
         rule_indices = [i - 1 for i, entry in enumerate(LOG) if entry[0] == "loc3"]
-        rule_index = random.randint(0, len(rule_indices) - 1)
-        rule_indices += [len(LOG)]
-        rule = LOG[rule_indices[rule_index]:rule_indices[rule_index + 1]]
-        LOG += rule * (new_choice - choice)
+        if new_choice > choice:
+            # Number of rules has increased, so duplicate random rule
+            rule_index = random.randint(0, len(rule_indices) - 1)
+            rule_indices += [len(LOG)]
+            rule = LOG[rule_indices[rule_index]:rule_indices[rule_index + 1]]
+            LOG += rule * (new_choice - choice)
+        elif new_choice < choice:
+            # Number of rules has decreased, so trim the log
+            LOG = LOG[:rule_indices[-(choice - new_choice)]]
     elif id == "loc3":
         # Size of a rule has changed, so duplicate choices
         rule_indices = [i - 1 for i, entry in enumerate(LOG) if entry[0] == "loc3"]
