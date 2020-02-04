@@ -103,14 +103,76 @@ def perturb_log():
             LOG[log_index + 1] = ("loc1", len(ALPHABET), random.randint(0, len(ALPHABET) - 1))
     LOG[log_index] = (id, n, new_choice)
 
+# Examples
+positive_examples = ['b' + 'a'*i for i in range(10)]
+negative_examples = ['a' + 'b'*i for i in range(10)]
+
+# Score maximizing vector. Indices correspond to objectives:
+# 1. Accuracy (Positive)    2. Accuracy (Negative)  3. Size
+SCORE_VEC = [0] * 3
+MAX_ITERS = 10
+
+def accuracy_score(grammar):
+    try:
+        parser = grammar.parser()
+    except:
+        return 0, 0
+    num_pos, num_neg = len(positive_examples), len(negative_examples)
+
+    pos_correct = 0
+    for pos in positive_examples:
+        try:
+            parser.parse(pos)
+            pos_correct += 1
+        except:
+            pass
+
+    neg_correct = 0
+    for neg in negative_examples:
+        try:
+            parser.parse(neg)
+            neg_correct += 1
+        except:
+            pass
+
+    return pos_correct / num_pos, 1 - (neg_correct / num_neg)
+
+def size_score(grammar):
+    total_rule_size = 0
+    for rule_start, rule in grammar.rules.items():
+        for body in rule.bodies:
+            total_rule_size += 1 + len(body)
+    return 1 / total_rule_size
+
+def print_grammar(grammar):
+    p_score, n_score = accuracy_score(prev_grammar)
+    s_score = size_score(prev_grammar)
+    print('Grammar:\n%s\n\nLog:\n%s\n\nScores:\n%s\n' % (prev_grammar, prev_grammar.log, (p_score, n_score, s_score)))
+    print('\n===========\n\n')
+
 setup()
-first_grammar, first_log = generate_grammar()
-first_grammar.log = first_log
-print('Grammar:\n%s\n\nLog:\n%s\n' % (first_grammar, first_grammar.log))
+prev_grammar, prev_log = generate_grammar()
+prev_grammar.log = prev_log
+print_grammar(prev_grammar)
 
-print('===========\n')
+iterations = 0
+while iterations < MAX_ITERS:
+    setup(prev_grammar)
+    next_grammar, next_log = generate_grammar()
+    next_grammar.log = next_log
+    print_grammar(next_grammar)
+    prev_grammar = next_grammar
+    iterations += 1
 
-setup(first_grammar)
-second_grammar, second_log = generate_grammar()
-second_grammar.log = second_log
-print('Grammar:\n%s\n\nLog:\n%s\n' % (second_grammar, second_grammar.log))
+# Grammar creation and perturbance example
+# setup()
+# first_grammar, first_log = generate_grammar()
+# first_grammar.log = first_log
+# print('Grammar:\n%s\n\nLog:\n%s\n' % (first_grammar, first_grammar.log))
+#
+# print('===========\n')
+#
+# setup(first_grammar)
+# second_grammar, second_log = generate_grammar()
+# second_grammar.log = second_log
+# print('Grammar:\n%s\n\nLog:\n%s\n' % (second_grammar, second_grammar.log))
