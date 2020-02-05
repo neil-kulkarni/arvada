@@ -124,8 +124,8 @@ positive_examples = ['b' + 'a'*i for i in range(10)]
 negative_examples = [generate_negative_example() for i in range(10)]
 
 # Score maximizing vector. Indices correspond to objectives:
-# 1. Accuracy (Positive)    2. Accuracy (Negative)  3. Size
-SCORE_VEC = [(0, None)] * 3
+# 1. Positive Accuracy * Negative Accuracy * Size
+SCORE_VEC = [(0, None)]
 MAX_ITERS = 10000
 
 def accuracy_score(grammar):
@@ -165,12 +165,13 @@ grammar, log = generate_grammar()
 grammar.log = log
 p_score, n_score = accuracy_score(grammar)
 s_score = size_score(grammar)
-SCORE_VEC = [(p_score, grammar), (n_score, grammar), (s_score, grammar)]
+score = p_score * n_score * s_score
+SCORE_VEC = [(p_score, grammar)]
 
 iterations = 0
 while iterations < MAX_ITERS:
-    prev_grammar_index = random.randint(0, 3)
-    if prev_grammar_index < 3:
+    prev_grammar_index = random.randint(0, 1)
+    if prev_grammar_index < 1:
         prev_grammar = SCORE_VEC[prev_grammar_index][1]
         setup(prev_grammar)
         grammar, log = generate_grammar()
@@ -180,12 +181,9 @@ while iterations < MAX_ITERS:
     grammar.log = log
     p_score, n_score = accuracy_score(grammar)
     s_score = size_score(grammar)
-    if p_score > SCORE_VEC[0][0]:
-        SCORE_VEC[0] = (p_score, grammar)
-    if n_score > SCORE_VEC[1][0]:
-        SCORE_VEC[1] = (n_score, grammar)
-    if s_score > SCORE_VEC[2][0]:
-        SCORE_VEC[2] = (s_score, grammar)
+    score = p_score * n_score * s_score
+    if score > SCORE_VEC[0][0]:
+        SCORE_VEC[0] = (score, grammar)
     print(iterations, [e[0] for e in SCORE_VEC])
     iterations += 1
 
