@@ -60,10 +60,13 @@ class GrammarNode():
         return GrammarNode(self.config, self.start, [c.copy() for c in self.children])
 
     def mutate(self):
-        if random.randint(0, 1):
+        choice = random.randint(0, 2)
+        if choice == 0:
             self.mutate_start()
-        else:
+        elif choice == 1:
             self.mutate_size()
+        else:
+            self.mutate_rule()
 
     def mutate_start(self):
         new_node = SymbolNode(self.config, None, True) # Create a dummy SymbolNode
@@ -85,6 +88,10 @@ class GrammarNode():
             for _ in range(old_size, new_size):
                 random_i = random.randint(0, self.grammar_size)
                 self.add_random_rule(random_i)
+
+    def mutate_rule(self):
+        random_i = random.randint(0, self.grammar_size - 1)
+        self.children[random_i].mutate()
 
     def delete_rule(self, i):
         self.children.pop(i)
@@ -122,10 +129,13 @@ class RuleNode():
         return RuleNode(self.config, self.lhs, [c.copy() for c in self.children])
 
     def mutate(self):
-        if random.randint(0, 1):
+        choice = random.randint(0, 2)
+        if choice == 0:
             self.mutate_lhs()
-        else:
+        elif choice == 1:
             self.mutate_size()
+        else:
+            self.mutate_symbol()
 
     def mutate_lhs(self):
         new_node = SymbolNode(self.config, None, True) # Create a dummy SymbolNode
@@ -147,6 +157,10 @@ class RuleNode():
             for _ in range(old_size, new_size):
                 random_i = random.randint(0, self.rule_size)
                 self.add_random_symbol(random_i)
+
+    def mutate_symbol(self):
+        random_i = random.randint(0, self.rule_size - 1)
+        self.children[random_i].mutate()
 
     def delete_symbol(self, i):
         self.children.pop(i)
