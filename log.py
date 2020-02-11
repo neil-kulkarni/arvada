@@ -67,12 +67,14 @@ class GrammarNode():
 
     def mutate_start(self):
         new_node = SymbolNode(self.config, None, True) # Create a dummy SymbolNode
-        while new_node.is_terminal:
+        while new_node.is_terminal or new_node.choice == self.start:
             new_node.mutate()
         self.start = new_node.choice
 
     def mutate_size(self):
         old_size, new_size = self.grammar_size, random.randint(1, self.max_size)
+        while new_size == old_size:
+            new_size = random.randint(1, self.max_size)
         if new_size < old_size:
             # Delete old_size - new_size random rules
             for _ in range(new_size, old_size):
@@ -127,12 +129,14 @@ class RuleNode():
 
     def mutate_lhs(self):
         new_node = SymbolNode(self.config, None, True) # Create a dummy SymbolNode
-        while new_node.is_terminal:
+        while new_node.is_terminal or new_node.choice == self.lhs:
             new_node.mutate()
         self.lhs = new_node.choice
 
     def mutate_size(self):
         old_size, new_size = self.rule_size, random.randint(1, self.max_size)
+        while new_size == old_size:
+            new_size = random.randint(1, self.max_size)
         if new_size < old_size:
             # Delete old_size - new_size random symbols
             for _ in range(new_size, old_size):
@@ -181,12 +185,19 @@ class SymbolNode():
         return SymbolNode(self.config, self.choice, self.is_terminal)
 
     def mutate(self):
-        if random.randint(0, 1):
-            self.is_terminal = True
+        flip = random.randint(0, 1)
+        if not flip:
+            new_index = random.randint(0, self.n - 1)
+            while self.choice == self.value(new_index):
+                new_index = random.randint(0, self.n - 1)
+            self.choice = self.value(new_index)
         else:
-            self.is_terminal = False
-        new_index = random.randint(0, self.n - 1)
-        self.choice = self.terminals[new_index] if self.is_terminal else self.nonterminals[new_index]
+            self.is_terminal = not self.is_terminal
+            new_index = random.randint(0, self.n - 1)
+            self.choice = self.value(new_index)
+
+    def value(self, new_index):
+        return self.terminals[new_index] if self.is_terminal else self.nonterminals[new_index]
 
     @property
     def n(self):
