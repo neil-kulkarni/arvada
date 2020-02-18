@@ -12,8 +12,8 @@ class Scorer():
     def __init__(self, config, data, grammar, gen):
         self.config = config
         self.data = data
-        self.score_map = {'pos':(0, grammar, gen), 'neg':(0, grammar, gen), 'size':(0, grammar, gen), 'ratio':(0, grammar, gen), 'variance':(0, grammar, gen), 'recur_cc':(0, grammar, gen), 'finite':(0, grammar, gen)}
-        self.score_fns = {'pos':Scorer.pos, 'neg':Scorer.neg, 'size':Scorer.size, 'ratio':Scorer.ratio, 'variance':Scorer.variance, 'recur_cc':Scorer.recur_cc, 'finite':Scorer.finite}
+        self.score_map = {'pos':(0, grammar, gen), 'neg':(0, grammar, gen), 'size':(0, grammar, gen), 'ratio':(0, grammar, gen), 'variance':(0, grammar, gen), 'compilation':(0, grammar, gen), 'recur_cc':(0, grammar, gen), 'finite':(0, grammar, gen)}
+        self.score_fns = {'pos':Scorer.pos, 'neg':Scorer.neg, 'size':Scorer.size, 'ratio':Scorer.ratio, 'variance':Scorer.variance, 'compilation':Scorer.compilation, 'recur_cc':Scorer.recur_cc, 'finite':Scorer.finite}
 
     def sample_grammar(self):
         """
@@ -115,6 +115,16 @@ class Scorer():
         variance_score = t_variance * n_variance
         if variance_score > self.score_map['variance'][0]:
             self.score_map['variance'] = (variance_score, grammar, gen)
+
+    def compilation(self, grammar, gen):
+        try:
+            parser = grammar.parser()
+            compilation_score = 1.0
+        except:
+            compilation_score = 0.0
+
+        if compilation_score > self.score_map['compilation'][0]:
+            self.score_map['compilation'] = (compilation_score, grammar, gen)
 
     def recur_cc(self, grammar, gen):
         nonterminals = gen.config['NONTERMINALS']
