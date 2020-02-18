@@ -1,5 +1,6 @@
 import random
 from log import Log
+from graph import Graph
 from grammar import Grammar, Rule
 
 class Scorer():
@@ -11,8 +12,8 @@ class Scorer():
     def __init__(self, config, data, grammar, log):
         self.config = config
         self.data = data
-        self.score_map = {'pos':(0, grammar, log), 'neg':(0, grammar, log), 'size':(0, grammar, log), 'ratio':(0, grammar, log), 'variance':(0, grammar, log)}
-        self.score_fns = {'pos':Scorer.pos, 'neg':Scorer.neg, 'size':Scorer.size, 'ratio':Scorer.ratio, 'variance':Scorer.variance}
+        self.score_map = {'pos':(0, grammar, log), 'neg':(0, grammar, log), 'size':(0, grammar, log), 'ratio':(0, grammar, log), 'variance':(0, grammar, log), 'recur_cc':(0, grammar, log), 'finite':(0, grammar, log)}
+        self.score_fns = {'pos':Scorer.pos, 'neg':Scorer.neg, 'size':Scorer.size, 'ratio':Scorer.ratio, 'variance':Scorer.variance, 'recur_cc':Scorer.recur_cc, 'finite':Scorer.finite}
 
     def sample_grammar(self):
         """
@@ -114,3 +115,47 @@ class Scorer():
         variance_score = t_variance * n_variance
         if variance_score > self.score_map['variance'][0]:
             self.score_map['variance'] = (variance_score, grammar, log)
+
+    def recur_cc(self, grammar, log):
+        nonterminals = log.config['NONTERMINALS']
+        graph = Graph(['start'] + list(nonterminals))
+        for rule_start, rule in grammar.rules.items():
+            for rule_body in rule.bodies:
+                for elem in rule_body:
+                    if elem in nonterminals:
+                        graph.add_edge(rule_start, elem)
+
+        recur_cc_score = 1.0 if graph.is_connected() and graph.has_cycle() else 0.0
+        if recur_cc_score > self.score_map['recur_cc'][0]:
+            self.score_map['recur_cc'] = (recur_cc_score, grammar, log)
+
+    def finite(self, grammar, log):
+        nonterminals = log.config['NONTERMINALS']
+        X = set() # The set of all nonterminals that can expand to a finite string
+        updated = True # Stop looping when there are no more updates
+
+        # Adds rule.start to X if rule.start can expand to a finite string
+        # Returns True if there was an update to X
+        def update(X, rule):
+            # Adds rule_start to X if rule_start can expand to a finite string
+            # in this particular rule_body
+            # Returns True if there was an update to X via this rule_body
+            def update_helper(X, rule_start, rule_body):
+                if rule_start in X:
+                    return False
+                for elem in rule_body:
+                    if elem in nonterminals and elem not in X:
+                        return False
+                X.add(rule_start)
+                return True
+
+            if rule.start in X:
+                return False
+            return any([update_helper(X, rule.start, rule_body) for rule_body in rule.bodies])
+
+        while updated:
+            updated = any([update(X, rule) for rule_start, rule in grammar.rules.items()])
+
+        finite_score = 1.0 if len(X) == len(nonterminals) + 1 else 0.0 # Include 'start'
+        if finite_score > self.score_map['finite'][0]:
+            self.score_map['finite'] = (finite_score, grammar, log)
