@@ -1,7 +1,7 @@
 import random
-from log import Log
 from graph import Graph
 from grammar import Grammar, Rule
+from generator import GrammarGenerator
 
 class Scorer():
     """
@@ -9,10 +9,10 @@ class Scorer():
     Scores new grammars and updates the score map accordingly.
     Data is a hashmap of auxiliary data used for scoring functions.
     """
-    def __init__(self, config, data, grammar, log):
+    def __init__(self, config, data, grammar, gen):
         self.config = config
         self.data = data
-        self.score_map = {'pos':(0, grammar, log), 'neg':(0, grammar, log), 'size':(0, grammar, log), 'ratio':(0, grammar, log), 'variance':(0, grammar, log), 'recur_cc':(0, grammar, log), 'finite':(0, grammar, log)}
+        self.score_map = {'pos':(0, grammar, gen), 'neg':(0, grammar, gen), 'size':(0, grammar, gen), 'ratio':(0, grammar, gen), 'variance':(0, grammar, gen), 'recur_cc':(0, grammar, gen), 'finite':(0, grammar, gen)}
         self.score_fns = {'pos':Scorer.pos, 'neg':Scorer.neg, 'size':Scorer.size, 'ratio':Scorer.ratio, 'variance':Scorer.variance, 'recur_cc':Scorer.recur_cc, 'finite':Scorer.finite}
 
     def sample_grammar(self):
@@ -25,21 +25,21 @@ class Scorer():
         if random_i < len(good_grammars):
             return good_grammars[random_i][1:]
         else:
-            new_log = Log(self.config)
-            new_grammar = new_log.generate_grammar()
-            return new_grammar, new_log
+            new_gen = GrammarGenerator(self.config)
+            new_grammar = new_gen.generate_grammar()
+            return new_grammar, new_gen
 
-    def score(self, grammar, log):
+    def score(self, grammar, gen):
         """
         Scores the grammar according to each of the scoring criteria by calling
         the appropriate scoring function.
         Each scoring function is responsible for updating the score_map
         """
         for category in self.score_fns:
-            self.score_fns[category](self, grammar, log)
+            self.score_fns[category](self, grammar, gen)
 
     # SCORING FUNCTIONS
-    def pos(self, grammar, log):
+    def pos(self, grammar, gen):
         try:
             parser = grammar.parser()
         except:
@@ -55,9 +55,9 @@ class Scorer():
 
         pos_score = positive_correct / len(positive_examples)
         if pos_score > self.score_map['pos'][0]:
-            self.score_map['pos'] = (pos_score, grammar, log)
+            self.score_map['pos'] = (pos_score, grammar, gen)
 
-    def neg(self, grammar, log):
+    def neg(self, grammar, gen):
         try:
             parser = grammar.parser()
         except:
@@ -73,9 +73,9 @@ class Scorer():
 
         neg_score = 1 - (negative_correct / len(negative_examples))
         if neg_score > self.score_map['neg'][0]:
-            self.score_map['neg'] = (neg_score, grammar, log)
+            self.score_map['neg'] = (neg_score, grammar, gen)
 
-    def size(self, grammar, log):
+    def size(self, grammar, gen):
         total_rule_size = 0
         for rule_start, rule in grammar.rules.items():
             for body in rule.bodies:
@@ -83,11 +83,11 @@ class Scorer():
 
         size_score = 4 / total_rule_size
         if size_score > self.score_map['size'][0]:
-            self.score_map['size'] = (size_score, grammar, log)
+            self.score_map['size'] = (size_score, grammar, gen)
 
-    def ratio(self, grammar, log):
+    def ratio(self, grammar, gen):
         num_t, num_n = 0, 0
-        for rule_node in log.grammar_node.children:
+        for rule_node in gen.grammar_node.children:
             for symbol_node in rule_node.children:
                 if symbol_node.is_terminal:
                     num_t += 1
@@ -96,14 +96,14 @@ class Scorer():
 
         ratio_score = 1 - 2 * abs(num_n / (num_n + num_t) - 1/2)
         if ratio_score > self.score_map['ratio'][0]:
-            self.score_map['ratio'] = (ratio_score, grammar, log)
+            self.score_map['ratio'] = (ratio_score, grammar, gen)
 
-    def variance(self, grammar, log):
+    def variance(self, grammar, gen):
         max_terminals = len(self.config['TERMINALS'])
         max_nonterminals = len(self.config['NONTERMINALS'])
 
         seen_terminals, seen_nonterminals = set(), set()
-        for rule_node in log.grammar_node.children:
+        for rule_node in gen.grammar_node.children:
             for symbol_node in rule_node.children:
                 if symbol_node.is_terminal:
                     seen_terminals.add(symbol_node.choice)
@@ -114,10 +114,10 @@ class Scorer():
 
         variance_score = t_variance * n_variance
         if variance_score > self.score_map['variance'][0]:
-            self.score_map['variance'] = (variance_score, grammar, log)
+            self.score_map['variance'] = (variance_score, grammar, gen)
 
-    def recur_cc(self, grammar, log):
-        nonterminals = log.config['NONTERMINALS']
+    def recur_cc(self, grammar, gen):
+        nonterminals = gen.config['NONTERMINALS']
         graph = Graph(['start'] + list(nonterminals))
         for rule_start, rule in grammar.rules.items():
             for rule_body in rule.bodies:
@@ -127,10 +127,10 @@ class Scorer():
 
         recur_cc_score = 1.0 if graph.is_connected() and graph.has_cycle() else 0.0
         if recur_cc_score > self.score_map['recur_cc'][0]:
-            self.score_map['recur_cc'] = (recur_cc_score, grammar, log)
+            self.score_map['recur_cc'] = (recur_cc_score, grammar, gen)
 
-    def finite(self, grammar, log):
-        nonterminals = log.config['NONTERMINALS']
+    def finite(self, grammar, gen):
+        nonterminals = gen.config['NONTERMINALS']
         X = set() # The set of all nonterminals that can expand to a finite string
         updated = True # Stop looping when there are no more updates
 
@@ -158,4 +158,4 @@ class Scorer():
 
         finite_score = 1.0 if len(X) == len(nonterminals) + 1 else 0.0 # Include 'start'
         if finite_score > self.score_map['finite'][0]:
-            self.score_map['finite'] = (finite_score, grammar, log)
+            self.score_map['finite'] = (finite_score, grammar, gen)

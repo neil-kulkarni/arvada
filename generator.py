@@ -1,7 +1,7 @@
 import random
 from grammar import Grammar, Rule
 
-class Log():
+class GrammarGenerator():
     """
     Tree-like structure to record random choices made during grammar creation.
     Used for play-back to recreate the same grammar or for mutation to recreate
@@ -18,7 +18,7 @@ class Log():
             self.grammar_node = node
 
     def copy(self):
-        return Log(self.config, self.grammar_node.copy())
+        return GrammarGenerator(self.config, self.grammar_node.copy())
 
     def mutate(self):
         self.grammar_node.mutate()

@@ -1,7 +1,7 @@
 import random
-from log import Log
 from score import Scorer
 from grammar import Grammar, Rule
+from generator import GrammarGenerator
 
 # Generate positive and negative examples
 # Soon, this will be replaced by an Oracle
@@ -29,25 +29,25 @@ DATA = {'positive_examples':positive_examples, 'negative_examples':negative_exam
 MAX_ITERS = 10000
 
 # Generate initial grammar and score it
-log = Log(CONFIG)
-grammar = log.generate_grammar()
-scorer = Scorer(CONFIG, DATA, grammar, log)
-scorer.score(grammar, log)
+gen = GrammarGenerator(CONFIG)
+grammar = gen.generate_grammar()
+scorer = Scorer(CONFIG, DATA, grammar, gen)
+scorer.score(grammar, gen)
 
 # Main Program Loop
 iterations = 0
 while iterations < MAX_ITERS:
-    good_grammar, good_log = scorer.sample_grammar()
-    new_log = good_log.copy()
-    new_log.mutate()
-    new_grammar = new_log.generate_grammar()
-    scorer.score(new_grammar, new_log)
+    good_grammar, good_gen = scorer.sample_grammar()
+    new_gen = good_gen.copy()
+    new_gen.mutate()
+    new_grammar = new_gen.generate_grammar()
+    scorer.score(new_grammar, new_gen)
     print('Iters:', iterations, '\tScores:', [v[0] for v in scorer.score_map.values()])
     iterations += 1
 
 print('\n\n====== RESULTS ======\n\n')
 for category in scorer.score_map:
-    score, grammar, log = scorer.score_map[category]
+    score, grammar, gen = scorer.score_map[category]
     print('Category:', category)
     print('Grammar:')
     print(grammar)
