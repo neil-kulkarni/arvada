@@ -12,8 +12,8 @@ class Scorer():
     def __init__(self, config, data, grammar, gen):
         self.config = config
         self.data = data
-        self.score_map = {'pos':(0, grammar, gen), 'neg':(0, grammar, gen), 'size':(0, grammar, gen), 'ratio':(0, grammar, gen), 'variance':(0, grammar, gen), 'compilation':(0, grammar, gen), 'recur_cc':(0, grammar, gen), 'finite':(0, grammar, gen)}
-        self.score_fns = {'pos':Scorer.pos, 'neg':Scorer.neg, 'size':Scorer.size, 'ratio':Scorer.ratio, 'variance':Scorer.variance, 'compilation':Scorer.compilation, 'recur_cc':Scorer.recur_cc, 'finite':Scorer.finite}
+        self.score_map = {'composite':(0, grammar, gen), 'pos':(0, grammar, gen), 'neg':(0, grammar, gen), 'size':(0, grammar, gen), 'ratio':(0, grammar, gen), 'variance':(0, grammar, gen), 'compilation':(0, grammar, gen), 'recur_cc':(0, grammar, gen), 'finite':(0, grammar, gen)}
+        self.score_fns = {'composite':Scorer.dummy, 'pos':Scorer.pos, 'neg':Scorer.neg, 'size':Scorer.size, 'ratio':Scorer.ratio, 'variance':Scorer.variance, 'compilation':Scorer.compilation, 'recur_cc':Scorer.recur_cc, 'finite':Scorer.finite}
 
     def sample_grammar(self):
         """
@@ -35,10 +35,16 @@ class Scorer():
         the appropriate scoring function.
         Each scoring function is responsible for updating the score_map
         """
+        composite_score = 1
         for category in self.score_fns:
-            self.score_fns[category](self, grammar, gen)
+            composite_score *= self.score_fns[category](self, grammar, gen)
+        if composite_score > self.score_map['composite'][0]:
+            self.score_map['composite'] = (composite_score, grammar, gen)
 
     # SCORING FUNCTIONS
+    def dummy(self, grammar, gen):
+        return 1
+
     def pos(self, grammar, gen):
         try:
             parser = grammar.parser()
@@ -56,6 +62,7 @@ class Scorer():
         pos_score = positive_correct / len(positive_examples)
         if pos_score > self.score_map['pos'][0]:
             self.score_map['pos'] = (pos_score, grammar, gen)
+        return pos_score
 
     def neg(self, grammar, gen):
         try:
@@ -74,6 +81,7 @@ class Scorer():
         neg_score = 1 - (negative_correct / len(negative_examples))
         if neg_score > self.score_map['neg'][0]:
             self.score_map['neg'] = (neg_score, grammar, gen)
+        return neg_score
 
     def size(self, grammar, gen):
         total_rule_size = 0
@@ -84,6 +92,7 @@ class Scorer():
         size_score = 4 / total_rule_size
         if size_score > self.score_map['size'][0]:
             self.score_map['size'] = (size_score, grammar, gen)
+        return size_score
 
     def ratio(self, grammar, gen):
         num_t, num_n = 0, 0
@@ -97,6 +106,7 @@ class Scorer():
         ratio_score = 1 - 2 * abs(num_n / (num_n + num_t) - 1/2)
         if ratio_score > self.score_map['ratio'][0]:
             self.score_map['ratio'] = (ratio_score, grammar, gen)
+        return ratio_score
 
     def variance(self, grammar, gen):
         max_terminals = len(self.config['TERMINALS'])
@@ -115,6 +125,7 @@ class Scorer():
         variance_score = t_variance * n_variance
         if variance_score > self.score_map['variance'][0]:
             self.score_map['variance'] = (variance_score, grammar, gen)
+        return variance_score
 
     def compilation(self, grammar, gen):
         try:
@@ -125,6 +136,7 @@ class Scorer():
 
         if compilation_score > self.score_map['compilation'][0]:
             self.score_map['compilation'] = (compilation_score, grammar, gen)
+        return compilation_score
 
     def recur_cc(self, grammar, gen):
         nonterminals = gen.config['NONTERMINALS']
@@ -138,6 +150,7 @@ class Scorer():
         recur_cc_score = 1.0 if graph.is_connected() and graph.has_cycle() else 0.0
         if recur_cc_score > self.score_map['recur_cc'][0]:
             self.score_map['recur_cc'] = (recur_cc_score, grammar, gen)
+        return recur_cc_score
 
     def finite(self, grammar, gen):
         nonterminals = gen.config['NONTERMINALS']
@@ -169,3 +182,4 @@ class Scorer():
         finite_score = 1.0 if len(X) == len(nonterminals) + 1 else 0.0 # Include 'start'
         if finite_score > self.score_map['finite'][0]:
             self.score_map['finite'] = (finite_score, grammar, gen)
+        return finite_score
