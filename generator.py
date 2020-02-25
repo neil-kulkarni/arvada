@@ -34,6 +34,24 @@ class GrammarGenerator():
         rhs = [symbol_node.choice for symbol_node in rule_node.children]
         return Rule(lhs).add_body(rhs)
 
+    def get_nonterminals(self):
+        nonterminals = set()
+        nonterminals.add(self.grammar_node.start)
+        for rule_node in self.grammar_node.children:
+            nonterminals.add(rule_node.lhs)
+            for symbol_node in rule_node.children:
+                if not symbol_node.is_terminal:
+                    nonterminals.add(symbol_node.choice)
+        return nonterminals
+
+    def get_terminals(self):
+        terminals = set()
+        for rule_node in self.grammar_node.children:
+            for symbol_node in rule_node.children:
+                if symbol_node.is_terminal:
+                    terminals.add(symbol_node.choice)
+        return terminals
+
     def __str__(self):
         return str(self.grammar_node)
 
@@ -210,8 +228,8 @@ class SymbolNode():
             new_index = random.randint(0, self.n - 1)
             self.choice = self.value(new_index)
 
-    def value(self, new_index):
-        return self.terminals[new_index] if self.is_terminal else self.nonterminals[new_index]
+    def value(self, index):
+        return self.terminals[index] if self.is_terminal else self.nonterminals[index]
 
     @property
     def n(self):

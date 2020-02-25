@@ -12,8 +12,9 @@ class Scorer():
     def __init__(self, config, data, grammar, gen):
         self.config = config
         self.data = data
-        self.score_map = {'composite':(0, grammar, gen), 'pos':(0, grammar, gen), 'neg':(0, grammar, gen), 'size':(0, grammar, gen), 'ratio':(0, grammar, gen), 'variance':(0, grammar, gen), 'compilation':(0, grammar, gen), 'recur_cc':(0, grammar, gen), 'finite':(0, grammar, gen)}
-        self.score_fns = {'composite':Scorer.dummy, 'pos':Scorer.pos, 'neg':Scorer.neg, 'size':Scorer.size, 'ratio':Scorer.ratio, 'variance':Scorer.variance, 'compilation':Scorer.compilation, 'recur_cc':Scorer.recur_cc, 'finite':Scorer.finite}
+        self.score_map = {'maximizer':(0, grammar, gen), 'composite':(0, grammar, gen), 'pos':(0, grammar, gen), 'neg':(0, grammar, gen), 'size':(0, grammar, gen), 'ratio':(0, grammar, gen), 'variance':(0, grammar, gen), 'compilation':(0, grammar, gen), 'recur_cc':(0, grammar, gen), 'finite':(0, grammar, gen)}
+        self.score_fns = {'maximizer':Scorer.dummy, 'composite':Scorer.dummy, 'pos':Scorer.pos, 'neg':Scorer.neg, 'size':Scorer.size, 'ratio':Scorer.ratio, 'variance':Scorer.variance, 'compilation':Scorer.compilation, 'recur_cc':Scorer.recur_cc, 'finite':Scorer.finite}
+        self.maximizers = ['pos', 'neg', 'compilation', 'finite', 'recur_cc']
 
     def sample_grammar(self):
         """
@@ -35,11 +36,16 @@ class Scorer():
         the appropriate scoring function.
         Each scoring function is responsible for updating the score_map
         """
-        composite_score = 1
+        composite_score, maximizer_score = 1, 1
         for category in self.score_fns:
-            composite_score *= self.score_fns[category](self, grammar, gen)
+            category_score = self.score_fns[category](self, grammar, gen)
+            composite_score *= category_score
+            if category in self.maximizers:
+                maximizer_score *= category_score
         if composite_score > self.score_map['composite'][0]:
             self.score_map['composite'] = (composite_score, grammar, gen)
+        if maximizer_score > self.score_map['maximizer'][0]:
+            self.score_map['maximizer'] = (maximizer_score, grammar, gen)
 
     # SCORING FUNCTIONS
     def dummy(self, grammar, gen):
@@ -139,7 +145,7 @@ class Scorer():
         return compilation_score
 
     def recur_cc(self, grammar, gen):
-        nonterminals = gen.config['NONTERMINALS']
+        nonterminals = gen.get_nonterminals()
         graph = Graph(['start'] + list(nonterminals))
         for rule_start, rule in grammar.rules.items():
             for rule_body in rule.bodies:
@@ -153,7 +159,7 @@ class Scorer():
         return recur_cc_score
 
     def finite(self, grammar, gen):
-        nonterminals = gen.config['NONTERMINALS']
+        nonterminals = gen.get_nonterminals()
         X = set() # The set of all nonterminals that can expand to a finite string
         updated = True # Stop looping when there are no more updates
 
