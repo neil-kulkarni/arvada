@@ -23,10 +23,10 @@ negative_examples = [generate_negative_example() for i in range(10)]
 
 # Configuration Options
 TERMINALS = ['"a"', '"b"']
-NONTERMINALS = ["T" + str(i) for i in range(0, 3)]
+NONTERMINALS = ["t" + str(i) for i in range(0, 3)]
 CONFIG = {'TERMINALS':TERMINALS, 'NONTERMINALS':NONTERMINALS, 'NUM_RULES':4, 'MAX_RHS_LEN':3}
 DATA = {'positive_examples':positive_examples, 'negative_examples':negative_examples}
-MAX_ITERS = 10000
+MAX_ITERS = 1000000
 
 # Generate initial grammar and score it
 gen = GrammarGenerator(CONFIG)
