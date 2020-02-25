@@ -12,8 +12,8 @@ class Scorer():
     def __init__(self, config, data, grammar, gen):
         self.config = config
         self.data = data
-        self.score_map = {'maximizer':(0, grammar, gen), 'composite':(0, grammar, gen), 'pos':(0, grammar, gen), 'neg':(0, grammar, gen), 'size':(0, grammar, gen), 'ratio':(0, grammar, gen), 'variance':(0, grammar, gen), 'compilation':(0, grammar, gen), 'recur_cc':(0, grammar, gen), 'finite':(0, grammar, gen)}
-        self.score_fns = {'maximizer':Scorer.dummy, 'composite':Scorer.dummy, 'pos':Scorer.pos, 'neg':Scorer.neg, 'size':Scorer.size, 'ratio':Scorer.ratio, 'variance':Scorer.variance, 'compilation':Scorer.compilation, 'recur_cc':Scorer.recur_cc, 'finite':Scorer.finite}
+        self.score_map = {'maximizer':(0, grammar, gen), 'size_maximizer':(0, grammar, gen), 'composite':(0, grammar, gen), 'pos':(0, grammar, gen), 'neg':(0, grammar, gen), 'size':(0, grammar, gen), 'ratio':(0, grammar, gen), 'variance':(0, grammar, gen), 'compilation':(0, grammar, gen), 'recur_cc':(0, grammar, gen), 'finite':(0, grammar, gen)}
+        self.score_fns = {'maximizer':Scorer.dummy, 'size_maximizer':Scorer.dummy, 'composite':Scorer.dummy, 'pos':Scorer.pos, 'neg':Scorer.neg, 'size':Scorer.size, 'ratio':Scorer.ratio, 'variance':Scorer.variance, 'compilation':Scorer.compilation, 'recur_cc':Scorer.recur_cc, 'finite':Scorer.finite}
         self.maximizers = ['pos', 'neg', 'compilation', 'finite', 'recur_cc']
 
     def sample_grammar(self):
@@ -36,16 +36,20 @@ class Scorer():
         the appropriate scoring function.
         Each scoring function is responsible for updating the score_map
         """
-        composite_score, maximizer_score = 1, 1
+        composite_score, maximizer_score, size_maximizer_score = 1, 1, 1
         for category in self.score_fns:
             category_score = self.score_fns[category](self, grammar, gen)
             composite_score *= category_score
             if category in self.maximizers:
                 maximizer_score *= category_score
+            if category in self.maximizers or category == 'size':
+                size_maximizer_score *= category_score
         if composite_score > self.score_map['composite'][0]:
             self.score_map['composite'] = (composite_score, grammar, gen)
         if maximizer_score > self.score_map['maximizer'][0]:
             self.score_map['maximizer'] = (maximizer_score, grammar, gen)
+        if size_maximizer_score > self.score_map['size_maximizer'][0]:
+            self.score_map['size_maximizer'] = (size_maximizer_score, grammar, gen)
 
     # SCORING FUNCTIONS
     def dummy(self, grammar, gen):
