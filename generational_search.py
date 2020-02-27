@@ -24,11 +24,13 @@ negative_examples = [generate_negative_example() for i in range(10)]
 DATA = {'positive_examples':positive_examples, 'negative_examples':negative_examples}
 
 def main(file_name, max_iters):
-    # Generate configuration options and initial grammar
-    CONFIG, gen, grammar = parse_input(file_name)
+    # Generate configuration options and oracle grammar
+    CONFIG, ORACLE_GEN, ORACLE = parse_input(file_name)
     MAX_ITERS = max_iters
 
-    # Generate scorer object and score initial grammar
+    # Generate intial grammar and score it
+    gen = GrammarGenerator(CONFIG)
+    grammar = gen.generate_grammar()
     scorer = Scorer(CONFIG, DATA, grammar, gen)
     scorer.score(grammar, gen)
 
