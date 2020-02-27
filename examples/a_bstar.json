@@ -1,0 +1,22 @@
+{
+  "config":
+  {
+    "TERMINALS": ["a", "b"],
+    "NONTERMINALS": ["t0", "t1", "t2"],
+    "NUM_RULES": 4,
+    "MAX_RHS_LEN": 3
+  },
+  "grammar":
+  {
+    "start": "t0",
+    "rules": [
+      {
+        "start": "t0",
+        "bodies": [
+          ["t0", "a"],
+          ["b"]
+        ]
+      }
+    ]
+  }
+}
