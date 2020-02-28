@@ -1,14 +1,16 @@
+import random
+
 class ParseTree():
     def __init__(self, gen):
         self.gen = gen
         self.root = ParseNode(gen.grammar_node.start, False, [])
 
-    def sample_unique(self, n):
+    def sample_strings(self, n):
         """
         Samples n unique strings from the parse tree.
         """
         samples = set()
-        while len(samples) < n:
+        for i in range(n):
             samples.add(self.sample_string())
         return samples
 
@@ -18,7 +20,7 @@ class ParseTree():
 
     def sample_string_from_node(self, parse_node):
         if parse_node.is_terminal:
-            return parse_node.payload
+            return parse_node.payload.replace('"', '')
         return ''.join([self.sample_string_from_node(child_node) for child_node in parse_node.children])
 
     def generate_tree(self):

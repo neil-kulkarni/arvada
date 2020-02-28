@@ -1,32 +1,20 @@
 import random, sys, os
 from score import Scorer
 from input import parse_input
+from parse_tree import ParseTree
 from grammar import Grammar, Rule
 from generator import GrammarGenerator
-
-# Generate positive and negative examples
-# Soon, this will be replaced by an Oracle
-def generate_negative_example():
-    example = ""
-    n_chars = random.randint(1, 10)
-    for _ in range(n_chars):
-        if random.randint(0, 1) == 1:
-            example += "a"
-        else:
-            example += "b"
-    if example in positive_examples:
-        return generate_negative_example()
-    else:
-        return example
-
-positive_examples = ['b' + 'a'*i for i in range(10)]
-negative_examples = [generate_negative_example() for i in range(10)]
-DATA = {'positive_examples':positive_examples, 'negative_examples':negative_examples}
 
 def main(file_name, max_iters):
     # Generate configuration options and oracle grammar
     CONFIG, ORACLE_GEN, ORACLE = parse_input(file_name)
+    POS_EXAMPLES = CONFIG['POS_EXAMPLES']
     MAX_ITERS = max_iters
+
+    # Generate positive examples
+    oracle_parse_tree = ParseTree(ORACLE_GEN)
+    positive_examples = oracle_parse_tree.sample_strings(POS_EXAMPLES)
+    DATA = {'positive_examples':positive_examples, 'oracle_parser':ORACLE.parser()}
 
     # Generate intial grammar and score it
     gen = GrammarGenerator(CONFIG)
@@ -60,6 +48,7 @@ if __name__ == '__main__':
     else:
         try:
             max_iters = int(sys.argv[2])
-            main(sys.argv[1], max_iters)
         except:
             print('Usage: python3 generational_search.py <input_file> <max_iters>')
+            exit()
+        main(sys.argv[1], max_iters)
