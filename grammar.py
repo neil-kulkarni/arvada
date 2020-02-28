@@ -15,9 +15,6 @@ class Grammar():
         start_rule.add_body([start])
         self.rules = {'start':start_rule}
 
-        # Optionally store a log that created the grammar
-        self.log = None
-
         # Define cacheable values and their dirty bits
         self.cached_str = ""
         self.cached_str_valid = False
