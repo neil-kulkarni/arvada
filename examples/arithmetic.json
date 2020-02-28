@@ -1,0 +1,32 @@
+{
+  "config":
+  {
+    "TERMINALS": ["int", "+", "*", "(", ")"],
+    "NONTERMINALS": ["t0", "t1", "t2"],
+    "NUM_RULES": 7,
+    "MAX_RHS_LEN": 5,
+    "POS_EXAMPLES": 10,
+    "NEG_EXAMPLES": 100
+  },
+  "grammar":
+  {
+    "start": "t0",
+    "rules": [
+      {
+        "start": "t0",
+        "bodies": [
+          ["t0", "+", "t1"],
+          ["t1"]
+        ]
+      },
+      {
+        "start": "t1",
+        "bodies": [
+          ["t1", "*", "int"],
+          ["int"],
+          ["(", "t0", ")"]
+        ]
+      }
+    ]
+  }
+}
