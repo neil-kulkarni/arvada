@@ -7,7 +7,8 @@ class ParseTree():
 
     def sample_strings(self, n):
         """
-        Samples n unique strings from the parse tree.
+        Samples n random strings from the parse tree.
+        Returns the unique subset of these.
         """
         samples = set()
         for i in range(n):

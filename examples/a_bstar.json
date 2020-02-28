@@ -5,8 +5,9 @@
     "NONTERMINALS": ["t0", "t1", "t2"],
     "NUM_RULES": 4,
     "MAX_RHS_LEN": 3,
-    "POS_EXAMPLES": 10,
-    "NEG_EXAMPLES": 100
+    "POS_EXAMPLES": 100,
+    "NEG_EXAMPLES": 100,
+    "MAX_NEG_EXAMPLE_SIZE":100
   },
   "grammar":
   {

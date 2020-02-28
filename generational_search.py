@@ -8,13 +8,15 @@ from generator import GrammarGenerator
 def main(file_name, max_iters):
     # Generate configuration options and oracle grammar
     CONFIG, ORACLE_GEN, ORACLE = parse_input(file_name)
-    POS_EXAMPLES = CONFIG['POS_EXAMPLES']
-    MAX_ITERS = max_iters
+    POS_EXAMPLES, NEG_EXAMPLES = CONFIG['POS_EXAMPLES'], CONFIG['NEG_EXAMPLES']
+    MAX_ITERS, MAX_NEG_EXAMPLE_SIZE = max_iters, CONFIG['MAX_NEG_EXAMPLE_SIZE']
+    TERMINALS = CONFIG['TERMINALS']
 
     # Generate positive examples
     oracle_parse_tree = ParseTree(ORACLE_GEN)
     positive_examples = oracle_parse_tree.sample_strings(POS_EXAMPLES)
-    DATA = {'positive_examples':positive_examples, 'oracle_parser':ORACLE.parser()}
+    negative_examples = ORACLE.sample_negatives(NEG_EXAMPLES, TERMINALS, MAX_NEG_EXAMPLE_SIZE)
+    DATA = {'positive_examples':positive_examples, 'negative_examples':negative_examples}
 
     # Generate intial grammar and score it
     gen = GrammarGenerator(CONFIG)

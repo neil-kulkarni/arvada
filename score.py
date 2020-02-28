@@ -81,25 +81,15 @@ class Scorer():
         except:
             return 0
 
-        # Get NEG_EXAMPLES samples from the test grammar
-        # Quit if the grammar infinitely recurses
-        try:
-            NEG_EXAMPLES = self.config['NEG_EXAMPLES']
-            parse_tree = ParseTree(gen)
-            negative_examples = parse_tree.sample_strings(NEG_EXAMPLES)
-        except:
-            return 0
-
-        # Record the percentage of these that match the oracle parser
-        oracle_parser, negative_correct = self.data['oracle_parser'], 0
+        negative_examples, negative_correct = self.data['negative_examples'], 0
         for negative_example in negative_examples:
             try:
-                oracle_parser.parse(negative_example)
+                parser.parse(negative_example)
                 negative_correct += 1
             except:
                 pass
 
-        neg_score = negative_correct / len(negative_examples)
+        neg_score = 1 - (negative_correct / len(negative_examples))
         if neg_score > self.score_map['neg'][0]:
             self.score_map['neg'] = (neg_score, grammar, gen)
         return neg_score

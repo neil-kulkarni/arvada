@@ -1,4 +1,5 @@
 from lark import Lark
+import random
 
 class Grammar():
     """
@@ -39,6 +40,31 @@ class Grammar():
         self.cached_parser = Lark(str(self))
         self.cached_parser_valid = True
         return self.cached_parser
+
+    def sample_negatives(self, n, terminals, max_size):
+        """
+        Samples n random strings that do not belong to the grammar.
+        Returns the unique subset of these.
+        """
+        samples = set()
+        for i in range(n):
+            samples.add(self.generate_negative_example(terminals, max_size))
+        return samples
+
+    def generate_negative_example(self, terminals, max_size):
+        # Generate the negative example by choosing randomly from the set of terminals
+        negative_example = ""
+        n_chars = random.randint(1, max_size)
+        for _ in range(n_chars):
+            rindex = random.randint(0, len(terminals) - 1)
+            negative_example += terminals[rindex]
+
+        # Check if the negative example is in the grammar. Try again if so.
+        try:
+            self.parser().parse(negative_example)
+            return self.generate_negative_example()
+        except:
+            return negative_example
 
     def __str__(self):
         if self.cached_str_valid:
