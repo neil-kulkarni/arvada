@@ -1,6 +1,9 @@
 import random
 
 class ParseTree():
+
+    MAX_TREE_DEPTH = 100
+
     def __init__(self, gen):
         self.gen = gen
         self.root = ParseNode(gen.grammar_node.start, False, [])
@@ -37,7 +40,7 @@ class ParseTree():
         self.root.children.clear()
         return self.generate_tree_from_node(self.root)
 
-    def generate_tree_from_node(self, parse_node):
+    def generate_tree_from_node(self, parse_node, depth=0):
         """
         Mutates an aribtrary parse_node to the the root of a parse tree
         """
@@ -45,7 +48,7 @@ class ParseTree():
             return
 
         # Sample a random rule (as a RuleNode) whose start is the parse_node's payload
-        sampled_rule = self.sample_rule_node(parse_node.payload)
+        sampled_rule = self.sample_rule_node(parse_node.payload, depth)
 
         # Let the symbols in the production of the sampled rule be children of
         # the current node in the parse tree
@@ -55,16 +58,32 @@ class ParseTree():
 
         # Recurse through each of the children to further build the parse tree
         for child_node in parse_node.children:
-            self.generate_tree_from_node(child_node)
+            self.generate_tree_from_node(child_node, depth + 1)
 
-    def sample_rule_node(self, rule_start):
+    def sample_rule_node(self, rule_start, depth):
         """
         Takes in a string representation of a nonterminal, rule_start, and returns
         a random RuleNode starting with rule_start from the generator's grammar_node.
+        If the depth exceeds the maximum possible depth, we filter the set of
+        RuleNodes starting with rule_start to be the set of RuleNodes containing
+        the minimum possible amount of nonterminals.
         """
-        rules_with_start = [rule_node.lhs == rule_start for rule_node in self.gen.grammar_node.children]
+        rules_with_start = [rule_node for rule_node in self.gen.grammar_node.children if rule_node.lhs == rule_start]
+
+        if depth > ParseTree.MAX_TREE_DEPTH:
+            # Find the smallest number of nonterminals among any of the RuleNodes
+            # in rules_with_start
+            number_nonterminals = []
+            for rule_node in rules_with_start:
+                number_nonterminals.append(sum([not symbol_node.is_terminal for symbol_node in rule_node.children]))
+            min_nonterminals = min(number_nonterminals)
+
+            # Filter rules_with_start to contain only the rules that have the
+            # smallest number of nonterminals
+            rules_with_start = [rules_with_start[i] for i in range(len(rules_with_start)) if number_nonterminals[i] == min_nonterminals]
+
         rind = random.randint(0, len(rules_with_start) - 1)
-        return self.gen.grammar_node.children[rind]
+        return rules_with_start[rind]
 
 class ParseNode():
     def __init__(self, payload, is_terminal, children):
