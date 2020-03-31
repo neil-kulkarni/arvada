@@ -58,6 +58,7 @@ class Grammar():
         for _ in range(n_chars):
             rindex = random.randint(0, len(terminals) - 1)
             negative_example += terminals[rindex]
+        negative_example = negative_example.replace('"', '')
 
         # Check if the negative example is in the grammar. Try again if so.
         try:
