@@ -1,4 +1,4 @@
-import random, sys, os
+import random, sys, os, signal
 from score import Scorer
 from input import parse_input
 from parse_tree import ParseTree
@@ -24,14 +24,20 @@ def main(file_name, max_iters):
     scorer = Scorer(CONFIG, DATA, grammar, gen)
     scorer.score(grammar, gen)
 
+    # Register signal handler that allows us to asynchronously peek at the grammar
+    def signal_handler(sig, frame):
+        print(grammar)
+
+    signal.signal(signal.SIGINT, signal_handler)
+
     # Main Program Loop
     iterations = 0
     while iterations < MAX_ITERS:
         good_grammar, good_gen = scorer.sample_grammar()
-        new_gen = good_gen.copy()
-        new_gen.mutate()
-        new_grammar = new_gen.generate_grammar()
-        scorer.score(new_grammar, new_gen)
+        gen = good_gen.copy()
+        gen.mutate()
+        grammar = gen.generate_grammar()
+        scorer.score(grammar, gen)
         print('Iters:', iterations, '\tScores:', [v[0] for v in scorer.score_map.values()])
         iterations += 1
 
