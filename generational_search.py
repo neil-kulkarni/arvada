@@ -10,11 +10,11 @@ def main(file_name, max_iters):
     CONFIG, ORACLE_GEN, ORACLE = parse_input(file_name)
     POS_EXAMPLES, NEG_EXAMPLES = CONFIG['POS_EXAMPLES'], CONFIG['NEG_EXAMPLES']
     MAX_ITERS, MAX_NEG_EXAMPLE_SIZE = max_iters, CONFIG['MAX_NEG_EXAMPLE_SIZE']
-    TERMINALS = CONFIG['TERMINALS']
+    TERMINALS, MAX_TREE_DEPTH = CONFIG['TERMINALS'], CONFIG['MAX_TREE_DEPTH']
 
     # Generate positive examples
     oracle_parse_tree = ParseTree(ORACLE_GEN)
-    positive_examples = oracle_parse_tree.sample_strings(POS_EXAMPLES)
+    positive_examples = oracle_parse_tree.sample_strings(POS_EXAMPLES, MAX_TREE_DEPTH)
     negative_examples = ORACLE.sample_negatives(NEG_EXAMPLES, TERMINALS, MAX_NEG_EXAMPLE_SIZE)
     DATA = {'positive_examples':positive_examples, 'negative_examples':negative_examples}
 
