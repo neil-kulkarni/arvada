@@ -13,7 +13,7 @@ def main(txt_file_name, json_file_name):
 
     # The first line of the file is the set of terminals. The rest are rules.
     terminals = [token.strip() for token in lines[0].split(',')]
-    rules = lines[1:]
+    rules = coalesce_rules(lines[1:])
 
     # Create and mutate the rule_map before dumping it to JSON
     rule_map = get_rule_map(rules)
@@ -106,6 +106,29 @@ def get_rule_map(rules):
         rule_name, rule_body = rule_name.strip(), rule_body.strip()
         rule_map[rule_name] = [body.strip() for body in rule_body.split('|')]
     return rule_map
+
+# Takes in a list where some rules are split among multiple lines and
+# coalesces them so that each rule belongs to one line (one entry of rules)
+def coalesce_rules(rules):
+    rule_idx, ptr = 0, 1
+    while rule_idx < len(rules):
+        # rule_idx points to a real rule, and ptr points directly after that
+        # Loop through and add this rule's | statements to the rule
+        while ptr < len(rules) and ':=' not in rules[ptr]:
+            rules[rule_idx] += ' ' + rules[ptr]
+            ptr += 1
+
+        # Now, the real rule has been updated to include all if its
+        # | statements, and ptr points to the next real rule OR
+        # it points past the end of the list
+        # Set rule_idx to point to the next real rule, and ptr to points
+        # directly after that to reset our loop invariant
+        rule_idx = ptr
+        ptr = ptr + 1
+
+    # Finally, prune out all | lines, since they were not removed
+    # in the above loop
+    return [rule for rule in rules if ':=' in rule]
 
 # Input lines starting with a # are comment lines and should be ignored
 # Ignore all empty lines and lines containing only whitespace
