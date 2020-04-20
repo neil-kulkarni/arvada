@@ -45,7 +45,7 @@ class GrammarGenerator():
         return nonterminals
 
     def get_terminals(self):
-        terminals = set()
+        terminals = set() # Includes the epsilon terminal
         for rule_node in self.grammar_node.children:
             for symbol_node in rule_node.children:
                 if symbol_node.is_terminal:
@@ -201,6 +201,7 @@ class RuleNode():
 class SymbolNode():
     """
     Represents a choice made for a symbol (a terminal or a nonterminal).
+    The epsilon terminal is defined by a choice of ''.
     """
     def __init__(self, config, choice, is_terminal):
         self.config = config
@@ -236,7 +237,7 @@ class SymbolNode():
         return self.len_t if self.is_terminal else self.len_n
 
     def __str__(self):
-        return self.choice
+        return self.choice if len(self.choice) > 0 else '\u03B5'
 
 # Example Configuration Options
 # TERMINALS = ['"a"', '"b"']
