@@ -92,6 +92,7 @@ class ParseNode():
         Payload is a string representing either a terminal or a nonterminal.
         The boolean flag is_terminal differentiates between the two.
         Children of a ParseNode are also ParseNodes.
+        The payload of the epsilon terminal is the empty string.
         """
         self.payload = payload
         self.children = children
