@@ -9,6 +9,7 @@ def parse_input(file_name):
 
     # Create configuration options and grammar
     config = d['config']
+    config['TERMINALS'] += [''] # Add in the epsilon terminal implicitly
     gen, grammar = generator_from_dict(d['grammar'], config)
 
     # Clean the terminals configuration option to double quote terminals
@@ -16,6 +17,9 @@ def parse_input(file_name):
     return config, gen, grammar
 
 def clean_terminal(terminal):
+    # The epsilon terminal should not appear in quotes
+    if len(terminal) == 0:
+        return terminal
     return '"%s"' % terminal
 
 def clean_terminals(config):
