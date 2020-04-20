@@ -114,8 +114,8 @@ class Rule():
         return ' '.join([b if len(b) > 0 else '\u03B5' for b in body])
 
 # Example grammar with nonterminals n1, n2 and terminals a, b
-grammar = Grammar('n1')
-grammar.add_rule(Rule('n1').add_body(['n2', '"a"']).add_body(['']))
-grammar.add_rule(Rule('n2').add_body(['', 'n1', '']))
-parser = grammar.parser()
-print(parser.parse("aa").pretty())
+# grammar = Grammar('n1')
+# grammar.add_rule(Rule('n1').add_body(['n2', '"a"']).add_body(['']))
+# grammar.add_rule(Rule('n2').add_body(['', 'n1', '']))
+# parser = grammar.parser()
+# print(parser.parse("aa").pretty())
