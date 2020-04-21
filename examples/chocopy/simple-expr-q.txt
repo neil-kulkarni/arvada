@@ -1,0 +1,24 @@
+# Terminals
+None, True, False, INT, IDSTR, STR, ID, +, -, *, //, %, ==, !=, <=, >=, <, >, is, not, and, or, if, else, (, ), NEWLINE
+
+# Grammar
+# The first rule in the grammar specifies the start nonterminal
+program := stmt/+
+
+stmt := expr NEWLINE
+
+expr := cexpr
+  | not expr
+  | expr and expr
+  | expr or expr
+  | expr if expr else expr
+
+literal := None | True | False | INT | IDSTR | STR
+
+cexpr := ID
+  | literal
+  | ( expr )
+  | ID ( expr )
+  | cexpr bin_op cexpr
+
+bin_op := + | - | * | // | % | == | != | <= | >= | < | > | is

@@ -35,7 +35,8 @@ def main(txt_file_name, json_file_name):
         rule_dict['bodies'] = []
 
         for rule_body in rule_bodies:
-            rule_dict['bodies'].append(rule_body.split())
+            split_body = [token if token != '/eps' else '' for token in rule_body.split()]
+            rule_dict['bodies'].append(split_body)
 
         json_repr['grammar']['rules'].append(rule_dict)
 
