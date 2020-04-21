@@ -14,6 +14,7 @@ def main(txt_file_name, json_file_name):
     # The first line of the file is the set of terminals. The rest are rules.
     terminals = [token.strip() for token in lines[0].split(',')]
     terminals = [t if t != 'COMMA' else ',' for t in terminals]
+    terminals = list(set(terminals)) # Clear duplicates, if any
     rules = coalesce_rules(lines[1:])
 
     # Create and mutate the rule_map before dumping it to JSON
