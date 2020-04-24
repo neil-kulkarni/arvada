@@ -67,6 +67,34 @@ class Grammar():
         except:
             return negative_example
 
+    def generate_positive_example(self, max_depth, start_nonterminal='start', cur_depth=0):
+        """
+        Samples a random positive example from the grammar, with max_depth as much as possible.
+        """
+        # Helper function: gets all the nonterminals for a body
+        def body_nonterminals(grammar, body):
+            nonterminals = []
+            for item in body:
+                if item in grammar.rules:
+                    nonterminals.append(item)
+            return nonterminals
+        bodies = self.rules[start_nonterminal].bodies
+        # If we've reached the max depth, try to choose a non-recursive rule.
+        if cur_depth >= max_depth:
+            terminal_bodies = [body for body in bodies if len(body_nonterminals(self, body)) == 0]
+            if len(terminal_bodies) > 0:
+                terminal_body = terminal_bodies[random.randint(0, len(terminal_bodies)-1)]
+                return "".join([elem.replace('"', '') for elem in terminal_body])
+            # Otherwise... guess we'll have to try to stop later. 
+        body_to_expand = bodies[random.randint(0, len(bodies) -1)]
+        nonterminals_to_expand = body_nonterminals(self, body_to_expand)
+        expanded_body = [self.generate_positive_example(max_depth, elem, cur_depth + 1) 
+                                if elem in nonterminals_to_expand 
+                                else elem.replace('"', '') 
+                                for elem in body_to_expand]
+        return "".join(expanded_body)
+
+
     def __str__(self):
         if self.cached_str_valid:
             return self.cached_str
