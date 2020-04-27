@@ -1,0 +1,47 @@
+{
+  "config": {
+    "TERMINALS": ["<a", "=", ">", "</a>", "SPACE", "TEXT"],
+    "NONTERMINALS": ["A", "BODY", "ATTRLIST", "ATTR", "SPACES"],
+    "NUM_RULES": 15,
+    "MAX_RHS_LEN" : 10,
+    "POS_EXAMPLES": 100,
+    "NEG_EXAMPLES": 100,
+    "MAX_NEG_EXAMPLE_SIZE": 50,
+    "MAX_TREE_DEPTH": 5
+
+  },
+  "grammar": {
+    "start": "A",
+    "rules": [{
+      "start": "A",
+      "bodies": [
+        ["<a", "SPACES", "ATTRLIST", ">", "BODY", "</a>"],
+        ["<a", ">", "BODY", "</a>"]
+      ]
+    }, {
+      "start": "BODY",
+      "bodies": [
+        ["A"],
+        ["TEXT"],
+        ["A", "BODY"]
+      ]
+    }, {
+      "start": "ATTRLIST",
+      "bodies": [
+        ["ATTR"],
+        ["ATTR", "SPACE", "ATTRLIST"]
+      ]
+    }, {
+      "start": "ATTR",
+      "bodies": [
+        ["TEXT", "=", "TEXT"]
+      ]
+    }, {
+      "start": "SPACES",
+      "bodies": [
+        ["SPACE"],
+        ["SPACE", "SPACES"]
+      ]
+    }]
+  }
+}

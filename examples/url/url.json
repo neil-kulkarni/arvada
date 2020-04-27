@@ -1,0 +1,84 @@
+{
+  "config": {
+    "TERMINALS": ["http", "https", "://", "www.", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "-", "."],
+    "NONTERMINALS": ["url", "B", "C", "char_p", "char"],
+    "NUM_RULES": 10,
+    "MAX_RHS_LEN": 7,
+    "POS_EXAMPLES": 50,
+    "NEG_EXAMPLES": 50,
+    "MAX_NEG_EXAMPLE_SIZE": 100,
+    "MAX_TREE_DEPTH": 7
+  },
+  "grammar": {
+    "start": "url",
+    "rules": [{
+      "start": "url",
+      "bodies": [
+        ["http", "://", "B", ".", "C"],
+        ["https", "://", "B", ".", "C"],
+        ["http", "://", "www.", "B", ".", "C"],
+        ["https", "://", "www.", "B", ".", "C"]
+      ]
+    }, {
+      "start": "B",
+      "bodies": [
+        ["char"],
+        ["char", "B"],
+        ["char", "char_p", "B"]
+      ]
+    }, {
+      "start": "C",
+      "bodies": [
+        ["char"],
+        ["char", "C"]
+      ]
+    }, {
+      "start": "char_p",
+      "bodies": [
+        ["char"],
+        ["."],
+        ["-"]
+      ]
+    }, {
+      "start": "char",
+      "bodies": [
+        ["a"],
+        ["b"],
+        ["c"],
+        ["d"],
+        ["e"],
+        ["f"],
+        ["g"],
+        ["h"],
+        ["i"],
+        ["j"],
+        ["k"],
+        ["l"],
+        ["m"],
+        ["n"],
+        ["o"],
+        ["p"],
+        ["q"],
+        ["r"],
+        ["s"],
+        ["t"],
+        ["u"],
+        ["v"],
+        ["w"],
+        ["x"],
+        ["y"],
+        ["z"],
+        ["0"],
+        ["1"],
+        ["2"],
+        ["3"],
+        ["4"],
+        ["5"],
+        ["6"],
+        ["7"],
+        ["8"],
+        ["9"]
+      ]
+    }]
+  }
+}

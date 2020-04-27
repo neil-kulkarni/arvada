@@ -1,0 +1,10 @@
+<a, =", ", >, </a>, SPACE, a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z
+
+A := <a SPACES ATTRLIST > BODY </a> | <a > BODY </a>
+BODY := A | TEXT | A BODY | TEXT BODY
+TEXT := a | a TEXT | b | b TEXT | c | c TEXT | d | d TEXT | e | e TEXT | f | f TEXT | g | g TEXT | h | h TEXT | i | i TEXT | j | j TEXT | k | k TEXT | l | l TEXT | m | m TEXT | n | n TEXT | o | o TEXT | p | p TEXT | q | q TEXT | r | r TEXT | s | s TEXT | t | t TEXT | u | u TEXT | v | v TEXT | w | w TEXT | x | x TEXT | y | y TEXT | z | z TEXT
+
+ATTRLIST := ATTR | ATTR ATTRLIST
+ATTR := TEXT =" TEXT "
+SPACES := SPACE | SPACE SPACES
+
