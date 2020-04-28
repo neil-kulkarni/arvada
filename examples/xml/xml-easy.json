@@ -7,7 +7,7 @@
     "POS_EXAMPLES": 100,
     "NEG_EXAMPLES": 100,
     "MAX_NEG_EXAMPLE_SIZE": 50,
-    "MAX_TREE_DEPTH": 5
+    "MAX_TREE_DEPTH": 7
 
   },
   "grammar": {
@@ -16,7 +16,9 @@
       "start": "A",
       "bodies": [
         ["<a", "SPACES", "ATTRLIST", ">", "BODY", "</a>"],
-        ["<a", ">", "BODY", "</a>"]
+        ["<a", "SPACES", "ATTRLIST", ">", "</a>"],
+        ["<a", ">", "BODY", "</a>"],
+        ["<a", ">",  "</a>"]
       ]
     }, {
       "start": "BODY",

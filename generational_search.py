@@ -14,6 +14,23 @@ def main(file_name, log_file, max_iters):
 
     # Generate positive examples
     oracle_parse_tree = ParseTree(ORACLE_GEN)
+    positive_examples = []
+    num_steps = len(list(range(1, MAX_TREE_DEPTH)))
+    buckets = 2 * num_steps
+    num_per_bucket = POS_EXAMPLES // buckets
+    extra = POS_EXAMPLES - num_per_bucket * buckets
+    for i in range(1, MAX_TREE_DEPTH):
+        mid = (MAX_TREE_DEPTH -1 + 1)/2
+        if i == 1:
+            positive_examples.extend(oracle_parse_tree.sample_strings(num_per_bucket * 3 + extra, i))
+        elif i < mid:
+            positive_examples.extend(oracle_parse_tree.sample_strings(num_per_bucket * 3, i))
+        elif i > mid:
+            positive_examples.extend(oracle_parse_tree.sample_strings(num_per_bucket, i))
+        elif i == mid:
+            positive_examples.extend(oracle_parse_tree.sample_strings(num_per_bucket * 2, i))
+
+
     positive_examples = oracle_parse_tree.sample_strings(POS_EXAMPLES, MAX_TREE_DEPTH)
     print(len(positive_examples))
     negative_examples = ORACLE.sample_negatives(NEG_EXAMPLES, TERMINALS, MAX_NEG_EXAMPLE_SIZE)
