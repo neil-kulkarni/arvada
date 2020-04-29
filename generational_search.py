@@ -1,11 +1,33 @@
 import random, sys, os
+import time
 from score import Scorer
 from input import parse_input
 from parse_tree import ParseTree
 from grammar import Grammar, Rule
 from generator import GrammarGenerator
 
+def fancy_positive_sampling(oracle_parse_tree, POS_EXAMPLES, MAX_TREE_DEPTH):
+    positive_examples = []
+    MIN_DEPTH=2
+    num_steps = len(list(range(MIN_DEPTH, MAX_TREE_DEPTH)))
+    buckets = 2 * num_steps
+    num_per_bucket = POS_EXAMPLES // buckets
+    extra = POS_EXAMPLES - num_per_bucket * buckets
+    mid = (MAX_TREE_DEPTH -1 + MIN_DEPTH)/2
+    for i in range(MIN_DEPTH, MAX_TREE_DEPTH):
+        if i == MIN_DEPTH:
+            positive_examples.extend(oracle_parse_tree.sample_strings(num_per_bucket * 3 + extra, i))
+        elif i < mid:
+            positive_examples.extend(oracle_parse_tree.sample_strings(num_per_bucket * 3, i))
+        elif i > mid:
+            positive_examples.extend(oracle_parse_tree.sample_strings(num_per_bucket, i))
+        elif i == mid:
+            positive_examples.extend(oracle_parse_tree.sample_strings(num_per_bucket * 2, i))
+    return positive_examples
+
+
 def main(file_name, log_file, max_iters):
+    start_time = time.time()
     # Generate configuration options and oracle grammar
     CONFIG, ORACLE_GEN, ORACLE = parse_input(file_name)
     POS_EXAMPLES, NEG_EXAMPLES = CONFIG['POS_EXAMPLES'], CONFIG['NEG_EXAMPLES']
@@ -14,25 +36,17 @@ def main(file_name, log_file, max_iters):
 
     # Generate positive examples
     oracle_parse_tree = ParseTree(ORACLE_GEN)
-    positive_examples = []
-    num_steps = len(list(range(1, MAX_TREE_DEPTH)))
-    buckets = 2 * num_steps
-    num_per_bucket = POS_EXAMPLES // buckets
-    extra = POS_EXAMPLES - num_per_bucket * buckets
-    for i in range(1, MAX_TREE_DEPTH):
-        mid = (MAX_TREE_DEPTH -1 + 1)/2
-        if i == 1:
-            positive_examples.extend(oracle_parse_tree.sample_strings(num_per_bucket * 3 + extra, i))
-        elif i < mid:
-            positive_examples.extend(oracle_parse_tree.sample_strings(num_per_bucket * 3, i))
-        elif i > mid:
-            positive_examples.extend(oracle_parse_tree.sample_strings(num_per_bucket, i))
-        elif i == mid:
-            positive_examples.extend(oracle_parse_tree.sample_strings(num_per_bucket * 2, i))
-
-
     positive_examples = oracle_parse_tree.sample_strings(POS_EXAMPLES, MAX_TREE_DEPTH)
-    print(len(positive_examples))
+
+    try:
+        # Test to make sure at least the oracle runs
+        OR_PARSER = ORACLE.parser()
+        OR_PARSER.parse(next(iter(positive_examples))) # Throws an exception if lark fails
+    except Exception as e:
+        print(f"Oops! Lark couldn't parse the first positive example. Here's the error:\n {e.__str__()}\n")
+        print("Fix your grammar. Exiting now.")
+        exit(1)
+
     negative_examples = ORACLE.sample_negatives(NEG_EXAMPLES, TERMINALS, MAX_NEG_EXAMPLE_SIZE)
     DATA = {'positive_examples': positive_examples, 'negative_examples': negative_examples}
 
@@ -50,6 +64,7 @@ def main(file_name, log_file, max_iters):
         print("Negative Examples:", file=f)
         for neg in negative_examples:
             print(neg, file=f)
+        print("Target grammar:\n{}\n".format(ORACLE.__str__()), file=f)
         print('\n\n====== RESULTS ======\n\n', file=f)
         for category in scorer.score_map:
             score, grammar, gen = scorer.score_map[category]
@@ -58,7 +73,7 @@ def main(file_name, log_file, max_iters):
             print(grammar, file=f)
             print('Score:', score, file=f)
             print(file=f)
-
+        print(f"Time elapsed: {time.time()-start_time} seconds, Iterations: {iterations}", file=f)
 
     # Main Program Loop
     iterations = 0

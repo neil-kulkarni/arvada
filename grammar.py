@@ -36,7 +36,6 @@ class Grammar():
     def parser(self):
         if self.cached_parser_valid:
             return self.cached_parser
-
         self.cached_parser = Lark(str(self))
         self.cached_parser_valid = True
         return self.cached_parser
