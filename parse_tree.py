@@ -15,8 +15,7 @@ class ParseTree():
         Returns the unique subset of these.
         """
         samples = set()
-        #for i in range(n):
-        while len(samples) < n:
+        for i in range(n):
             samples.add(self.sample_string(max_tree_depth))
         return samples
 
@@ -71,6 +70,7 @@ class ParseTree():
         the minimum possible amount of nonterminals.
         """
         rules_with_start = [rule_node for rule_node in self.gen.grammar_node.children if rule_node.lhs == rule_start]
+
         if depth > max_depth:
             # Find the smallest number of nonterminals among any of the RuleNodes
             # in rules_with_start
