@@ -45,11 +45,11 @@ class Scorer():
                 maximizer_score *= category_score
             if category in self.maximizers or category == 'size':
                 size_maximizer_score *= category_score
-        if composite_score > self.score_map['composite'][0]:
+        if composite_score >= self.score_map['composite'][0]:
             self.score_map['composite'] = (composite_score, grammar, gen)
-        if maximizer_score > self.score_map['maximizer'][0]:
+        if maximizer_score >= self.score_map['maximizer'][0]:
             self.score_map['maximizer'] = (maximizer_score, grammar, gen)
-        if size_maximizer_score > self.score_map['size_maximizer'][0]:
+        if size_maximizer_score >= self.score_map['size_maximizer'][0]:
             self.score_map['size_maximizer'] = (size_maximizer_score, grammar, gen)
 
     # SCORING FUNCTIONS
@@ -71,7 +71,7 @@ class Scorer():
                 pass
 
         pos_score = positive_correct / len(positive_examples)
-        if pos_score > self.score_map['pos'][0]:
+        if pos_score >= self.score_map['pos'][0]:
             self.score_map['pos'] = (pos_score, grammar, gen)
         return pos_score
 
@@ -90,7 +90,7 @@ class Scorer():
                 pass
 
         neg_score = 1 - (negative_correct / len(negative_examples))
-        if neg_score > self.score_map['neg'][0]:
+        if neg_score >= self.score_map['neg'][0]:
             self.score_map['neg'] = (neg_score, grammar, gen)
         return neg_score
 
@@ -101,7 +101,7 @@ class Scorer():
                 total_rule_size += 1 + len(body)
 
         size_score = 4 / total_rule_size
-        if size_score > self.score_map['size'][0]:
+        if size_score >= self.score_map['size'][0]:
             self.score_map['size'] = (size_score, grammar, gen)
         return size_score
 
@@ -115,7 +115,7 @@ class Scorer():
                     num_n += 1
 
         ratio_score = 1 - 2 * abs(num_n / (num_n + num_t) - 1/2)
-        if ratio_score > self.score_map['ratio'][0]:
+        if ratio_score >= self.score_map['ratio'][0]:
             self.score_map['ratio'] = (ratio_score, grammar, gen)
         return ratio_score
 
@@ -134,7 +134,7 @@ class Scorer():
         t_variance, n_variance = num_t / max_terminals, num_n / max_nonterminals
 
         variance_score = t_variance * n_variance
-        if variance_score > self.score_map['variance'][0]:
+        if variance_score >= self.score_map['variance'][0]:
             self.score_map['variance'] = (variance_score, grammar, gen)
         return variance_score
 
@@ -145,7 +145,7 @@ class Scorer():
         except:
             compilation_score = 0.0
 
-        if compilation_score > self.score_map['compilation'][0]:
+        if compilation_score >= self.score_map['compilation'][0]:
             self.score_map['compilation'] = (compilation_score, grammar, gen)
         return compilation_score
 
@@ -159,7 +159,7 @@ class Scorer():
                         graph.add_edge(rule_start, elem)
 
         recur_cc_score = 1.0 if graph.is_connected() and graph.has_cycle() else 0.0
-        if recur_cc_score > self.score_map['recur_cc'][0]:
+        if recur_cc_score >= self.score_map['recur_cc'][0]:
             self.score_map['recur_cc'] = (recur_cc_score, grammar, gen)
         return recur_cc_score
 
@@ -191,6 +191,6 @@ class Scorer():
             updated = any([update(X, rule) for rule_start, rule in grammar.rules.items()])
 
         finite_score = 1.0 if len(X) == len(nonterminals) + 1 else 0.0 # Include 'start'
-        if finite_score > self.score_map['finite'][0]:
+        if finite_score >= self.score_map['finite'][0]:
             self.score_map['finite'] = (finite_score, grammar, gen)
         return finite_score
