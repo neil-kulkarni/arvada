@@ -1,0 +1,84 @@
+# Terminals
+class, ID, IDSTR, STR, (, ), :, NEWLINE, INDENT, DEDENT, pass, def, =, global, nonlocal, [, ], if, while, for, in, return, elif, else, not, and, or, ~, ., +, -, *, //, %, ==, !=, <=, >=, <, >, is, None, True, False, INT, ->, COMMA
+
+# Grammar
+# The first rule in the grammar specifies the start nonterminal
+
+# Main Program
+program := definition/* stmt/*
+
+# Classes
+class_def := class ID ( ID ) : NEWLINE INDENT class_body DEDENT
+class_body := pass NEWLINE | var_func_def/+
+
+# Functions
+func_def := def ID ( arglist/? ) rv_type_decl/? : NEWLINE INDENT func_body DEDENT
+func_body := func_decl/* stmt/+
+
+# Variables
+var_def := typed_var = literal NEWLINE
+
+# Definitions
+definition := var_func_def | class_def
+var_func_def := var_def | func_def
+
+# Declarations
+func_decl := global_decl | nonlocal_decl | var_func_def
+global_decl := global ID NEWLINE
+nonlocal_decl := nonlocal ID NEWLINE
+
+# Types
+typed_var := ID : type
+type := ID | IDSTR | [ type ]
+
+# Statements
+stmt := simple_stmt NEWLINE
+  | if expr : block elif_block/* else_block/?
+  | while expr : block
+  | for ID in expr : block
+
+simple_stmt := pass
+  | expr
+  | return expr/?
+  | target_eq/+ expr
+
+# Blocks
+block := NEWLINE INDENT stmt/+ DEDENT
+elif_block := elif expr : block
+else_block := else : block
+
+# Expressions
+expr := cexpr
+  | not expr
+  | expr and expr
+  | expr or expr
+  | expr if expr else expr
+
+cexpr := ID
+  | literal
+  | [ exprlist/? ]
+  | ( expr )
+  | member_expr
+  | index_expr
+  | member_expr ( exprlist/? )
+  | ID ( exprlist/? )
+  | cexpr bin_op cexpr
+  | ~ cexpr
+
+member_expr := cexpr . ID
+index_expr := cexpr [ expr ]
+target := ID | member_expr | index_expr
+
+bin_op := + | - | * | // | % | == | != | <= | >= | < | > | is
+literal := None | True | False | INT | IDSTR | STR
+
+# Helper Definitions
+arglist := typed_var comma_typed_var/*
+comma_typed_var := , typed_var
+
+rv_type_decl := -> type
+
+exprlist := expr comma_expr/*
+comma_expr := , expr
+
+target_eq := target =

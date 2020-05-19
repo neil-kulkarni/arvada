@@ -1,0 +1,53 @@
+# Terminals
+ID, IDSTR, STR, (, ), :, NEWLINE, INDENT, DEDENT, pass, =, [, ], if, while, for, in, return, elif, else, not, and, or, ~, ., +, -, *, //, %, ==, !=, <=, >=, <, >, is, None, True, False, INT, COMMA
+
+# Grammar
+# The first rule in the grammar specifies the start nonterminal
+program := stmt/*
+
+# Statements
+stmt := simple_stmt NEWLINE
+  | if expr : block elif_block/* else_block/?
+  | while expr : block
+  | for ID in expr : block
+
+simple_stmt := pass
+  | expr
+  | return expr/?
+  | target_eq/+ expr
+
+# Blocks
+block := NEWLINE INDENT stmt/+ DEDENT
+elif_block := elif expr : block
+else_block := else : block
+
+# Expressions
+expr := cexpr
+  | not expr
+  | expr and expr
+  | expr or expr
+  | expr if expr else expr
+
+cexpr := ID
+  | literal
+  | [ exprlist/? ]
+  | ( expr )
+  | member_expr
+  | index_expr
+  | member_expr ( exprlist/? )
+  | ID ( exprlist/? )
+  | cexpr bin_op cexpr
+  | ~ cexpr
+
+member_expr := cexpr . ID
+index_expr := cexpr [ expr ]
+target := ID | member_expr | index_expr
+
+bin_op := + | - | * | // | % | == | != | <= | >= | < | > | is
+literal := None | True | False | INT | IDSTR | STR
+
+# Helper Definitions
+exprlist := expr comma_expr/*
+comma_expr := , expr
+
+target_eq := target =

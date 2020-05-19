@@ -16,7 +16,7 @@ class Grammar():
         start_rule.add_body([start])
         self.rules = {'start':start_rule}
 
-        # Define cacheable values and their dirty bits
+        # Define cacheable values and their valid bits
         self.cached_str = ""
         self.cached_str_valid = False
         self.cached_parser = None
@@ -37,7 +37,7 @@ class Grammar():
         if self.cached_parser_valid:
             return self.cached_parser
 
-        self.cached_parser = Lark(str(self))
+        self.cached_parser = Lark(str(self).replace('\u03B5', ''))
         self.cached_parser_valid = True
         return self.cached_parser
 
@@ -86,6 +86,8 @@ class Rule():
         Start must be a nonterminal.
         Each body is a sequence of terminals and nonterminals.
         If there are multiple bodies, they will be connected via the | op.
+        The epsilon terminal is represented under the hood as an empty string,
+        but is displayed to the user as the epsilon character.
         """
         self.start = start
         self.bodies = []
@@ -109,11 +111,11 @@ class Rule():
         return self.cached_str
 
     def _body_str(self, body):
-        return ' '.join(body)
+        return ' '.join([b if len(b) > 0 else '\u03B5' for b in body])
 
-# Example grammar with nonterminals T1, T2 and terminals a, b
-# grammar = Grammar('T1')
-# grammar.add_rule(Rule('T1').add_body(['"a"', 'T2']).add_body(['"b"', 'T2']))
-# grammar.add_rule(Rule('T2').add_body(['"b"']))
+# Example grammar with nonterminals n1, n2 and terminals a, b
+# grammar = Grammar('n1')
+# grammar.add_rule(Rule('n1').add_body(['n2', '"a"']).add_body(['']))
+# grammar.add_rule(Rule('n2').add_body(['', 'n1', '']))
 # parser = grammar.parser()
-# print(parser.parse("ab").pretty())
+# print(parser.parse("aa").pretty())

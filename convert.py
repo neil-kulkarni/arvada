@@ -13,11 +13,15 @@ def main(txt_file_name, json_file_name):
 
     # The first line of the file is the set of terminals. The rest are rules.
     terminals = [token.strip() for token in lines[0].split(',')]
+    terminals = [t if t != 'COMMA' else ',' for t in terminals]
+    terminals = list(set(terminals)) # Clear duplicates, if any
     rules = coalesce_rules(lines[1:])
 
     # Create and mutate the rule_map before dumping it to JSON
     rule_map = get_rule_map(rules)
     handle_plus_rules(rule_map)
+    handle_star_rules(rule_map)
+    handle_question_rules(rule_map)
 
     # Create dictionary mapping to be marshalled into a JSON representation
     json_repr = {}
@@ -35,7 +39,8 @@ def main(txt_file_name, json_file_name):
         rule_dict['bodies'] = []
 
         for rule_body in rule_bodies:
-            rule_dict['bodies'].append(rule_body.split())
+            split_body = [token if token != '/eps' else '' for token in rule_body.split()]
+            rule_dict['bodies'].append(split_body)
 
         json_repr['grammar']['rules'].append(rule_dict)
 
@@ -50,16 +55,23 @@ def main(txt_file_name, json_file_name):
     print('Conversion successful!')
     print('Remember to update the remainder of the configuration options!')
 
-# Mutates the rule map to search for all regex + expressions
-# Adds a new rule corresponding to the + expression, and updates each rule
-# containing a + expression to point to the newly created rule
+# Mutates the rule map to search for all expressions ending in the rule_token.
+# Adds a new rule corresponding to the expression via the passed-in rule_builder
+# and names it according to the rule_name function. Updates each rule ending in
+# the rule_token to point to the newly created rule
 #
-# Example:
-# program := expr\+
+# Example Parameters:
+# rule_token = '/+'
+# rule_name_fn = lambda s: '_%s_plus' % s
+# rule_builder_fn = lambda s, n: [s, '%s %s' % (n, s)]
+#
+# Example Effect:
+# program := expr/+
 # =>
 # program := _expr_plus
 # _expr_plus := expr | _expr_plus expr
-def handle_plus_rules(rule_map):
+# If any other rules had expr/+, they would also point to _expr_plus
+def handle_custom_rules(rule_map, rule_token, rule_name_fn, rule_builder_fn):
     # Taking the list of the keys forces us to iterate only through keys
     # that were present at the start of this function
     for rule_name in list(rule_map.keys()):
@@ -71,22 +83,23 @@ def handle_plus_rules(rule_map):
         for rule_body_index in range(len(rule_bodies)):
             rule_body = rule_bodies[rule_body_index]
 
-            # Tokenize the rule body to check for any + tokens
+            # Tokenize the rule body to check for any custom tokens
             rule_body_symbols = rule_body.split()
             for i in range(len(rule_body_symbols)):
                 symbol = rule_body_symbols[i]
 
-                # If part of a token ends in (non-escaped) +...
-                if symbol[-2:] == '/+' and symbol[-3] != '/':
-                    cleaned_symbol = symbol[:-2]
-                    plus_rule_name = '_%s_plus' % cleaned_symbol
+                # If part of a token ends in (non-escaped) rule_token...
+                n = len(rule_token)
+                if symbol[-n:] == rule_token and symbol[-(n+1)] != '/':
+                    cleaned_symbol = symbol[:-n]
+                    custom_rule_name = rule_name_fn(cleaned_symbol)
 
-                    # If there is not already a plus rule for this token, create one
-                    if not plus_rule_name in rule_map:
-                        rule_map[plus_rule_name] = [cleaned_symbol, '%s %s' % (plus_rule_name, cleaned_symbol)]
+                    # If there is not already a custom rule for this token, create one
+                    if not custom_rule_name in rule_map:
+                        rule_map[custom_rule_name] = rule_builder_fn(cleaned_symbol, custom_rule_name)
 
-                    # Update the + token to use the new rule
-                    rule_body_symbols[i] = plus_rule_name
+                    # Update the token ending in rule_token to use the new rule
+                    rule_body_symbols[i] = custom_rule_name
 
             # Some tokens in rule_body_symbols may have been updated
             # Regardless, we untokenize the rule_body_symbols back into a
@@ -95,6 +108,54 @@ def handle_plus_rules(rule_map):
 
             # Update the rule body list to use the (potentially new) rule body
             rule_bodies[rule_body_index] = new_rule_body
+
+# Mutates the rule map to search for all regex + expressions
+# Adds a new rule corresponding to the + expression, and updates each rule
+# containing a + expression to point to the newly created rule
+#
+# Example:
+# program := expr/+
+# =>
+# program := _expr_plus
+# _expr_plus := expr | _expr_plus expr
+# If any other rules had expr/+, they would also point to _expr_plus
+def handle_plus_rules(rule_map):
+    plus_rule_token = '/+'
+    plus_rule_name_fn = lambda s: '_%s_plus' % s
+    plus_rule_builder_fn = lambda s, n: ['%s %s' % (n, s), s]
+    handle_custom_rules(rule_map, plus_rule_token, plus_rule_name_fn, plus_rule_builder_fn)
+
+# Mutates the rule map to search for all regex * expressions
+# Adds a new rule corresponding to the * expression, and updates each rule
+# containing a * expression to point to the newly created rule
+#
+# Example:
+# program := expr/*
+# =>
+# program := _expr_star
+# _expr_star := /eps | _expr_star expr
+# If any other rules had expr/*, they would also point to _expr_star
+def handle_star_rules(rule_map):
+    star_rule_token = '/*'
+    star_rule_name_fn = lambda s: '_%s_star' % s
+    star_rule_builder_fn = lambda s, n: ['%s %s' % (n, s), '/eps']
+    handle_custom_rules(rule_map, star_rule_token, star_rule_name_fn, star_rule_builder_fn)
+
+# Mutates the rule map to search for all regex ? expressions
+# Adds a new rule corresponding to the ? expression, and updates each rule
+# containing a ? expression to point to the newly created rule
+#
+# Example:
+# program := expr?
+# =>
+# program := _expr_one_or_none
+# _expr_one_or_none := expr | /eps
+# If any other rules had expr/?, they would also point to _expr_one_or_none
+def handle_question_rules(rule_map):
+    question_rule_token = '/?'
+    question_rule_name_fn = lambda s: '_%s_one_or_none' % s
+    question_rule_builder_fn = lambda s, n: [s, '/eps']
+    handle_custom_rules(rule_map, question_rule_token, question_rule_name_fn, question_rule_builder_fn)
 
 # Turns the list of rules (as strings) into a rule map
 # Maps the start nonterminal of a rule to a list of strings of its bodies

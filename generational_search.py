@@ -75,13 +75,14 @@ def main(file_name, log_file, max_iters):
             log_results(scorer, log_file)
 
         good_grammar, good_gen = scorer.sample_grammar()
-        new_gen = good_gen.copy()
-        new_gen.mutate()
-        new_grammar = new_gen.generate_grammar()
-        scorer.score(new_grammar, new_gen)
+        gen = good_gen.copy()
+        gen.mutate()
+        grammar = gen.generate_grammar()
+        scorer.score(grammar, gen)
         print('Iters:', iterations, '\tScores:', ', '.join(['{:.2f}'.format(v[0]) for v in scorer.score_map.values()]), end='\r')
         iterations += 1
 
+    # Print final results to the log
     log_results(scorer, log_file)
 
 if __name__ == '__main__':

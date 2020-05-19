@@ -1,0 +1,181 @@
+{
+  "config": {
+    "TERMINALS": ["for", "+", "NEWLINE", "DEDENT", "and", "!=", "else", "elif", "is", "IDSTR", ">=", "-", "=", ",", "INDENT", "or", "*", "while", "if", "==", "<=", ":", "%", "None", "in", "pass", "~", "[", "False", "//", "True", "ID", "STR", "not", "]", "<", "(", ">", "INT", ".", ")", "return"],
+    "NONTERMINALS": ["program", "stmt", "simple_stmt", "block", "elif_block", "else_block", "expr", "cexpr", "member_expr", "index_expr", "target", "bin_op", "literal", "exprlist", "comma_expr", "target_eq", "_target_eq_plus", "_stmt_plus", "_stmt_star", "_elif_block_star", "_comma_expr_star", "_else_block_one_or_none", "_expr_one_or_none", "_exprlist_one_or_none"],
+    "NUM_RULES": 140,
+    "MAX_RHS_LEN": 12,
+    "POS_EXAMPLES": 100,
+    "NEG_EXAMPLES": 100,
+    "MAX_NEG_EXAMPLE_SIZE": 100,
+    "MAX_TREE_DEPTH": 10
+  },
+  "grammar": {
+    "start": "program",
+    "rules": [{
+      "start": "program",
+      "bodies": [
+        ["_stmt_star"]
+      ]
+    }, {
+      "start": "stmt",
+      "bodies": [
+        ["simple_stmt", "NEWLINE"],
+        ["if", "expr", ":", "block", "_elif_block_star", "_else_block_one_or_none"],
+        ["while", "expr", ":", "block"],
+        ["for", "ID", "in", "expr", ":", "block"]
+      ]
+    }, {
+      "start": "simple_stmt",
+      "bodies": [
+        ["pass"],
+        ["expr"],
+        ["return", "_expr_one_or_none"],
+        ["_target_eq_plus", "expr"]
+      ]
+    }, {
+      "start": "block",
+      "bodies": [
+        ["NEWLINE", "INDENT", "_stmt_plus", "DEDENT"]
+      ]
+    }, {
+      "start": "elif_block",
+      "bodies": [
+        ["elif", "expr", ":", "block"]
+      ]
+    }, {
+      "start": "else_block",
+      "bodies": [
+        ["else", ":", "block"]
+      ]
+    }, {
+      "start": "expr",
+      "bodies": [
+        ["cexpr"],
+        ["not", "expr"],
+        ["expr", "and", "expr"],
+        ["expr", "or", "expr"],
+        ["expr", "if", "expr", "else", "expr"]
+      ]
+    }, {
+      "start": "cexpr",
+      "bodies": [
+        ["ID"],
+        ["literal"],
+        ["[", "_exprlist_one_or_none", "]"],
+        ["(", "expr", ")"],
+        ["member_expr"],
+        ["index_expr"],
+        ["member_expr", "(", "_exprlist_one_or_none", ")"],
+        ["ID", "(", "_exprlist_one_or_none", ")"],
+        ["cexpr", "bin_op", "cexpr"],
+        ["~", "cexpr"]
+      ]
+    }, {
+      "start": "member_expr",
+      "bodies": [
+        ["cexpr", ".", "ID"]
+      ]
+    }, {
+      "start": "index_expr",
+      "bodies": [
+        ["cexpr", "[", "expr", "]"]
+      ]
+    }, {
+      "start": "target",
+      "bodies": [
+        ["ID"],
+        ["member_expr"],
+        ["index_expr"]
+      ]
+    }, {
+      "start": "bin_op",
+      "bodies": [
+        ["+"],
+        ["-"],
+        ["*"],
+        ["//"],
+        ["%"],
+        ["=="],
+        ["!="],
+        ["<="],
+        [">="],
+        ["<"],
+        [">"],
+        ["is"]
+      ]
+    }, {
+      "start": "literal",
+      "bodies": [
+        ["None"],
+        ["True"],
+        ["False"],
+        ["INT"],
+        ["IDSTR"],
+        ["STR"]
+      ]
+    }, {
+      "start": "exprlist",
+      "bodies": [
+        ["expr", "_comma_expr_star"]
+      ]
+    }, {
+      "start": "comma_expr",
+      "bodies": [
+        [",", "expr"]
+      ]
+    }, {
+      "start": "target_eq",
+      "bodies": [
+        ["target", "="]
+      ]
+    }, {
+      "start": "_target_eq_plus",
+      "bodies": [
+        ["_target_eq_plus", "target_eq"],
+        ["target_eq"]
+      ]
+    }, {
+      "start": "_stmt_plus",
+      "bodies": [
+        ["_stmt_plus", "stmt"],
+        ["stmt"]
+      ]
+    }, {
+      "start": "_stmt_star",
+      "bodies": [
+        ["_stmt_star", "stmt"],
+        [""]
+      ]
+    }, {
+      "start": "_elif_block_star",
+      "bodies": [
+        ["_elif_block_star", "elif_block"],
+        [""]
+      ]
+    }, {
+      "start": "_comma_expr_star",
+      "bodies": [
+        ["_comma_expr_star", "comma_expr"],
+        [""]
+      ]
+    }, {
+      "start": "_else_block_one_or_none",
+      "bodies": [
+        ["else_block"],
+        [""]
+      ]
+    }, {
+      "start": "_expr_one_or_none",
+      "bodies": [
+        ["expr"],
+        [""]
+      ]
+    }, {
+      "start": "_exprlist_one_or_none",
+      "bodies": [
+        ["exprlist"],
+        [""]
+      ]
+    }]
+  }
+}
