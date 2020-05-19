@@ -24,13 +24,15 @@ def main(file_name, max_iters):
     scorer = Scorer(CONFIG, DATA, grammar, gen)
     scorer.score(grammar, gen)
 
-    # Register signal handler that allows us to asynchronously peek at the grammar
+    # Define signal handler that allows us to asynchronously peek at the grammar
     def signal_handler(sig, frame):
         print_results(scorer)
         print('Sampled Grammar:')
         print(grammar)
         print()
+        input('Hit any key to continue...\n')
 
+    # Register the signal handler with the OS
     signal.signal(signal.SIGINT, signal_handler)
 
     # Main Program Loop
@@ -45,7 +47,7 @@ def main(file_name, max_iters):
         iterations += 1
 
     print('\n\n====== RESULTS ======\n\n')
-    print_results()
+    print_results(scorer)
 
 def print_results(scorer):
     for category in scorer.score_map:
