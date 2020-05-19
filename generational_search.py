@@ -14,20 +14,19 @@ def main(file_name, log_file, max_iters):
     MAX_ITERS, MAX_NEG_EXAMPLE_SIZE = max_iters, CONFIG['MAX_NEG_EXAMPLE_SIZE']
     TERMINALS, MAX_TREE_DEPTH = CONFIG['TERMINALS'], CONFIG['MAX_TREE_DEPTH']
 
+    # Test to make sure that the oracle at least compiles, and throws an exception if not
+    try:
+        OR_PARSER = ORACLE.parser()
+    except Exception as e:
+        print(f"Oops! The Lark parser couldn't compile. Here's the error:\n {e.__str__()}\n")
+        print('Fix your grammar. Exiting now.')
+        exit(1)
+
     # Generate positive examples
     oracle_parse_tree = ParseTree(ORACLE_GEN)
     positive_examples = oracle_parse_tree.sample_strings(POS_EXAMPLES, MAX_TREE_DEPTH)
     negative_examples = ORACLE.sample_negatives(NEG_EXAMPLES, TERMINALS, MAX_NEG_EXAMPLE_SIZE)
     DATA = {'positive_examples': positive_examples, 'negative_examples': negative_examples}
-
-    # Test to make sure that the oracle at least compiles, and throws an exception if not
-    try:
-        OR_PARSER = ORACLE.parser()
-        OR_PARSER.parse(next(iter(positive_examples)))
-    except Exception as e:
-        print(f"Oops! Lark couldn't parse the first positive example. Here's the error:\n {e.__str__()}\n")
-        print('Fix your grammar. Exiting now.')
-        exit(1)
 
     # Create the log file and write positive and negative examples to it
     with open(log_file, 'w+') as f:
@@ -64,7 +63,7 @@ def main(file_name, log_file, max_iters):
             print(file=f)
 
         # Print the total time elapsed
-        print(f'\nTime elapsed: {time.time()-start_time} seconds, Iterations: {iterations}', file=f)
+        print(f'\nTime elapsed: %.2f seconds, Iterations: %d' % (time.time()-start_time, iterations), file=f)
 
         # Print a delimeter for the next time information is logged
         print('\n\n==========', file=f)
