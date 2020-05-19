@@ -3,21 +3,8 @@ from graph import Graph
 from parse_tree import ParseTree
 from grammar import Grammar, Rule
 from generator import GrammarGenerator
-import time
 
 class Scorer():
-
-    total_time = 0
-    scorer_time = 0
-
-    pos_time = 0
-    total_pos_time = 0
-    percent_pos_parses = 0
-
-    neg_time = 0
-    total_neg_time = 0
-    percent_neg_parses = 0
-
     """
     Keeps a map of score category to highest-scoring grammar in that category.
     Scores new grammars and updates the score map accordingly.
@@ -50,7 +37,6 @@ class Scorer():
         the appropriate scoring function.
         Each scoring function is responsible for updating the score_map
         """
-        start = time.time()
         composite_score, maximizer_score, size_maximizer_score = 1, 1, 1
         for category in self.score_fns:
             category_score = self.score_fns[category](self, grammar, gen)
@@ -65,11 +51,6 @@ class Scorer():
             self.score_map['maximizer'] = (maximizer_score, grammar, gen)
         if size_maximizer_score > self.score_map['size_maximizer'][0]:
             self.score_map['size_maximizer'] = (size_maximizer_score, grammar, gen)
-        end = time.time()
-        Scorer.scorer_time = (end - start)
-        Scorer.total_time += Scorer.scorer_time
-        print('Positive: %.4f %.4f %.2f %.2f %.2f' % (Scorer.pos_time, Scorer.scorer_time, Scorer.percent_pos_parses, Scorer.pos_time / Scorer.scorer_time, Scorer.total_pos_time / Scorer.total_time))
-        print('Negative: %.4f %.4f %.2f %.2f %.2f' % (Scorer.neg_time, Scorer.scorer_time, Scorer.percent_neg_parses, Scorer.neg_time / Scorer.scorer_time, Scorer.total_neg_time / Scorer.total_time))
 
     # SCORING FUNCTIONS
     def dummy(self, grammar, gen):
@@ -81,7 +62,6 @@ class Scorer():
         except:
             return 0
 
-        start = time.time()
         positive_examples, positive_correct = self.data['positive_examples'], 0
         for positive_example in positive_examples:
             try:
@@ -89,10 +69,6 @@ class Scorer():
                 positive_correct += 1
             except:
                 pass
-        end = time.time()
-        Scorer.percent_pos_parses = positive_correct / len(positive_examples)
-        Scorer.pos_time = (end - start)
-        Scorer.total_pos_time += Scorer.pos_time
 
         pos_score = positive_correct / len(positive_examples)
         if pos_score > self.score_map['pos'][0]:
@@ -106,17 +82,12 @@ class Scorer():
             return 0
 
         negative_examples, negative_correct = self.data['negative_examples'], 0
-        start = time.time()
         for negative_example in negative_examples:
             try:
                 parser.parse(negative_example)
                 negative_correct += 1
             except:
                 pass
-        end = time.time()
-        Scorer.percent_neg_parses = negative_correct / len(negative_examples)
-        Scorer.neg_time = (end - start)
-        Scorer.total_neg_time += Scorer.neg_time
 
         neg_score = 1 - (negative_correct / len(negative_examples))
         if neg_score > self.score_map['neg'][0]:
