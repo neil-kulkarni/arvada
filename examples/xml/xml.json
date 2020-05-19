@@ -1,0 +1,103 @@
+{
+  "config": {
+    "TERMINALS": ["<a", "=\"", "\"", ">", "</a>", "SPACE", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"],
+    "NONTERMINALS": ["A", "BODY", "TEXT", "ATTRLIST", "ATTR", "SPACES"],
+    "NUM_RULES": 75,
+    "MAX_RHS_LEN" : 5,
+    "POS_EXAMPLES": 100,
+    "NEG_EXAMPLES": 100,
+    "MAX_NEG_EXAMPLE_SIZE": 100,
+    "MAX_TREE_DEPTH": 5
+  },
+  "grammar": {
+    "start": "A",
+    "rules": [{
+      "start": "A",
+      "bodies": [
+        ["<a", "SPACES", "ATTRLIST", ">", "BODY", "</a>"],
+        ["<a", ">", "BODY", "</a>"]
+      ]
+    }, {
+      "start": "BODY",
+      "bodies": [
+        ["A"],
+        ["TEXT"],
+        ["A", "BODY"],
+        ["TEXT", "BODY"]
+      ]
+    }, {
+      "start": "TEXT",
+      "bodies": [
+        ["a"],
+        ["a", "TEXT"],
+        ["b"],
+        ["b", "TEXT"],
+        ["c"],
+        ["c", "TEXT"],
+        ["d"],
+        ["d", "TEXT"],
+        ["e"],
+        ["e", "TEXT"],
+        ["f"],
+        ["f", "TEXT"],
+        ["g"],
+        ["g", "TEXT"],
+        ["h"],
+        ["h", "TEXT"],
+        ["i"],
+        ["i", "TEXT"],
+        ["j"],
+        ["j", "TEXT"],
+        ["k"],
+        ["k", "TEXT"],
+        ["l"],
+        ["l", "TEXT"],
+        ["m"],
+        ["m", "TEXT"],
+        ["n"],
+        ["n", "TEXT"],
+        ["o"],
+        ["o", "TEXT"],
+        ["p"],
+        ["p", "TEXT"],
+        ["q"],
+        ["q", "TEXT"],
+        ["r"],
+        ["r", "TEXT"],
+        ["s"],
+        ["s", "TEXT"],
+        ["t"],
+        ["t", "TEXT"],
+        ["u"],
+        ["u", "TEXT"],
+        ["v"],
+        ["v", "TEXT"],
+        ["w"],
+        ["w", "TEXT"],
+        ["x"],
+        ["x", "TEXT"],
+        ["y"],
+        ["y", "TEXT"],
+        ["z"],
+        ["z", "TEXT"]
+      ]
+    }, {
+      "start": "ATTRLIST",
+      "bodies": [
+        ["ATTR"],
+        ["ATTR", "ATTRLIST"]
+      ]
+    }, {
+      "start": "ATTR",
+      "bodies": [
+        ["TEXT", "=\"", "TEXT", "\""]
+      ]
+    }, {
+      "start": "SPACES",
+      "bodies": [
+        ["SPACE"],
+        ["SPACE", "SPACES"]
+      ]
+    }]
+  }
+}

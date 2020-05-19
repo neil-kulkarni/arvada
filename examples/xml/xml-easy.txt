@@ -1,0 +1,9 @@
+<a, =,  >, </a>, SPACE, TEXT
+
+A := <a SPACES ATTRLIST > BODY </a> | <a > BODY </a>
+BODY := A | TEXT | A BODY 
+
+ATTRLIST := ATTR | ATTR SPACE ATTRLIST
+ATTR := TEXT = TEXT 
+SPACES := SPACE | SPACE SPACES
+
