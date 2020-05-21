@@ -53,3 +53,19 @@ class Graph():
                 explore(node)
 
         return has_cycle
+
+    def reachable_from(self, start):
+        visited = {v:False for v in self.V}
+        reachable = set()
+
+        # Launches DFS from a given node
+        def explore(v):
+            visited[v] = True
+            reachable.add(v)
+            for n in self.neighbors(v):
+                if not visited[n]:
+                    explore(n)
+
+        # Launch DFS from just the start and return
+        explore(start)
+        return reachable
