@@ -133,7 +133,7 @@ class Scorer():
         num_t, num_n = len(seen_terminals), len(seen_nonterminals)
         t_variance, n_variance = num_t / max_terminals, num_n / max_nonterminals
 
-        variance_score = t_variance * n_variance
+        variance_score = min(t_variance * n_variance, 1.0)
         if variance_score >= self.score_map['variance'][0]:
             self.score_map['variance'] = (variance_score, grammar, gen)
         return variance_score

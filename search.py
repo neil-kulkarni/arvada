@@ -43,18 +43,32 @@ def main(file_name, log_file, max_iters):
             print(neg, file=f)
 
     # Build the starting grammars and test them for compilation
-    gens = build_start_grammars(CONFIG, positive_nodes)
-    for gen in gens:
+    start_gens = build_start_grammars(CONFIG, positive_nodes)
+    for start_gen in start_gens:
         try:
-            gen.generate_grammar().parser()
+            start_gen.generate_grammar().parser()
         except Exception as e:
             printf('Initial grammars do not compile! %s' % str(e))
 
-    # Generate intial grammar and score it
+    # Generate random intial grammar and score it. Then, score all the start
+    # grammars we arrived at earlier, which will add the good ones to the
+    # "interesting" set for future iterations. Then, sample many more random
+    # grammars so that overall variance is reduced.
     gen = GrammarGenerator(CONFIG)
     grammar = gen.generate_grammar()
     scorer = Scorer(CONFIG, DATA, grammar, gen)
     scorer.score(grammar, gen)
+
+    print('Scoring starting grammars..'.ljust(50), end='\r')
+    for start_gen in start_gens:
+        start_grammar = start_gen.generate_grammar()
+        scorer.score(start_grammar, start_gen)
+
+    print('Adding random grammrs...'.ljust(50), end='\r')
+    for _ in range(len(start_gens)):
+        gen = GrammarGenerator(CONFIG)
+        grammar = gen.generate_grammar()
+        scorer.score(grammar, gen)
 
     # Prints iteration information to the log file
     def log_results(scorer, log_file):
