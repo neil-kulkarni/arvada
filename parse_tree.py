@@ -12,12 +12,17 @@ class ParseTree():
         """
         Samples n random strings from the parse tree.
         Ensures the parse tree does not grow beyond max_tree_depth.
-        Returns the unique subset of these.
+        Returns the unique subset of these and also returns the list of
+        ParseNodes that each of these strings were derived from.
         """
-        samples = set()
+        samples, nodes = set(), []
         for i in range(n):
-            samples.add(self.sample_string(max_tree_depth))
-        return samples
+            parse_list = self.sample_string(max_tree_depth)
+            parse_string = ''.join([n.payload for n in parse_list])
+            if parse_string not in samples:
+                samples.add(parse_string)
+                nodes.append(parse_list)
+        return list(samples), nodes
 
     def sample_string(self, max_tree_depth):
         self.generate_tree(max_tree_depth)
@@ -25,8 +30,9 @@ class ParseTree():
 
     def sample_string_from_node(self, parse_node):
         if parse_node.is_terminal:
-            return parse_node.payload.replace('"', '')
-        return ''.join([self.sample_string_from_node(child_node) for child_node in parse_node.children])
+            parse_node.payload = parse_node.payload.replace('"', '')
+            return [parse_node]
+        return sum([self.sample_string_from_node(child_node) for child_node in parse_node.children], [])
 
     def generate_tree(self, max_depth):
         """

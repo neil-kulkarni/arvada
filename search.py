@@ -4,6 +4,7 @@ from input import parse_input
 from parse_tree import ParseTree
 from grammar import Grammar, Rule
 from generator import GrammarGenerator
+from start import build_start_grammars
 
 def main(file_name, log_file, max_iters):
     start_time = time.time() # To compute elapsed time
@@ -24,7 +25,9 @@ def main(file_name, log_file, max_iters):
 
     # Generate positive examples
     oracle_parse_tree = ParseTree(ORACLE_GEN)
-    positive_examples = oracle_parse_tree.sample_strings(POS_EXAMPLES, MAX_TREE_DEPTH)
+    print('Generating positive examples...'.ljust(50), end='\r')
+    positive_examples, positive_nodes = oracle_parse_tree.sample_strings(POS_EXAMPLES, MAX_TREE_DEPTH)
+    print('Generating negative examples...'.ljust(50), end='\r')
     negative_examples = ORACLE.sample_negatives(NEG_EXAMPLES, TERMINALS, MAX_NEG_EXAMPLE_SIZE)
     DATA = {'positive_examples': positive_examples, 'negative_examples': negative_examples}
 
@@ -38,6 +41,14 @@ def main(file_name, log_file, max_iters):
         print('\n\nNegative Examples:\n', file=f)
         for neg in negative_examples:
             print(neg, file=f)
+
+    # Build the starting grammars and test them for compilation
+    gens = build_start_grammars(CONFIG, positive_nodes)
+    for gen in gens:
+        try:
+            gen.generate_grammar().parser()
+        except Exception as e:
+            printf('Initial grammars do not compile! %s' % str(e))
 
     # Generate intial grammar and score it
     gen = GrammarGenerator(CONFIG)
@@ -69,6 +80,8 @@ def main(file_name, log_file, max_iters):
         print('\n\n==========', file=f)
 
     # Main Program Loop
+    print('Beginning main program loop...'.ljust(50), end='\r')
+    print(''.ljust(50), end='\r')
     iterations = 0
     while iterations < MAX_ITERS:
         if iterations % 500 == 0:

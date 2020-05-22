@@ -11,7 +11,7 @@ def allocate_tid():
     Returns a new, unqiue nonterminal name.
     """
     global next_tid
-    nt_name = 't%d' % (next_tid)
+    nt_name = '<t%d>' % (next_tid)
     next_tid += 1
     return nt_name
 
@@ -25,12 +25,36 @@ def build_start_grammars(config, leaves):
     Returns a set of starting grammar generators whose corresponding grammars
     each match at least one input example.
     """
+    # Initial round of tree building. Obtain fully built ParseTrees and convert
+    # them into GrammarGenerators
+    print('Stage One: Building initial trees...'.ljust(50), end='\r')
     trees, nt_grouping = build_trees(leaves)
     gens = [build_generator(config, tree) for tree in trees]
     grammar_nodes = [gen.grammar_node for gen in gens]
+
+    # Second round of tree building. Notice common patterns in the above
+    # ParseTrees, and derive further abstraction from them
+    print('Stage Two: Merging trees together...'.ljust(50), end='\r')
     merge_trees(config, grammar_nodes, nt_grouping)
-    gens = [GrammarGenerator(config, g_n) for g_n in grammar_nodes]
-    return gens
+
+    # Clean up the final grammars that we are returning
+    for grammar_node in grammar_nodes:
+        grammar_node.start = grammar_node.start.replace('<t', 't')
+        grammar_node.start = grammar_node.start.replace('<v', 'v')
+        grammar_node.start = grammar_node.start.replace('>', '')
+        for rule_node in grammar_node.children:
+            rule_node.lhs = rule_node.lhs.replace('<t', 't')
+            rule_node.lhs = rule_node.lhs.replace('<v', 'v')
+            rule_node.lhs = rule_node.lhs.replace('>', '')
+            for symbol_node in rule_node.children:
+                symbol_node.choice = symbol_node.choice.replace('<t', 't')
+                symbol_node.choice = symbol_node.choice.replace('<v', 'v')
+                symbol_node.choice = symbol_node.choice.replace('>', '')
+                if symbol_node.is_terminal and symbol_node.choice[0] != '"':
+                    symbol_node.choice = '"%s"' % (symbol_node.choice)
+
+    # Convert them back into GrammarGenerators and return
+    return [GrammarGenerator(config, g_n) for g_n in grammar_nodes]
 
 def group(trees):
     """
@@ -54,7 +78,7 @@ def group(trees):
             for j in range(i + 1, len(tree_lst) + 1):
                 tree_sublist = tree_lst[i:j]
                 tree_substr = ''.join([t.payload for t in tree_sublist])
-                tree_substr = re.sub('t\d+', 't', tree_substr)
+                tree_substr = re.sub('<t\d+>', '<t>', tree_substr)
                 if tree_substr in counts:
                     count, sublist, id = counts[tree_substr]
                     counts[tree_substr] = (count + 1, sublist, id)
@@ -67,8 +91,8 @@ def group(trees):
     counts = {k:v for k, v in counts.items() if len(v[1]) > 1}
 
     # Sort first by frequency, then by key-length
-    counts = sorted(counts.items(), key=lambda elem: len(elem[0]), reverse=True)
-    return sorted(counts, key=lambda elem: elem[1][0], reverse=True)
+    counts = sorted(counts.items(), key=lambda elem: elem[1][0], reverse=True)
+    return sorted(counts, key=lambda elem: len(elem[1][1]), reverse=True)
 
 def matches(grouping, layer):
     """
@@ -124,21 +148,21 @@ def apply(grouping, trees):
         If no groupings can be found, create a start node pointing to each
         of the remaining nodes in the parse tree.
         """
-        if len(tree_lst) == 0:
-            return tree_lst
+        if len(tree_lst) == 1:
+            if next(iter(tree_lst)).payload != '<t0>':
+                return [ParseNode('<t0>', False, tree_lst[:])]
+            else:
+                return tree_lst
 
         for group_str, tup in grouping:
             count, group_lst, id = tup
             ng = len(group_lst)
             ind = matches(group_lst, tree_lst)
             if ind != -1:
-                parent = ParseNode(group_str, False, tree_lst[ind : ind + ng])
-                parent.payload = id
+                parent = ParseNode(id, False, tree_lst[ind : ind + ng])
                 tree_lst[ind : ind + ng] = [parent]
                 return tree_lst
-        start = ParseNode('t0', False, tree_lst[:])
-        start.payload = 't0'
-        return [start]
+        return [ParseNode('<t0>', False, tree_lst[:])]
 
     return [apply_single(grouping, tree) for tree in trees]
 
@@ -176,23 +200,24 @@ def build_trees(leaves):
 
     while not finished(layers):
         layers = apply(grouping, layers)
+
         for grp_key, grp_val in group(layers):
-            if 't' not in grp_key:
+            if '<t' not in grp_key or grp_key.replace('<t', '').replace('>', '') == '':
                 continue
             if grp_key not in nt_grouping:
                 nt_grouping[grp_key] = grp_val
             else:
                 cnt, nodes, id = nt_grouping[grp_key]
-                nt_grouping[grp_key] = (cnt + 1, nodes, id)
+                nt_grouping[grp_key] = (cnt + grp_val[0], nodes, id)
 
     # Sort nt_grouping before returning it, and give merged nonterminals a different
     # identifier than normal nonterminals
-    nt_grouping = sorted(nt_grouping.items(), key=lambda elem: len(elem[0]), reverse=True)
-    nt_grouping = sorted(nt_grouping, key=lambda elem: elem[1][0], reverse=True)
+    nt_grouping = sorted(nt_grouping.items(), key=lambda elem: elem[1][0], reverse=True)
+    nt_grouping = sorted(nt_grouping, key=lambda elem: len(elem[1][1]), reverse=True)
     for i in range(len(nt_grouping)):
         grp_str, tup = nt_grouping[i]
         cnt, nodes, grp_id = tup
-        grp_id = grp_id.replace('t', 'v')
+        grp_id = grp_id.replace('<t', '<v')
         nt_grouping[i] = (grp_str, (cnt, nodes, grp_id))
 
     return [layer[0] for layer in layers], nt_grouping
@@ -231,9 +256,15 @@ def merge_trees(config, grammar_nodes, nt_grouping):
         # in the rule into the group's alternation set
         rule_body = ''.join([child.choice for child in grammar_rule.children])
 
-        if grp_str in re.sub('t\d+', 't', rule_body):
-            pattern = re.sub('t', 't\d+', grp_str)
+        if grp_str in re.sub('<t\d+>', '<t>', rule_body):
+            pattern = re.sub('<t>', '<t\d+>', grp_str)
+            pattern = pattern.replace('+', '\+')
+            pattern = pattern.replace('\d\+', '\d+')
+            pattern = pattern.replace('*', '\*')
+            pattern = pattern.replace('(', '\(')
+            pattern = pattern.replace(')', '\)')
             nt_matches = re.findall(pattern, rule_body)
+            nt_matches = sum([re.findall('<t\d+>', m) for m in nt_matches], [])
 
             # Define a set of new rules for this grammar
             new_rules = [RuleNode(config, grp_id, [SymbolNode(config, nt, False)]) for nt in nt_matches]
@@ -244,7 +275,12 @@ def merge_trees(config, grammar_nodes, nt_grouping):
                 alternation_set[grp_id] = (grp_str, nt_matches, new_rules)
             else:
                 _, alt_set, rules = alternation_set[grp_id]
-                alternation_set[grp_id] = (grp_str, alt_set + nt_matches, rules + new_rules)
+                combined_alt_set, combined_rules = set(alt_set), set(rules)
+                for nt_match, new_rule in zip(nt_matches, new_rules):
+                    if nt_match not in combined_alt_set:
+                        combined_alt_set.add(nt_match)
+                        combined_rules.add(new_rule)
+                alternation_set[grp_id] = (grp_str, list(combined_alt_set), list(combined_rules))
 
             # Update the nonterminals to point to the grp_id
             for child in grammar_rule.children:
@@ -291,7 +327,7 @@ def merge_trees(config, grammar_nodes, nt_grouping):
         _, _, rule_nodes = alternation_set[group_tid]
         nts_to_add[group_tid] = set()
         for rule_node in rule_nodes:
-            # alt_nt := one of the altnernation nonterminals, e.g. t2 or t4 in
+            # alt_nt := one of the alternation nonterminals, e.g. t2 or t4 in
             # the above example
             alt_nt = next(iter(rule_node.children)).choice
             nts_to_add[group_tid].add(alt_nt)
@@ -367,7 +403,9 @@ def build_generator(config, tree):
         #    ...
         # E.g. the ParseNode t0 defines the rule t0 -> t1 a b
         rule_body = [SymbolNode(config, child.payload, child.is_terminal) for child in parse_node.children]
-        grammar_node.children.append(RuleNode(config, parse_node.payload, rule_body))
+        rule = RuleNode(config, parse_node.payload, rule_body)
+        if not rule.lhs in [r.lhs for r in grammar_node.children]:
+            grammar_node.children.append(rule)
 
         # Recurse on the children of this ParseNode so the rule they define
         # are also added to the grammar.
