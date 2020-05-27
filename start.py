@@ -240,8 +240,13 @@ def apply(grouping, trees):
 
     return [apply_single(grouping, tree) for tree in trees]
 
-def build_trees(leaves):
+def build_trees(oracle, config, leaves):
     """
+    ORACLE is a Lark parser for the grammar we seek to find. We ask the oracle
+    yes or no replacement questions in this method.
+
+    CONFIG is the required configuration options for GrammarGenerator classes.
+
     LEAVES should be a list of lists (one list for each input example), where
     each sublist contains the tokens that built that example, as ParseNodes.
 
@@ -250,7 +255,7 @@ def build_trees(leaves):
 
     Algorithm:
         1. Initialization
-            - S <- input examples
+            - S <- preprocessed input examples
             - G <- group(S)
         2. while grouping G is not empty:
             a. Build new ParseNodes from S
@@ -259,10 +264,10 @@ def build_trees(leaves):
         3. Add a start nonterminal to each ParseNode
         4. return the set of finished starts
     """
-    layers = leaves
+    layers = derive_classes(oracle, config, leaves)
     grouping = group(layers)
 
-    while not len(grouping) > 0:
+    while len(grouping) > 0:
         layers = apply(grouping, layers)
         grouping = group(layers)
 
