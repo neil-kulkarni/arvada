@@ -120,116 +120,125 @@ def derive_classes(oracle, config, leaves):
 #
 #     # Convert them back into GrammarGenerators and return
 #     return [GrammarGenerator(config, g_n) for g_n in grammar_nodes]
-#
-# def group(trees):
-#     """
-#     TREES is composed of half-built ParseTrees. Each of the intermediate
-#     ParseTrees are represented as a list of nodes at the top-most layer.
-#
-#     Given a list of TREES, computes and returns a map of the most common
-#     payloads in the ParseNodes. Each returned map entry is given a unique
-#     identifier ti for some i > 1, reserving i = 0 for the start node.
-#
-#     Trivial groups are filtered out, including groups that only appear once or
-#     groups that only consist of one token.
-#
-#     Returns the group first sorted by frequency so that most frequently occuring
-#     substrings come first, then sorted by length, so that longer substrings are
-#     preferred, like in the maximal-munch rule.
-#     """
-#     counts = {}
-#     for tree_lst in trees:
-#         for i in range(len(tree_lst)):
-#             for j in range(i + 1, len(tree_lst) + 1):
-#                 tree_sublist = tree_lst[i:j]
-#                 tree_substr = ''.join([t.payload for t in tree_sublist])
-#                 tree_substr = re.sub('<t\d+>', '<t>', tree_substr)
-#                 if tree_substr in counts:
-#                     count, sublist, id = counts[tree_substr]
-#                     counts[tree_substr] = (count + 1, sublist, id)
-#                 else:
-#                     counts[tree_substr] = (1, tree_sublist, allocate_tid())
-#
-#     # Filter out tokens that only appear once
-#     counts = {k:v for k, v in counts.items() if v[0] > 1}
-#     # Filter out nonterminals composed of only one token
-#     counts = {k:v for k, v in counts.items() if len(v[1]) > 1}
-#
-#     # Sort first by frequency, then by key-length
-#     counts = sorted(counts.items(), key=lambda elem: elem[1][0], reverse=True)
-#     return sorted(counts, key=lambda elem: len(elem[1][1]), reverse=True)
-#
-# def matches(grouping, layer):
-#     """
-#     LAYER is the top layer of one half-built ParseTree.
-#
-#     The GROUPING of the TREES is an implicit map of a list of tokens to the
-#     frequency at which the list occurs in the top layer of TREES, with most
-#     frequent token appearing first.
-#
-#     Returns the index at which grouping appears in layer, and returns -1 if
-#     the grouping does not appear in the layer.
-#     """
-#     ng, nl = len(grouping), len(layer)
-#     for i in range(nl):
-#         layer_ind = i # Index into layer
-#         group_ind = 0 # Index into group
-#         while group_ind < ng and layer_ind < nl and layer[layer_ind].payload == grouping[group_ind].payload:
-#             layer_ind += 1
-#             group_ind += 1
-#         if group_ind == ng: return i
-#     return -1
-#
-# def apply(grouping, trees):
-#     """
-#     TREES is composed of half-built ParseTrees. Each of the intermediate
-#     ParseTrees are represented as a list of nodes at the top-most layer. This
-#     algorithm applies GROUPING to the topmost layer of each tree to progress
-#     in building the tree. This algorithm should be repeatedly called until
-#     each of the trees consists of a list of a single node, the root.
-#
-#     The GROUPING of the TREES is an implicit map of a list of tokens to the
-#     frequency at which the list occurs in the top layer of TREES, with most
-#     frequent token appearing first.
-#
-#     Algorithm: For each of the trees in TREES, greedily group the ParseNodes in
-#     accord with GROUPING so that the most frequently appearing tokens are grouped
-#     first. Perform only one iteration of this greedy grouping scheme, so that
-#     in order to completely build the tree, this method must be called many times.
-#     Grouped nodes become the children of new ParseNodes, which are inserted
-#     into the top layer list of the trees. The updated top layer lists are returned.
-#
-#     In other words, this method, given the ith layer of the tree and the set of
-#     groupings for that layer, returns the i + 1st layer of the tree, for each
-#     of the input trees in TREES.
-#     """
-#
-#     def apply_single(group_lst, tree_lst):
-#         """
-#         Applies the grouping to a single tree in the manner defined above.
-#         Only a single new ParseNode is created at one time.
-#         Returns the updated TREE_LST.
-#
-#         If no groupings can be found, create a start node pointing to each
-#         of the remaining nodes in the parse tree.
-#         """
-#         if len(tree_lst) == 1:
-#             if next(iter(tree_lst)).payload != '<t0>':
-#                 return [ParseNode('<t0>', False, tree_lst[:])]
-#             else:
-#                 return tree_lst
-#
-#         for group_str, tup in grouping:
-#             count, group_lst, id = tup
-#             ng = len(group_lst)
-#             ind = matches(group_lst, tree_lst)
-#             if ind != -1:
-#                 parent = ParseNode(id, False, tree_lst[ind : ind + ng])
-#                 tree_lst[ind : ind + ng] = [parent]
-#                 return tree_lst
-#         return [ParseNode('<t0>', False, tree_lst[:])]
-#
-#     return [apply_single(grouping, tree) for tree in trees]
+
+def group(trees):
+    """
+    TREES is composed of half-built ParseTrees. Each of the intermediate
+    ParseTrees are represented as a list of nodes at the top-most layer.
+
+    Given a list of TREES, computes and returns a map of the most common
+    payloads in the ParseNodes. These payloads can be either terminals or
+    nonterminals, both are treated the same. Each returned map entry is given a
+    unique identifier ti for some i > 1, reserving i = 0 for the start node.
+
+    Trivial groups are filtered out, including groups that only appear once,
+    groups that only consist of one token, and groups that are substrings of
+    other groups.
+
+    Returns the group first sorted by frequency so that most frequently occuring
+    substrings come first, then sorted by length, so that longer substrings are
+    preferred, like in the maximal-munch rule.
+    """
+    def is_substr(counts, candidate):
+        """
+        Checks whether candidate is a substring of any string key in the count
+        dictionary, and returns True if so.
+        """
+        for key_str in counts:
+            if candidate != key_str and candidate in key_str:
+                return True
+        return False
+
+    # Compute a map of substrings to their frequency of occurence over all trees
+    counts = {}
+    for tree_lst in trees:
+        for i in range(len(tree_lst)):
+            for j in range(i + 1, len(tree_lst) + 1):
+                tree_sublist = tree_lst[i:j]
+                tree_substr = ''.join([t.payload for t in tree_sublist])
+                if tree_substr in counts:
+                    count, sublist, id = counts[tree_substr]
+                    counts[tree_substr] = (count + 1, sublist, id)
+                else:
+                    counts[tree_substr] = (1, tree_sublist, allocate_tid())
+
+    # Filter out tokens that only appear once and nonterminals that are composed
+    # of only a single token. Filter out keys that are substrings of other keys.
+    counts = {k:v for k, v in counts.items() if v[0] > 1 and len(v[1]) > 1}
+    counts = {k:v for k, v in counts.items() if not is_substr(counts, k)}
+
+    # Sort first by frequency, then by key-length
+    counts = sorted(counts.items(), key=lambda elem: elem[1][0], reverse=True)
+    counts = sorted(counts, key=lambda elem: len(elem[1][1]), reverse=True)
+    return counts
+
+def apply(grouping, trees):
+    """
+    The GROUPING of the TREES is an implicit map of a list of tokens to the
+    frequency at which the list occurs in the top layer of TREES, with most
+    frequent token appearing first.
+
+    TREES is composed of half-built ParseTrees. Each of the intermediate
+    ParseTrees are represented as a list of nodes at the top-most layer. This
+    algorithm applies GROUPING to the topmost layer of each tree to progress
+    in building the tree. This algorithm should be repeatedly called until
+    the tree is fully built.
+
+    Algorithm: For each of the trees in TREES, greedily group the ParseNodes in
+    accord with GROUPING so that the most frequently appearing tokens are grouped
+    first. Perform only one iteration of this greedy grouping scheme, so that
+    in order to completely build the tree, this method must be called many times.
+    Grouped nodes become the children of new ParseNodes, which are inserted
+    into the top layer list of the trees. The updated top layer lists are returned.
+
+    In other words, this method, given the ith layer of the tree and the set of
+    groupings for that layer, returns the i + 1st layer of the tree, for each
+    of the input trees in TREES.
+    """
+    def matches(grouping, layer):
+        """
+        LAYER is the top layer of one half-built ParseTree.
+
+        The GROUPING of the TREES is an implicit map of a list of tokens to the
+        frequency at which the list occurs in the top layer of TREES, with most
+        frequent token appearing first. Requires len(grouping) > 0.
+
+        Returns the index at which grouping appears in layer, and returns -1 if
+        the grouping does not appear in the layer.
+        """
+        ng, nl = len(grouping), len(layer)
+        for i in range(nl):
+            layer_ind = i # Index into layer
+            group_ind = 0 # Index into group
+            while group_ind < ng and layer_ind < nl and layer[layer_ind].payload == grouping[group_ind].payload:
+                layer_ind += 1
+                group_ind += 1
+            if group_ind == ng: return i
+        return -1
+
+    def apply_single(group_lst, tree_lst):
+        """
+        Applies the grouping GROUP_LST to a single tree. For each grouping,
+        processed in order, applies that grouping to TREE_LST as many times
+        as possible.
+
+        Returns the updated TREE_LST. If no groupings can be found, do nothing.
+        """
+        if len(group_lst) == 0:
+            return tree_lst
+
+        for group_str, tup in grouping:
+            count, group_lst, id = tup
+            ng = len(group_lst)
+            ind = matches(group_lst, tree_lst)
+            while ind != -1:
+                parent = ParseNode(id, False, tree_lst[ind : ind + ng])
+                tree_lst[ind : ind + ng] = [parent]
+                ind = matches(group_lst, tree_lst)
+
+        return tree_lst
+
+    return [apply_single(grouping, tree) for tree in trees]
 #
 # def build_trees(leaves):
 #     """
@@ -492,11 +501,13 @@ def derive_classes(oracle, config, leaves):
 #
 # from input import parse_input
 # from parse_tree import ParseTree
-# file_name = 'examples/arithmetic/arithmetic-numbers.json'
+# file_name = 'examples/arithmetic/arithmetic.json'
 # CONFIG, ORACLE_GEN, ORACLE = parse_input(file_name)
 # POS_EXAMPLES, MAX_TREE_DEPTH = CONFIG['POS_EXAMPLES'], CONFIG['MAX_TREE_DEPTH']
 # oracle_parse_tree = ParseTree(ORACLE_GEN)
 # positive_examples, positive_nodes = oracle_parse_tree.sample_strings(POS_EXAMPLES, MAX_TREE_DEPTH)
+# positive_examples = ['int', '( int )', 'int + int', 'int * int']
+# positive_nodes = [[ParseNode(tok, True, []) for tok in s.split()] for s in positive_examples]
 #
 # starts = build_start_grammars(config, arithmetic)
 # for gen in starts:
