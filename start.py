@@ -268,6 +268,49 @@ def build_trees(leaves):
 
     return [ParseNode(START, False, tree_lst[:]) for tree_lst in layers]
 
+def build_grammar(config, trees):
+    """
+    CONFIG is the required configuration options for GrammarGenerator classes.
+
+    TREES is a list of fully constructed parse trees. This method builds a
+    GrammarNode that is the disjunction of the parse trees, and returns it.
+    """
+    def build_rules(grammar_node, parse_node, rule_map):
+        """
+        Adds the rules defined in PARSE_NODE and all of its subtrees to the
+        GRAMMAR_NODE via recursion.
+        """
+        # Terminals and nodes with no children do not define rules
+        if parse_node.is_terminal or len(parse_node.children) == 0:
+            return
+
+        # The current ParseNode defines a rule. Add this rule to the grammar.
+        #        t0
+        #       / | \
+        #     t1  a  b
+        #    / |
+        #    ...
+        # E.g. the ParseNode t0 defines the rule t0 -> t1 a b
+        rule_body = [SymbolNode(config, child.payload, child.is_terminal) for child in parse_node.children]
+        rule = RuleNode(config, parse_node.payload, rule_body)
+        rule_str = ''.join([sn.choice for sn in rule.children])
+        if rule.lhs not in rule_map: rule_map[rule.lhs] = set()
+        if rule_str not in rule_map[rule.lhs]:
+            grammar_node.children.append(rule)
+            rule_map[rule.lhs].add(rule_str)
+
+        # Recurse on the children of this ParseNode so the rule they define
+        # are also added to the grammar.
+        for child in parse_node.children:
+            build_rules(grammar_node, child, rule_map)
+
+    # Construct the initial grammar node without children, then fill them.
+    # Return the corresponding GrammarNode
+    grammar_node, rule_map = GrammarNode(config, START, []), {}
+    for tree in trees:
+        build_rules(grammar_node, tree, rule_map)
+    return grammar_node
+
 # def merge_trees(config, grammar_nodes, nt_grouping):
 #     """
 #     CONFIG is the required configuration options for GrammarGenerator classes.
@@ -424,46 +467,6 @@ def build_trees(leaves):
 #
 #         # Finished finding all the rules to add to this grammar, now add them
 #         grammar_node.children.extend(rules_to_add)
-#
-# def build_generator(config, tree):
-#     """
-#     CONFIG is the required configuration options for GrammarGenerator classes.
-#
-#     TREE is a fully constructed parse tree. This method builds a GrammarGenerator
-#     based on the parse tree, and returns it.
-#     """
-#     def build_rules(grammar_node, parse_node):
-#         """
-#         Adds the rules defined in PARSE_NODE and all of its subtrees to the
-#         GRAMMAR_NODE via recursion.
-#         """
-#         # Terminals and nodes with no children do not define rules
-#         if parse_node.is_terminal or len(parse_node.children) == 0:
-#             return
-#
-#         # The current ParseNode defines a rule. Add this rule to the grammar.
-#         #        t0
-#         #       / | \
-#         #     t1  a  b
-#         #    / |
-#         #    ...
-#         # E.g. the ParseNode t0 defines the rule t0 -> t1 a b
-#         rule_body = [SymbolNode(config, child.payload, child.is_terminal) for child in parse_node.children]
-#         rule = RuleNode(config, parse_node.payload, rule_body)
-#         if not rule.lhs in [r.lhs for r in grammar_node.children]:
-#             grammar_node.children.append(rule)
-#
-#         # Recurse on the children of this ParseNode so the rule they define
-#         # are also added to the grammar.
-#         # Terminals and nodes without children are taken care of by the base case.
-#         for child in parse_node.children:
-#             build_rules(grammar_node, child)
-#
-#     # Initial grammar node without children, then fill its children.
-#     # Return the corresponding GrammarGenerator
-#     grammar_node = GrammarNode(config, tree.payload, [])
-#     build_rules(grammar_node, tree)
-#     return GrammarGenerator(config, grammar_node)
 
 # Examples:
 # leaves = [[ParseNode('abc', True, None), ParseNode('d', True, None), ParseNode('e', True, None), ParseNode('f', True, None), ParseNode('g', True, None)], [ParseNode('abc', True, None), ParseNode('d', True, None), ParseNode('e', True, None)]]
