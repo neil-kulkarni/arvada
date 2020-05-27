@@ -239,63 +239,35 @@ def apply(grouping, trees):
         return tree_lst
 
     return [apply_single(grouping, tree) for tree in trees]
-#
-# def build_trees(leaves):
-#     """
-#     LEAVES should be a list of lists (one list for each input example), where
-#     each sublist contains the tokens that built that example, as ParseNodes.
-#
-#     Iteratively builds parse trees from each of the examples and returns a list
-#     of ParseNode references
-#
-#     Algorithm:
-#         1. Initialization
-#             - S <- input examples
-#             - G <- group(S)
-#         2. while there is some unfinished tree:
-#             a. Build new ParseNodes from S
-#             b. S <- set of ParseNodes
-#         3. return the set of finished ParseNodes
-#
-#     This method also computes groups for nonterminals, which are used for merging
-#     the finished trees in later algorithms
-#     """
-#     def finished(layers):
-#         """
-#         Helper function that returns when each of the trees in layers is
-#         composed of just a single root (has a length of 1), indicating that
-#         the algorithm is finished building all the trees.
-#         """
-#         return all([len(layer) <= 1 for layer in layers])
-#
-#     grouping = group(leaves)
-#     nt_grouping = {}
-#     layers = leaves
-#
-#     while not finished(layers):
-#         layers = apply(grouping, layers)
-#
-#         for grp_key, grp_val in group(layers):
-#             if '<t' not in grp_key or grp_key.replace('<t', '').replace('>', '') == '':
-#                 continue
-#             if grp_key not in nt_grouping:
-#                 nt_grouping[grp_key] = grp_val
-#             else:
-#                 cnt, nodes, id = nt_grouping[grp_key]
-#                 nt_grouping[grp_key] = (cnt + grp_val[0], nodes, id)
-#
-#     # Sort nt_grouping before returning it, and give merged nonterminals a different
-#     # identifier than normal nonterminals
-#     nt_grouping = sorted(nt_grouping.items(), key=lambda elem: elem[1][0], reverse=True)
-#     nt_grouping = sorted(nt_grouping, key=lambda elem: len(elem[1][1]), reverse=True)
-#     for i in range(len(nt_grouping)):
-#         grp_str, tup = nt_grouping[i]
-#         cnt, nodes, grp_id = tup
-#         grp_id = grp_id.replace('<t', '<v')
-#         nt_grouping[i] = (grp_str, (cnt, nodes, grp_id))
-#
-#     return [layer[0] for layer in layers], nt_grouping
-#
+
+def build_trees(leaves):
+    """
+    LEAVES should be a list of lists (one list for each input example), where
+    each sublist contains the tokens that built that example, as ParseNodes.
+
+    Iteratively builds parse trees from each of the examples and returns a list
+    of ParseNode references
+
+    Algorithm:
+        1. Initialization
+            - S <- input examples
+            - G <- group(S)
+        2. while grouping G is not empty:
+            a. Build new ParseNodes from S
+            b. S <- set of ParseNodes
+            c. G <- group(S)
+        3. Add a start nonterminal to each ParseNode
+        4. return the set of finished starts
+    """
+    layers = leaves
+    grouping = group(layers)
+
+    while not len(grouping) > 0:
+        layers = apply(grouping, layers)
+        grouping = group(layers)
+
+    return [ParseNode(START, False, tree_lst[:]) for tree_lst in layers]
+
 # def merge_trees(config, grammar_nodes, nt_grouping):
 #     """
 #     CONFIG is the required configuration options for GrammarGenerator classes.
