@@ -1,4 +1,3 @@
-import re
 from parse_tree import ParseNode
 from generator import *
 from graph import Graph
