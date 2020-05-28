@@ -34,7 +34,7 @@ def build_start_grammars(oracle, config, leaves):
     grammar = build_grammar(config, trees)
     grammar = coalesce(oracle, config, trees, grammar)
     grammar = minimize(config, grammar)
-    return grammar
+    return finalize(config, grammar)
 
 def derive_classes(oracle, config, leaves):
     """
@@ -480,6 +480,8 @@ def minimize(config, grammar):
     """
     Mutative method that deletes repeated rules from GRAMMAR and removes
     unnecessary layers of indirection.
+
+    CONFIG is the required configuration options for GrammarGenerator classes.
     """
     # Create a unique set of rules represented as a map
     grammar_map = {}
@@ -531,8 +533,23 @@ def minimize(config, grammar):
 
     # Now, remove all the rules that defined nonterminals in X
     grammar.children = [rule for rule in grammar.children if rule.lhs not in X]
-
     return grammar
+
+def finalize(config, grammar):
+    """
+    Adds the finishing touches to the GRAMMAR, then returns the corresponding
+    GrammarGenerator object.
+
+    CONFIG is the required configuration options for GrammarGenerator classes.
+    """
+    # Wrap each terminal in the grammar in quotations
+    for rule_node in grammar.children:
+        for symbol_node in rule_node.children:
+            if symbol_node.is_terminal and symbol_node.choice[0] != '"':
+                symbol_node.choice = '"%s"' % (symbol_node.choice)
+
+    # Return the GrammarGenerator
+    return GrammarGenerator(config, grammar)
 
 # Examples:
 # leaves = [[ParseNode('abc', True, None), ParseNode('d', True, None), ParseNode('e', True, None), ParseNode('f', True, None), ParseNode('g', True, None)], [ParseNode('abc', True, None), ParseNode('d', True, None), ParseNode('e', True, None)]]
