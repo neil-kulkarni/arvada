@@ -17,7 +17,7 @@ def allocate_tid():
 next_tid = 0
 START = allocate_tid() # The start nonterminal is t0
 
-def build_start_grammars(oracle, config, leaves):
+def build_start_grammar(oracle, config, leaves):
     """
     ORACLE is a Lark parser for the grammar we seek to find. We ask the oracle
     yes or no replacement questions in this method.
@@ -30,9 +30,13 @@ def build_start_grammars(oracle, config, leaves):
     Returns a set of starting grammar generators whose corresponding grammars
     each match at least one input example.
     """
+    print('Building the starting trees...'.ljust(50), end='\r')
     trees = build_trees(oracle, config, leaves)
+    print('Building initial grammar...'.ljust(50), end='\r')
     grammar = build_grammar(config, trees)
+    print('Coalescing nonterminals...'.ljust(50), end='\r')
     grammar = coalesce(oracle, config, trees, grammar)
+    print('Minimizing and finalizing...'.ljust(50), end='\r')
     grammar = minimize(config, grammar)
     return finalize(config, grammar)
 
@@ -551,12 +555,7 @@ def finalize(config, grammar):
     # Return the GrammarGenerator
     return GrammarGenerator(config, grammar)
 
-# Examples:
-# leaves = [[ParseNode('abc', True, None), ParseNode('d', True, None), ParseNode('e', True, None), ParseNode('f', True, None), ParseNode('g', True, None)], [ParseNode('abc', True, None), ParseNode('d', True, None), ParseNode('e', True, None)]]
-# config = {'TERMINALS': ['"a"', '"b"', '', '"c"', '"d"', '"e"', '"f"', '"g"'], 'NONTERMINALS': ['t0', 't1', 't2', 't3', 't4', 't5', 't6', 't7', 't8', 't9', 't10', 't11', 't12', 't13', 't14'], 'NUM_RULES': 15, 'MAX_RHS_LEN': 3, 'POS_EXAMPLES': 100, 'NEG_EXAMPLES': 100, 'MAX_NEG_EXAMPLE_SIZE': 100, 'MAX_TREE_DEPTH': 10}
-# arithmetic = [[ParseNode('(', True, None), ParseNode('int', True, None), ParseNode('+', True, None), ParseNode('int', True, None), ParseNode(')', True, None)], [ParseNode('(', True, None), ParseNode('int', True, None), ParseNode('*', True, None), ParseNode('int', True, None), ParseNode(')', True, None)], [ParseNode('int', True, None), ParseNode('+', True, None), ParseNode('int', True, None)], [ParseNode('int', True, None), ParseNode('*', True, None), ParseNode('int', True, None)]]
-# config = {'TERMINALS': ['"int"', '"+"', '"*"', '"("', '")"', ''], 'NONTERMINALS': ['t0', 't1', 't2'], 'NUM_RULES': 7, 'MAX_RHS_LEN': 5, 'POS_EXAMPLES': 100, 'NEG_EXAMPLES': 100, 'MAX_NEG_EXAMPLE_SIZE': 100, 'MAX_TREE_DEPTH': 10}
-#
+# Example:
 # from input import parse_input
 # from parse_tree import ParseTree
 # file_name = 'examples/arithmetic/arithmetic.json'
@@ -567,6 +566,5 @@ def finalize(config, grammar):
 # positive_examples = ['int', '( int )', 'int + int', 'int * int']
 # positive_nodes = [[ParseNode(tok, True, []) for tok in s.split()] for s in positive_examples]
 #
-# starts = build_start_grammars(config, arithmetic)
-# for gen in starts:
-#     print('%s\n\n' % (gen.generate_grammar()))
+# gen = build_start_grammar(ORACLE.parser(), CONFIG, positive_nodes)
+# print(gen.generate_grammar())

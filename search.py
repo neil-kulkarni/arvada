@@ -1,10 +1,10 @@
 import random, sys, os, time
 from score import Scorer
 from input import parse_input
-from parse_tree import ParseTree
+from parse_tree import ParseTree, ParseNode
 from grammar import Grammar, Rule
 from generator import GrammarGenerator
-from start import build_start_grammars
+from start import build_start_grammar
 
 def main(file_name, log_file, max_iters):
     start_time = time.time() # To compute elapsed time
@@ -14,6 +14,7 @@ def main(file_name, log_file, max_iters):
     POS_EXAMPLES, NEG_EXAMPLES = CONFIG['POS_EXAMPLES'], CONFIG['NEG_EXAMPLES']
     MAX_ITERS, MAX_NEG_EXAMPLE_SIZE = max_iters, CONFIG['MAX_NEG_EXAMPLE_SIZE']
     TERMINALS, MAX_TREE_DEPTH = CONFIG['TERMINALS'], CONFIG['MAX_TREE_DEPTH']
+    GUIDE_EXAMPLES = CONFIG['GUIDE']
 
     # Test to make sure that the oracle at least compiles, and throws an exception if not
     try:
@@ -31,6 +32,10 @@ def main(file_name, log_file, max_iters):
     negative_examples = ORACLE.sample_negatives(NEG_EXAMPLES, TERMINALS, MAX_NEG_EXAMPLE_SIZE)
     DATA = {'positive_examples': positive_examples, 'negative_examples': negative_examples}
 
+    # Generate guiding examples and corresponding ParseNodes
+    guide_nodes = [[ParseNode(tok, True, []) for tok in ex.split()] for ex in GUIDE_EXAMPLES]
+    if len(guide_nodes) == 0: guide_nodes = positive_nodes
+
     # Create the log file and write positive and negative examples to it
     with open(log_file, 'w+') as f:
         # Print the positive and negative examples
@@ -43,29 +48,26 @@ def main(file_name, log_file, max_iters):
             print(neg, file=f)
 
     # Build the starting grammars and test them for compilation
-    start_gens = build_start_grammars(CONFIG, positive_nodes)
-    for start_gen in start_gens:
-        try:
-            start_gen.generate_grammar().parser()
-        except Exception as e:
-            printf('Initial grammars do not compile! %s' % str(e))
+    print('Building the starting grammar...'.ljust(50), end='\r')
+    start_gen = build_start_grammar(OR_PARSER, CONFIG, guide_nodes)
+    try:
+        start_gen.generate_grammar().parser()
+    except Exception as e:
+        printf('Initial grammar does not compile! %s' % str(e))
 
-    # Generate random intial grammar and score it. Then, score all the start
-    # grammars we arrived at earlier, which will add the good ones to the
-    # "interesting" set for future iterations. Then, sample many more random
-    # grammars so that overall variance is reduced.
+    # Generate random intial grammar and score it. Then, score the start grammar
+    # we arrived at earlier, which will add it to the "interesting" set for
+    # future iterations. Then, sample many more random grammars so that overall
+    # variance is reduced.
     gen = GrammarGenerator(CONFIG)
     grammar = gen.generate_grammar()
     scorer = Scorer(CONFIG, DATA, grammar, gen)
     scorer.score(grammar, gen)
 
-    print('Scoring starting grammars..'.ljust(50), end='\r')
-    for start_gen in start_gens:
-        start_grammar = start_gen.generate_grammar()
-        scorer.score(start_grammar, start_gen)
+    start_grammar = start_gen.generate_grammar()
+    scorer.score(start_grammar, start_gen)
 
-    print('Adding random grammrs...'.ljust(50), end='\r')
-    for _ in range(len(start_gens)):
+    for _ in range(len(positive_examples)):
         gen = GrammarGenerator(CONFIG)
         grammar = gen.generate_grammar()
         scorer.score(grammar, gen)
@@ -94,7 +96,6 @@ def main(file_name, log_file, max_iters):
         print('\n\n==========', file=f)
 
     # Main Program Loop
-    print('Beginning main program loop...'.ljust(50), end='\r')
     print(''.ljust(50), end='\r')
     iterations = 0
     while iterations < MAX_ITERS:

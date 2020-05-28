@@ -7,8 +7,8 @@
     "POS_EXAMPLES": 100,
     "NEG_EXAMPLES": 100,
     "MAX_NEG_EXAMPLE_SIZE": 50,
-    "MAX_TREE_DEPTH": 7
-
+    "MAX_TREE_DEPTH": 7,
+    "GUIDE": []
   },
   "grammar": {
     "start": "A",
