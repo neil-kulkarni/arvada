@@ -9,7 +9,7 @@
     "NEG_EXAMPLES": 100,
     "MAX_NEG_EXAMPLE_SIZE": 100,
     "MAX_TREE_DEPTH": 10,
-    "GUIDE": []
+    "GUIDE": ["b", "b a"]
   },
   "grammar":
   {
