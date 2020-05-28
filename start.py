@@ -33,6 +33,7 @@ def build_start_grammars(oracle, config, leaves):
     trees = build_trees(oracle, config, leaves)
     grammar = build_grammar(config, trees)
     grammar = coalesce(oracle, config, trees, grammar)
+    grammar = minimize(config, grammar)
     return grammar
 
 def derive_classes(oracle, config, leaves):
@@ -472,6 +473,64 @@ def coalesce(oracle, config, trees, grammar):
         grammar.children = [rule_node for rule_node in grammar.children if not (rule_node.lhs == conservative_class_nt and next(iter(rule_node.children)).choice == START)]
         grammar.children.append(RuleNode(config, new_class_nt, [SymbolNode(config, conservative_class_nt, False)]))
         grammar.children.append(RuleNode(config, new_class_nt, [SymbolNode(config, START, False)]))
+
+    return grammar
+
+def minimize(config, grammar):
+    """
+    Mutative method that deletes repeated rules from GRAMMAR and removes
+    unnecessary layers of indirection.
+    """
+    # Create a unique set of rules represented as a map
+    grammar_map = {}
+    for rule in grammar.children:
+        if rule.lhs not in grammar_map:
+            grammar_map[rule.lhs] = ([], [])
+        rule_str = ''.join([sn.choice for sn in rule.children])
+        if rule_str not in grammar_map[rule.lhs][1]:
+            rules, rule_strings = grammar_map[rule.lhs]
+            rules.append(rule)
+            rule_strings.append(rule_str)
+
+    # Turn the unique set of rules into a new GrammarNode object
+    new_grammar = GrammarNode(config, START, [])
+    for rule_start in grammar_map:
+        rules, _ = grammar_map[rule_start]
+        for rule in rules:
+            new_grammar.children.append(rule)
+    grammar = new_grammar
+
+    # Finds the set of nonterminals that expand only to terminals
+    # Let the keys of X be the set of these nonterminals, and the corresponding
+    # values be the the strings derivable from those nonterminals
+    X, updated = {}, True # updated defines a stopping condition
+
+    while updated:
+        updated = False
+        for rule_start in grammar_map:
+            rules, _ = grammar_map[rule_start]
+            if len(rules) == 1 and all([(sn.is_terminal or sn.choice in X) for sn in next(iter(rules)).children]):
+                rule = next(iter(rules))
+                if rule.lhs not in X:
+                    X[rule.lhs] = sum([X[sn.choice] if sn.choice in X else [sn.choice] for sn in rule.children], [])
+                    updated = True
+
+    # Update the set X so that the strings derivable from it are lists of
+    # SymbolNodes instead of lists of strings
+    for k in X: X[k] = [SymbolNode(config, s, True) for s in X[k]]
+
+    # Iterate through the grammar, and mutate any rules that use a nonterminal
+    # in X to contain the set of terminals instead
+    for rule_node in grammar.children:
+        to_fix = [sn.choice in X for sn in rule_node.children]
+        while any(to_fix):
+            ind = to_fix.index(True)
+            nt = rule_node.children[ind]
+            rule_node.children[ind:ind+1] = X[nt.choice]
+            to_fix = [sn.choice in X for sn in rule_node.children]
+
+    # Now, remove all the rules that defined nonterminals in X
+    grammar.children = [rule for rule in grammar.children if rule.lhs not in X]
 
     return grammar
 
