@@ -8,7 +8,7 @@
     "NEG_EXAMPLES": 50,
     "MAX_NEG_EXAMPLE_SIZE": 100,
     "MAX_TREE_DEPTH": 7,
-    "GUIDE": []
+    "GUIDE": ["HTTP :// A . B", "HTTP :// WWW. C . D", "HTTPS :// E . F", "HTTPS :// WWW. G . H", "HTTP :// A B C . X Y Z", "HTTP :// H E L L O . C O M", "HTTP :// I . J", "HTTP :// K . L", "HTTP :// M . N", "HTTP :// O . P", "HTTP :// Q . R", "HTTP :// S . T", "HTTP :// U . V", "HTTP :// W . X", "HTTP :// Y . Z", "HTTP :// 0 . 1", "HTTP :// 2 . 3", "HTTP :// 4 . 5", "HTTP :// 6 . 7", "HTTP :// 8 . 9"]
   },
   "grammar": {
     "start": "url",
