@@ -8,7 +8,7 @@
     "NEG_EXAMPLES": 100,
     "MAX_NEG_EXAMPLE_SIZE": 50,
     "MAX_TREE_DEPTH": 7,
-    "GUIDE": []
+    "GUIDE": ["<a > TEXT </a>", "<a > <a > TEXT </a> </a>", "<a > <a > TEXT </a> </a>", "<a > <a > TEXT </a> TEXT </a>", "<a SPACE TEXT = TEXT > TEXT </a>", "<a SPACE TEXT = TEXT > <a > TEXT </a> </a>"]
   },
   "grammar": {
     "start": "main",
