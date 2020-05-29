@@ -37,6 +37,7 @@ def main(file_name, log_file, max_iters):
     if len(guide_nodes) == 0: guide_nodes = positive_nodes
 
     # Create the log file and write positive and negative examples to it
+    # Also write the initial starting grammar to the file
     with open(log_file, 'w+') as f:
         # Print the positive and negative examples
         print('\n\nPositive Examples:\n', file=f)
@@ -47,13 +48,15 @@ def main(file_name, log_file, max_iters):
         for neg in negative_examples:
             print(neg, file=f)
 
-    # Build the starting grammars and test them for compilation
-    print('Building the starting grammar...'.ljust(50), end='\r')
-    start_gen = build_start_grammar(OR_PARSER, CONFIG, guide_nodes)
-    try:
-        start_gen.generate_grammar().parser()
-    except Exception as e:
-        printf('Initial grammar does not compile! %s' % str(e))
+        # Build the starting grammars and test them for compilation
+        print('Building the starting grammar...'.ljust(50), end='\r')
+        start_gen = build_start_grammar(OR_PARSER, CONFIG, guide_nodes)
+        try:
+            start_gen.generate_grammar().parser()
+            print('\n\nInitial Grammar Created:\n%s' % str(start_gen.generate_grammar()), file=f)
+        except Exception as e:
+            print('\n\nInitial grammar does not compile! %s' % str(e), file=f)
+            exit()
 
     # Generate random intial grammar and score it. Then, score the start grammar
     # we arrived at earlier, which will add it to the "interesting" set for
