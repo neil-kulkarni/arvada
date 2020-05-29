@@ -30,9 +30,9 @@ def build_start_grammar(oracle, config, leaves):
     each match at least one input example.
     """
     print('Building the starting trees...'.ljust(50), end='\r')
-    trees, class_map = build_trees(oracle, config, leaves)
+    trees = build_trees(oracle, config, leaves)
     print('Building initial grammar...'.ljust(50), end='\r')
-    grammar = build_grammar(config, trees, class_map)
+    grammar = build_grammar(config, trees)
     print('Coalescing nonterminals...'.ljust(50), end='\r')
     grammar = coalesce(oracle, config, trees, grammar)
     print('Minimizing and finalizing...'.ljust(50), end='\r')
@@ -47,7 +47,7 @@ def derive_classes(oracle, config, leaves):
     the characters in the class in every grammar. Characters that do not belong
     to any classes are still given a unique nonterminal. Returns the new layer
     in the tree that is created by bubbling up each of the terminals to their
-    corresponding class. Also returns a map of nonterminal -> character class.
+    corresponding class.
 
     ORACLE is a Lark parser for the grammar we seek to find. We ask the oracle
     yes or no replacement questions in this method.
@@ -93,16 +93,15 @@ def derive_classes(oracle, config, leaves):
 
     # Define a mapping and a reverse mapping between a character class and
     # the newly generated nonterminal for that class
-    get_class, class_map = {}, {}
+    get_class = {}
     for cc in uf.classes().values():
         class_nt = allocate_tid()
-        class_map[class_nt] = cc
         for terminal in cc:
             get_class[terminal] = class_nt
 
     # Update each of the terminals in leaves to instead be a new nonterminal
     # ParseNode pointing to the original terminal
-    return [[ParseNode(get_class[leaf.payload], False, [leaf]) for leaf in tree] for tree in leaves], class_map
+    return [[ParseNode(get_class[leaf.payload], False, [leaf]) for leaf in tree] for tree in leaves]
 
 def group(trees):
     """
@@ -234,8 +233,7 @@ def build_trees(oracle, config, leaves):
     each sublist contains the tokens that built that example, as ParseNodes.
 
     Iteratively builds parse trees from each of the examples and returns a list
-    of ParseNode references. Also returns a map of nonterminal -> character
-    class that was obtained from the derive_classes method.
+    of ParseNode references
 
     Algorithm:
         1. Initialization
@@ -248,23 +246,21 @@ def build_trees(oracle, config, leaves):
         3. Add a start nonterminal to each ParseNode
         4. return the set of finished starts
     """
-    layers, class_map = derive_classes(oracle, config, leaves)
+    layers = derive_classes(oracle, config, leaves)
     grouping = group(layers)
 
     while len(grouping) > 0:
         layers = apply(grouping, layers)
         grouping = group(layers)
 
-    return [ParseNode(START, False, tree_lst[:]) for tree_lst in layers], class_map
+    return [ParseNode(START, False, tree_lst[:]) for tree_lst in layers]
 
-def build_grammar(config, trees, class_map):
+def build_grammar(config, trees):
     """
     CONFIG is the required configuration options for GrammarGenerator classes.
 
     TREES is a list of fully constructed parse trees. This method builds a
     GrammarNode that is the disjunction of the parse trees, and returns it.
-
-    CLASS_MAP is a map of nonterminal -> character class.
     """
     def build_rules(grammar_node, parse_node, rule_map):
         """
@@ -289,16 +285,6 @@ def build_grammar(config, trees, class_map):
         if rule_str not in rule_map[rule.lhs]:
             grammar_node.children.append(rule)
             rule_map[rule.lhs].add(rule_str)
-
-        # If this nonterminal is the root of a character class, add the rest
-        # of the character class in as well, without repetition
-        if rule.lhs in class_map:
-            for terminal in class_map[rule.lhs]:
-                if terminal not in rule_map[rule.lhs]:
-                    class_rule_body = [SymbolNode(config, terminal, True)]
-                    class_rule = RuleNode(config, rule.lhs, class_rule_body)
-                    grammar_node.children.append(class_rule)
-                    rule_map[rule.lhs].add(terminal)
 
         # Recurse on the children of this ParseNode so the rule they define
         # are also added to the grammar.
