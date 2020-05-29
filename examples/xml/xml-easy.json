@@ -1,7 +1,7 @@
 {
   "config": {
-    "TERMINALS": ["<a", "=", ">", "</a>", "SPACE", "TEXT"],
-    "NONTERMINALS": ["A", "BODY", "ATTRLIST", "ATTR", "SPACES"],
+    "TERMINALS": [">", "</a>", "=", "TEXT", "SPACE", "<a"],
+    "NONTERMINALS": ["main", "body", "attrlist", "attr", "spaces"],
     "NUM_RULES": 15,
     "MAX_RHS_LEN" : 10,
     "POS_EXAMPLES": 100,
@@ -11,38 +11,36 @@
     "GUIDE": []
   },
   "grammar": {
-    "start": "A",
+    "start": "main",
     "rules": [{
-      "start": "A",
+      "start": "main",
       "bodies": [
-        ["<a", "SPACES", "ATTRLIST", ">", "BODY", "</a>"],
-        ["<a", "SPACES", "ATTRLIST", ">", "</a>"],
-        ["<a", ">", "BODY", "</a>"],
-        ["<a", ">",  "</a>"]
+        ["<a", "spaces", "attrlist", ">", "body", "</a>"],
+        ["<a", ">", "body", "</a>"]
       ]
     }, {
-      "start": "BODY",
+      "start": "body",
       "bodies": [
-        ["A"],
+        ["main"],
         ["TEXT"],
-        ["A", "BODY"]
+        ["main", "body"]
       ]
     }, {
-      "start": "ATTRLIST",
+      "start": "attrlist",
       "bodies": [
-        ["ATTR"],
-        ["ATTR", "SPACE", "ATTRLIST"]
+        ["attr"],
+        ["attr", "SPACE", "attrlist"]
       ]
     }, {
-      "start": "ATTR",
+      "start": "attr",
       "bodies": [
         ["TEXT", "=", "TEXT"]
       ]
     }, {
-      "start": "SPACES",
+      "start": "spaces",
       "bodies": [
         ["SPACE"],
-        ["SPACE", "SPACES"]
+        ["SPACE", "spaces"]
       ]
     }]
   }

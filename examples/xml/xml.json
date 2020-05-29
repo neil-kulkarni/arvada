@@ -1,7 +1,7 @@
 {
   "config": {
-    "TERMINALS": ["<a", "=\"", "\"", ">", "</a>", "SPACE", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"],
-    "NONTERMINALS": ["A", "BODY", "TEXT", "ATTRLIST", "ATTR", "SPACES"],
+    "TERMINALS": ["'", "b", "u", "='", "x", "k", "j", "SPACE", "e", ">", "w", "i", "q", "y", "n", "<a", "d", "h", "</a>", "g", "p", "l", "f", "s", "r", "z", "m", "v", "t", "c", "o", "a"],
+    "NONTERMINALS": ["main", "body", "text", "attrlist", "attr", "spaces"],
     "NUM_RULES": 75,
     "MAX_RHS_LEN" : 5,
     "POS_EXAMPLES": 100,
@@ -11,93 +11,93 @@
     "GUIDE": []
   },
   "grammar": {
-    "start": "A",
+    "start": "main",
     "rules": [{
-      "start": "A",
+      "start": "main",
       "bodies": [
-        ["<a", "SPACES", "ATTRLIST", ">", "BODY", "</a>"],
-        ["<a", ">", "BODY", "</a>"]
+        ["<a", "spaces", "attrlist", ">", "body", "</a>"],
+        ["<a", ">", "body", "</a>"]
       ]
     }, {
-      "start": "BODY",
+      "start": "body",
       "bodies": [
-        ["A"],
-        ["TEXT"],
-        ["A", "BODY"],
-        ["TEXT", "BODY"]
+        ["main"],
+        ["text"],
+        ["main", "body"],
+        ["text", "body"]
       ]
     }, {
-      "start": "TEXT",
+      "start": "text",
       "bodies": [
         ["a"],
-        ["a", "TEXT"],
+        ["a", "text"],
         ["b"],
-        ["b", "TEXT"],
+        ["b", "text"],
         ["c"],
-        ["c", "TEXT"],
+        ["c", "text"],
         ["d"],
-        ["d", "TEXT"],
+        ["d", "text"],
         ["e"],
-        ["e", "TEXT"],
+        ["e", "text"],
         ["f"],
-        ["f", "TEXT"],
+        ["f", "text"],
         ["g"],
-        ["g", "TEXT"],
+        ["g", "text"],
         ["h"],
-        ["h", "TEXT"],
+        ["h", "text"],
         ["i"],
-        ["i", "TEXT"],
+        ["i", "text"],
         ["j"],
-        ["j", "TEXT"],
+        ["j", "text"],
         ["k"],
-        ["k", "TEXT"],
+        ["k", "text"],
         ["l"],
-        ["l", "TEXT"],
+        ["l", "text"],
         ["m"],
-        ["m", "TEXT"],
+        ["m", "text"],
         ["n"],
-        ["n", "TEXT"],
+        ["n", "text"],
         ["o"],
-        ["o", "TEXT"],
+        ["o", "text"],
         ["p"],
-        ["p", "TEXT"],
+        ["p", "text"],
         ["q"],
-        ["q", "TEXT"],
+        ["q", "text"],
         ["r"],
-        ["r", "TEXT"],
+        ["r", "text"],
         ["s"],
-        ["s", "TEXT"],
+        ["s", "text"],
         ["t"],
-        ["t", "TEXT"],
+        ["t", "text"],
         ["u"],
-        ["u", "TEXT"],
+        ["u", "text"],
         ["v"],
-        ["v", "TEXT"],
+        ["v", "text"],
         ["w"],
-        ["w", "TEXT"],
+        ["w", "text"],
         ["x"],
-        ["x", "TEXT"],
+        ["x", "text"],
         ["y"],
-        ["y", "TEXT"],
+        ["y", "text"],
         ["z"],
-        ["z", "TEXT"]
+        ["z", "text"]
       ]
     }, {
-      "start": "ATTRLIST",
+      "start": "attrlist",
       "bodies": [
-        ["ATTR"],
-        ["ATTR", "ATTRLIST"]
+        ["attr"],
+        ["attr", "attrlist"]
       ]
     }, {
-      "start": "ATTR",
+      "start": "attr",
       "bodies": [
-        ["TEXT", "=\"", "TEXT", "\""]
+        ["text", "='", "text", "'"]
       ]
     }, {
-      "start": "SPACES",
+      "start": "spaces",
       "bodies": [
         ["SPACE"],
-        ["SPACE", "SPACES"]
+        ["SPACE", "spaces"]
       ]
     }]
   }

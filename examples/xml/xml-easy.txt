@@ -1,9 +1,10 @@
+# Terminals
 <a, =,  >, </a>, SPACE, TEXT
 
-A := <a SPACES ATTRLIST > BODY </a> | <a > BODY </a>
-BODY := A | TEXT | A BODY 
+# Grammar
+main := <a spaces attrlist > body </a> | <a > body </a>
+body := main | TEXT | main body
 
-ATTRLIST := ATTR | ATTR SPACE ATTRLIST
-ATTR := TEXT = TEXT 
-SPACES := SPACE | SPACE SPACES
-
+attrlist := attr | attr SPACE attrlist
+attr := TEXT = TEXT
+spaces := SPACE | SPACE spaces
