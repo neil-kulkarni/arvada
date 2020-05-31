@@ -50,7 +50,7 @@ def main(file_name, log_file, max_iters):
 
         # Build the starting grammars and test them for compilation
         print('Building the starting grammar...'.ljust(50), end='\r')
-        start_gen = build_start_grammar(OR_PARSER, CONFIG, guide_nodes)
+        start_gen = build_start_grammar(OR_PARSER, CONFIG, DATA, guide_nodes)
         try:
             start_gen.generate_grammar().parser()
             print('\n\nInitial Grammar Created:\n%s' % str(start_gen.generate_grammar()), file=f)

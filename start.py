@@ -2,6 +2,7 @@ from parse_tree import ParseNode
 from generator import *
 from graph import Graph
 from union import UnionFind
+from score import Scorer
 
 def allocate_tid():
     """
@@ -16,12 +17,15 @@ def allocate_tid():
 next_tid = 0
 START = allocate_tid() # The start nonterminal is t0
 
-def build_start_grammar(oracle, config, leaves):
+def build_start_grammar(oracle, config, data, leaves):
     """
     ORACLE is a Lark parser for the grammar we seek to find. We ask the oracle
     yes or no replacement questions in this method.
 
     CONFIG is the required configuration options for GrammarGenerator classes.
+
+    DATA is a map containing both the positive and negative examples used to
+    train the stochastic search.
 
     LEAVES is a list of positive examples, each expressed as a list of tokens
     (ParseNode objects).
@@ -30,14 +34,17 @@ def build_start_grammar(oracle, config, leaves):
     each match at least one input example.
     """
     print('Building the starting trees...'.ljust(50), end='\r')
-    trees = build_trees(oracle, config, leaves)
+    trees, classes = build_trees(oracle, config, leaves)
     print('Building initial grammar...'.ljust(50), end='\r')
     grammar = build_grammar(config, trees)
     print('Coalescing nonterminals...'.ljust(50), end='\r')
     grammar = coalesce(oracle, config, trees, grammar)
-    print('Minimizing and finalizing...'.ljust(50), end='\r')
+    print('Minimizing and cleaning...'.ljust(50), end='\r')
     grammar = minimize(config, grammar)
-    return finalize(config, grammar)
+    gen = clean(config, grammar)
+    print('Adding repetition...'.ljust(50), end='\r')
+    gen = add_repetition(config, data, gen, classes)
+    return gen
 
 def derive_classes(oracle, config, leaves):
     """
@@ -47,7 +54,8 @@ def derive_classes(oracle, config, leaves):
     the characters in the class in every grammar. Characters that do not belong
     to any classes are still given a unique nonterminal. Returns the new layer
     in the tree that is created by bubbling up each of the terminals to their
-    corresponding class.
+    corresponding class. Also returns a map of nonterminal to the character
+    class that it defines.
 
     ORACLE is a Lark parser for the grammar we seek to find. We ask the oracle
     yes or no replacement questions in this method.
@@ -93,15 +101,17 @@ def derive_classes(oracle, config, leaves):
 
     # Define a mapping and a reverse mapping between a character class and
     # the newly generated nonterminal for that class
-    get_class = {}
+    get_class, classes = {}, {}
     for cc in uf.classes().values():
         class_nt = allocate_tid()
+        classes[class_nt] = cc
         for terminal in cc:
             get_class[terminal] = class_nt
 
     # Update each of the terminals in leaves to instead be a new nonterminal
-    # ParseNode pointing to the original terminal
-    return [[ParseNode(get_class[leaf.payload], False, [leaf]) for leaf in tree] for tree in leaves]
+    # ParseNode pointing to the original terminal. Return the updated list
+    # as well as a mapping of nonterminal to the character class it defines.
+    return [[ParseNode(get_class[leaf.payload], False, [leaf]) for leaf in tree] for tree in leaves], classes
 
 def group(trees):
     """
@@ -233,7 +243,8 @@ def build_trees(oracle, config, leaves):
     each sublist contains the tokens that built that example, as ParseNodes.
 
     Iteratively builds parse trees from each of the examples and returns a list
-    of ParseNode references
+    of ParseNode references. Also returns the character classes for use in future
+    stages of the algorithm.
 
     Algorithm:
         1. Initialization
@@ -246,14 +257,14 @@ def build_trees(oracle, config, leaves):
         3. Add a start nonterminal to each ParseNode
         4. return the set of finished starts
     """
-    layers = derive_classes(oracle, config, leaves)
+    layers, classes = derive_classes(oracle, config, leaves)
     grouping = group(layers)
 
     while len(grouping) > 0:
         layers = apply(grouping, layers)
         grouping = group(layers)
 
-    return [ParseNode(START, False, tree_lst[:]) for tree_lst in layers]
+    return [ParseNode(START, False, tree_lst[:]) for tree_lst in layers], classes
 
 def build_grammar(config, trees):
     """
@@ -540,7 +551,7 @@ def minimize(config, grammar):
     grammar.children = [rule for rule in grammar.children if rule.lhs not in X]
     return grammar
 
-def finalize(config, grammar):
+def clean(config, grammar):
     """
     Adds the finishing touches to the GRAMMAR, then returns the corresponding
     GrammarGenerator object.
@@ -555,6 +566,59 @@ def finalize(config, grammar):
 
     # Return the GrammarGenerator
     return GrammarGenerator(config, grammar)
+
+def add_repetition(config, data, gen, classes):
+    """
+    CONFIG is the required configuration options for GrammarGenerator classes.
+
+    DATA is a map containing both the positive and negative examples used to
+    train the stochastic search.
+
+    GEN is a GrammarGenerator object output of the previous five stages of
+    development.
+
+    CLASSES is a map of nonterminal -> the character class that it defines.
+
+    This function iterates through each of the symbols in the grammar, attempts
+    to update the symbol by allowing repetition, and sees if that improves
+    the grammar's positive score.
+    """
+    # Get the initial positive score of the original generator. Quit if >= 1.
+    grammar = gen.generate_grammar()
+    scorer = Scorer(config, data, grammar, gen)
+    print('Initial scoring...'.ljust(50), end='\r')
+    scorer.score(grammar, gen)
+    pos_score = scorer.score_map['pos'][0]
+    if pos_score >= 1.0:
+        return gen
+
+    # Iterate through the grammar, attempting to add a '+' rule at each symbol
+    updated, count = True, 1
+    while updated:
+        updated = False
+        k = len(gen.grammar_node.children)
+        for i in range(k):
+            l = len(gen.grammar_node.children[i].children)
+            if gen.grammar_node.children[i].lhs in classes:
+                continue # Skip over character classes
+            for j in range(l):
+                gen_cpy = gen.copy()
+                sn_cpy = gen_cpy.grammar_node.children[i].children[j]
+                sn_cpy.choice = '%s+' % (sn_cpy.choice)
+                grammar_cpy = gen_cpy.generate_grammar()
+                print(('Scoring grammar (%d, %d, %d, %d, %d)' % (i, j, k, l, count)).ljust(50), end='\r')
+                scorer.score(grammar_cpy, gen_cpy)
+                new_pos_score = scorer.score_map['pos'][0]
+                if new_pos_score > pos_score:
+                    gen = gen_cpy
+                    pos_score = new_pos_score
+                    updated = True
+                    if pos_score >= 1.0:
+                        return gen
+        count += 1
+
+    # Return the final grammar
+    return gen
 
 # Example:
 # from input import parse_input
