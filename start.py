@@ -39,9 +39,9 @@ def build_start_grammar(oracle, config, data, leaves):
     grammar = build_grammar(config, trees)
     print('Coalescing nonterminals...'.ljust(50), end='\r')
     grammar = coalesce(oracle, config, trees, grammar)
-    print('Minimizing and cleaning...'.ljust(50), end='\r')
+    print('Minimizing and converting...'.ljust(50), end='\r')
     grammar = minimize(config, grammar)
-    gen = clean(config, grammar)
+    gen = convert(config, grammar)
     print('Adding repetition...'.ljust(50), end='\r')
     gen = add_repetition(config, data, gen, classes)
     return gen
@@ -551,7 +551,7 @@ def minimize(config, grammar):
     grammar.children = [rule for rule in grammar.children if rule.lhs not in X]
     return grammar
 
-def clean(config, grammar):
+def convert(config, grammar):
     """
     Adds the finishing touches to the GRAMMAR, then returns the corresponding
     GrammarGenerator object.
