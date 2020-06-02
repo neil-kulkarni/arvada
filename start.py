@@ -98,7 +98,7 @@ def derive_classes(oracle, config, leaves):
 
             # If the terminals can replace each other in every context, they
             # must belong to the same character class
-            if replaces(first, second) and replaces(second, first):
+            if not uf.is_connected(first, second) and replaces(first, second) and replaces(second, first):
                 uf.connect(first, second)
 
     # Define a mapping and a reverse mapping between a character class and
@@ -109,7 +109,6 @@ def derive_classes(oracle, config, leaves):
         classes[class_nt] = cc
         for terminal in cc:
             get_class[terminal] = class_nt
-
     # Update each of the terminals in leaves to instead be a new nonterminal
     # ParseNode pointing to the original terminal. Return the updated list
     # as well as a mapping of nonterminal to the character class it defines.
@@ -437,7 +436,7 @@ def coalesce(oracle, config, trees, grammar):
 
             # If the nonterminals can replace each other in every context, they
             # must belong to the same character class
-            if replaces(first, second) and replaces(second, first):
+            if not uf.is_connected(first, second) and replaces(first, second) and replaces(second, first):
                 uf.connect(first, second)
 
     # Define a mapping and a reverse mapping between a set of equivalent
