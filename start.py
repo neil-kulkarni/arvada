@@ -605,71 +605,64 @@ def add_alternation(config, data, gen, classes):
     # that appears in the grammar, any terminal that doesn't appear in a
     # character class, or epsilon. Also attempts to let each nonterminal also
     # go to epsilon.
-    updated, count = True, 1
-    while updated:
-        updated = False
+    rule_nodes = list(gen.grammar_node.children)
+    for i in range(len(rule_nodes)):
+        rule_node = rule_nodes[i]
+        for j in range(len(rule_node.children)):
+            if rule_node.lhs in classes:
+                continue # Skip over character classes
 
-        rule_nodes = list(gen.grammar_node.children)
-        for i in range(len(rule_nodes)):
-            rule_node = rule_nodes[i]
-            for j in range(len(rule_node.children)):
-                if rule_node.lhs in classes:
-                    continue # Skip over character classes
-
-                # Create a copy of the grammar
-                gen_cpy = gen.copy()
-                sn_cpy = gen_cpy.grammar_node.children[i].children[j]
-
-                # Add a minimial OR rule just containing the current symbol,
-                # and update the symbol to point to that rule
-                or_nt = allocate_tid()
-                or_rule = RuleNode(config, or_nt, [sn_cpy.copy()])
-                gen_cpy.grammar_node.children.append(or_rule)
-                sn_cpy.choice = or_nt
-                sn_cpy.is_terminal = False
-
-                # Attempt to add each of the ORing canidates to the OR rule,
-                # removing them if they do not help
-                or_used = False
-                for k in range(len(candidates)):
-                    candidate = candidates[k]
-                    new_or_rule = RuleNode(config, or_nt, [candidate])
-                    gen_cpy.grammar_node.children.append(new_or_rule)
-                    grammar_cpy = gen_cpy.generate_grammar()
-                    print(('Scoring alternation (%d/%d, %d/%d, %d/%d, %d)' % (i, len(rule_nodes), j, len(rule_node.children), k, len(candidates), count)).ljust(50), end='\r')
-                    scorer.score(grammar_cpy, gen_cpy)
-                    new_pos_score = scorer.score_map['pos'][0]
-                    if new_pos_score > pos_score:
-                        or_used = True
-                        pos_score = new_pos_score
-                    else:
-                        gen_cpy.grammar_node.children.pop()
-
-                # Update the generator if this alternation helped
-                if or_used:
-                    gen = gen_cpy
-                    updated = True
-                    if pos_score >= 1.0:
-                        return gen
-
-            # Attempt to add an epsilon rule for this rule start, removing it
-            # if it does not help
+            # Create a copy of the grammar
             gen_cpy = gen.copy()
-            eps_rule = RuleNode(config, rule_node.lhs, [SymbolNode(config, '', True)])
-            gen_cpy.grammar_node.children.append(eps_rule)
-            grammar_cpy = gen_cpy.generate_grammar()
-            print(('Adding epsilon rule (%d/%d)' % (i, len(rule_nodes))).ljust(50), end='\r')
-            scorer.score(grammar_cpy, gen_cpy)
-            new_pos_score = scorer.score_map['pos'][0]
-            if new_pos_score > pos_score:
+            sn_cpy = gen_cpy.grammar_node.children[i].children[j]
+
+            # Add a minimial OR rule just containing the current symbol,
+            # and update the symbol to point to that rule
+            or_nt = allocate_tid()
+            or_rule = RuleNode(config, or_nt, [sn_cpy.copy()])
+            gen_cpy.grammar_node.children.append(or_rule)
+            sn_cpy.choice = or_nt
+            sn_cpy.is_terminal = False
+
+            # Attempt to add each of the ORing canidates to the OR rule,
+            # removing them if they do not help
+            or_used = False
+            for k in range(len(candidates)):
+                candidate = candidates[k]
+                new_or_rule = RuleNode(config, or_nt, [candidate])
+                gen_cpy.grammar_node.children.append(new_or_rule)
+                grammar_cpy = gen_cpy.generate_grammar()
+                print(('Scoring alternation (%d/%d, %d/%d, %d/%d)' % (i, len(rule_nodes), j, len(rule_node.children), k, len(candidates))).ljust(50), end='\r')
+                scorer.score(grammar_cpy, gen_cpy)
+                new_pos_score = scorer.score_map['pos'][0]
+                if new_pos_score > pos_score:
+                    or_used = True
+                    pos_score = new_pos_score
+                else:
+                    gen_cpy.grammar_node.children.pop()
+
+            # Update the generator if this alternation helped
+            if or_used:
                 gen = gen_cpy
-                pos_score = new_pos_score
                 updated = True
                 if pos_score >= 1.0:
                     return gen
 
-        # Increment the outer loop counter
-        count += 1
+        # Attempt to add an epsilon rule for this rule start, removing it
+        # if it does not help
+        gen_cpy = gen.copy()
+        eps_rule = RuleNode(config, rule_node.lhs, [SymbolNode(config, '', True)])
+        gen_cpy.grammar_node.children.append(eps_rule)
+        grammar_cpy = gen_cpy.generate_grammar()
+        print(('Adding epsilon rule (%d/%d)' % (i, len(rule_nodes))).ljust(50), end='\r')
+        scorer.score(grammar_cpy, gen_cpy)
+        new_pos_score = scorer.score_map['pos'][0]
+        if new_pos_score > pos_score:
+            gen = gen_cpy
+            pos_score = new_pos_score
+            updated = True
+            if pos_score >= 1.0:
+                return gen
 
     # Return the final grammar
     return gen
@@ -699,31 +692,25 @@ def add_repetition(config, data, gen, classes):
         return gen
 
     # Iterate through the grammar, attempting to add a '+' rule at each symbol
-    updated, count = True, 1
-    while updated:
-        updated = False
-        k = len(gen.grammar_node.children)
-        for i in range(k):
-            l = len(gen.grammar_node.children[i].children)
-            if gen.grammar_node.children[i].lhs in classes:
-                continue # Skip over character classes
-            for j in range(l):
-                gen_cpy = gen.copy()
-                sn_cpy = gen_cpy.grammar_node.children[i].children[j]
-                sn_cpy.choice = '%s+' % (sn_cpy.choice)
-                grammar_cpy = gen_cpy.generate_grammar()
-                print(('Scoring repetition (%d, %d, %d, %d, %d)' % (i, j, k, l, count)).ljust(50), end='\r')
-                scorer.score(grammar_cpy, gen_cpy)
-                new_pos_score = scorer.score_map['pos'][0]
-                if new_pos_score > pos_score:
-                    gen = gen_cpy
-                    pos_score = new_pos_score
-                    updated = True
-                    if pos_score >= 1.0:
-                        return gen
-
-        # Increment the outer loop counter
-        count += 1
+    k = len(gen.grammar_node.children)
+    for i in range(k):
+        l = len(gen.grammar_node.children[i].children)
+        if gen.grammar_node.children[i].lhs in classes:
+            continue # Skip over character classes
+        for j in range(l):
+            gen_cpy = gen.copy()
+            sn_cpy = gen_cpy.grammar_node.children[i].children[j]
+            sn_cpy.choice = '%s+' % (sn_cpy.choice)
+            grammar_cpy = gen_cpy.generate_grammar()
+            print(('Scoring repetition (%d/%d, %d/%d)' % (i, k, j, l)).ljust(50), end='\r')
+            scorer.score(grammar_cpy, gen_cpy)
+            new_pos_score = scorer.score_map['pos'][0]
+            if new_pos_score > pos_score:
+                gen = gen_cpy
+                pos_score = new_pos_score
+                updated = True
+                if pos_score >= 1.0:
+                    return gen
 
     # Return the final grammar
     return gen
