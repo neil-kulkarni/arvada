@@ -42,6 +42,8 @@ def build_start_grammar(oracle, config, data, leaves):
     print('Minimizing and converting...'.ljust(50), end='\r')
     grammar = minimize(config, grammar)
     gen = convert(config, grammar)
+    print('Adding alternation...'.ljust(50), end='\r')
+    gen = add_alternation(config, data, gen, classes)
     print('Adding repetition...'.ljust(50), end='\r')
     gen = add_repetition(config, data, gen, classes)
     return gen
@@ -518,16 +520,20 @@ def minimize(config, grammar):
             new_grammar.children.append(rule)
     grammar = new_grammar
 
-    # Finds the set of nonterminals that expand directly to only terminals
+    # Finds the set of nonterminals that expand directly to a single terminal
     # Let the keys of X be the set of these nonterminals, and the corresponding
     # values be the the strings derivable from those nonterminals
-    X = {}
-    for rule_start in grammar_map:
-        rules, _ = grammar_map[rule_start]
-        if len(rules) == 1 and len(rules[0].children) == 1 and rules[0].children[0].is_terminal:
-            rule = next(iter(rules))
-            if rule.lhs not in X:
-                X[rule.lhs] = [sn.choice for sn in rule.children]
+    X, updated = {}, True # updated determines the stopping condition
+
+    while updated:
+        updated = False
+        for rule_start in grammar_map:
+            rules, _ = grammar_map[rule_start]
+            if len(rules) == 1 and len(rules[0].children) == 1 and (rules[0].children[0].is_terminal or rules[0].children[0].choice in X):
+                rule = next(iter(rules))
+                if rule.lhs not in X:
+                    X[rule.lhs] = [X[sn.choice][0] if sn.choice in X else sn.choice for sn in rule.children]
+                    updated = True
 
     # Update the set X so that the strings derivable from it are lists of
     # SymbolNodes instead of lists of strings
@@ -563,6 +569,111 @@ def convert(config, grammar):
     # Return the GrammarGenerator
     return GrammarGenerator(config, grammar)
 
+def add_alternation(config, data, gen, classes):
+    """
+    CONFIG is the required configuration options for GrammarGenerator classes.
+
+    DATA is a map containing both the positive and negative examples used to
+    train the stochastic search.
+
+    GEN is a GrammarGenerator object output of the previous stages of development.
+
+    CLASSES is a map of nonterminal -> the character class that it defines.
+
+    This function iterates through each of the symbols in the grammar, attempts
+    to update the symbol by allowing alternation, and sees if that improves
+    the grammar's positive score.
+    """
+    # Get the initial positive score of the original generator. Quit if >= 1.
+    grammar = gen.generate_grammar()
+    scorer = Scorer(config, data, grammar, gen)
+    print('Alternation initial scoring...'.ljust(50), end='\r')
+    scorer.score(grammar, gen)
+    pos_score = scorer.score_map['pos'][0]
+    if pos_score >= 1.0:
+        return gen
+
+    # Define the set of candidate replacements for any given symbol, as a list
+    # of SymbolNodes. These are defined below
+    class_terminals = set(['"%s"' % s for s in sum([v for v in classes.values() if len(v) > 1], [])])
+    candidates = [SymbolNode(config, nt, False) for nt in gen.get_nonterminals()]
+    candidates.extend([SymbolNode(config, t, True) for t in gen.get_terminals() if t not in class_terminals])
+    candidates.extend([SymbolNode(config, '', True)]) # Epsilon is a valid candidate
+
+    # Iterate through the grammar, attempting to add an alternation rule at
+    # each symbol, representing the OR of the current symbol and any nonterminal
+    # that appears in the grammar, any terminal that doesn't appear in a
+    # character class, or epsilon. Also attempts to let each nonterminal also
+    # go to epsilon.
+    updated, count = True, 1
+    while updated:
+        updated = False
+
+        rule_nodes = list(gen.grammar_node.children)
+        for i in range(len(rule_nodes)):
+            rule_node = rule_nodes[i]
+            for j in range(len(rule_node.children)):
+                if rule_node.lhs in classes:
+                    continue # Skip over character classes
+
+                # Create a copy of the grammar
+                gen_cpy = gen.copy()
+                sn_cpy = gen_cpy.grammar_node.children[i].children[j]
+
+                # Add a minimial OR rule just containing the current symbol,
+                # and update the symbol to point to that rule
+                or_nt = allocate_tid()
+                or_rule = RuleNode(config, or_nt, [sn_cpy.copy()])
+                gen_cpy.grammar_node.children.append(or_rule)
+                sn_cpy.choice = or_nt
+                sn_cpy.is_terminal = False
+
+                # Attempt to add each of the ORing canidates to the OR rule,
+                # removing them if they do not help
+                or_used = False
+                for k in range(len(candidates)):
+                    candidate = candidates[k]
+                    new_or_rule = RuleNode(config, or_nt, [candidate])
+                    gen_cpy.grammar_node.children.append(new_or_rule)
+                    grammar_cpy = gen_cpy.generate_grammar()
+                    print(('Scoring alternation (%d/%d, %d/%d, %d/%d, %d)' % (i, len(rule_nodes), j, len(rule_node.children), k, len(candidates), count)).ljust(50), end='\r')
+                    scorer.score(grammar_cpy, gen_cpy)
+                    new_pos_score = scorer.score_map['pos'][0]
+                    if new_pos_score > pos_score:
+                        or_used = True
+                        pos_score = new_pos_score
+                    else:
+                        gen_cpy.grammar_node.children.pop()
+
+                # Update the generator if this alternation helped
+                if or_used:
+                    gen = gen_cpy
+                    updated = True
+                    if pos_score >= 1.0:
+                        return gen
+
+            # Attempt to add an epsilon rule for this rule start, removing it
+            # if it does not help
+            gen_cpy = gen.copy()
+            eps_rule = RuleNode(config, rule_node.lhs, [SymbolNode(config, '', True)])
+            gen_cpy.grammar_node.children.append(eps_rule)
+            grammar_cpy = gen_cpy.generate_grammar()
+            print(('Adding epsilon rule (%d/%d)' % (i, len(rule_nodes))).ljust(50), end='\r')
+            scorer.score(grammar_cpy, gen_cpy)
+            new_pos_score = scorer.score_map['pos'][0]
+            if new_pos_score > pos_score:
+                gen = gen_cpy
+                pos_score = new_pos_score
+                updated = True
+                if pos_score >= 1.0:
+                    return gen
+
+        # Increment the outer loop counter
+        count += 1
+
+    # Return the final grammar
+    return gen
+
 def add_repetition(config, data, gen, classes):
     """
     CONFIG is the required configuration options for GrammarGenerator classes.
@@ -570,8 +681,7 @@ def add_repetition(config, data, gen, classes):
     DATA is a map containing both the positive and negative examples used to
     train the stochastic search.
 
-    GEN is a GrammarGenerator object output of the previous five stages of
-    development.
+    GEN is a GrammarGenerator object output of the previous stages of development.
 
     CLASSES is a map of nonterminal -> the character class that it defines.
 
@@ -582,7 +692,7 @@ def add_repetition(config, data, gen, classes):
     # Get the initial positive score of the original generator. Quit if >= 1.
     grammar = gen.generate_grammar()
     scorer = Scorer(config, data, grammar, gen)
-    print('Initial scoring...'.ljust(50), end='\r')
+    print('Repetition initial scoring...'.ljust(50), end='\r')
     scorer.score(grammar, gen)
     pos_score = scorer.score_map['pos'][0]
     if pos_score >= 1.0:
@@ -602,7 +712,7 @@ def add_repetition(config, data, gen, classes):
                 sn_cpy = gen_cpy.grammar_node.children[i].children[j]
                 sn_cpy.choice = '%s+' % (sn_cpy.choice)
                 grammar_cpy = gen_cpy.generate_grammar()
-                print(('Scoring grammar (%d, %d, %d, %d, %d)' % (i, j, k, l, count)).ljust(50), end='\r')
+                print(('Scoring repetition (%d, %d, %d, %d, %d)' % (i, j, k, l, count)).ljust(50), end='\r')
                 scorer.score(grammar_cpy, gen_cpy)
                 new_pos_score = scorer.score_map['pos'][0]
                 if new_pos_score > pos_score:
@@ -611,6 +721,8 @@ def add_repetition(config, data, gen, classes):
                     updated = True
                     if pos_score >= 1.0:
                         return gen
+
+        # Increment the outer loop counter
         count += 1
 
     # Return the final grammar
