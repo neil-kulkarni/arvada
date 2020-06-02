@@ -518,20 +518,16 @@ def minimize(config, grammar):
             new_grammar.children.append(rule)
     grammar = new_grammar
 
-    # Finds the set of nonterminals that expand only to terminals
+    # Finds the set of nonterminals that expand directly to only terminals
     # Let the keys of X be the set of these nonterminals, and the corresponding
     # values be the the strings derivable from those nonterminals
-    X, updated = {}, True # updated defines a stopping condition
-
-    while updated:
-        updated = False
-        for rule_start in grammar_map:
-            rules, _ = grammar_map[rule_start]
-            if len(rules) == 1 and all([(sn.is_terminal or sn.choice in X) for sn in next(iter(rules)).children]):
-                rule = next(iter(rules))
-                if rule.lhs not in X:
-                    X[rule.lhs] = sum([X[sn.choice] if sn.choice in X else [sn.choice] for sn in rule.children], [])
-                    updated = True
+    X = {}
+    for rule_start in grammar_map:
+        rules, _ = grammar_map[rule_start]
+        if len(rules) == 1 and len(rules[0].children) == 1 and rules[0].children[0].is_terminal:
+            rule = next(iter(rules))
+            if rule.lhs not in X:
+                X[rule.lhs] = [sn.choice for sn in rule.children]
 
     # Update the set X so that the strings derivable from it are lists of
     # SymbolNodes instead of lists of strings
@@ -548,7 +544,7 @@ def minimize(config, grammar):
             to_fix = [sn.choice in X for sn in rule_node.children]
 
     # Now, remove all the rules that defined nonterminals in X
-    grammar.children = [rule for rule in grammar.children if rule.lhs not in X]
+    grammar.children = [rule for rule in grammar.children if rule.lhs not in X or rule.lhs == START]
     return grammar
 
 def convert(config, grammar):
