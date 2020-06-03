@@ -8,7 +8,7 @@
     "NEG_EXAMPLES": 100,
     "MAX_NEG_EXAMPLE_SIZE": 100,
     "MAX_TREE_DEPTH": 5,
-    "GUIDE": []
+    "GUIDE": ["<a > a </a>", "<a > <a > b </a> </a>",  "<a > <a > c </a> d </a>", "<a > e <a > f </a> </a>", "<a SPACE g =' h ' > i </a>", "<a SPACE j =' k ' l =' m ' > <a > n </a> </a>", "<a > o </a>", "<a > p </a>", "<a > q </a>", "<a > r </a>", "<a > s </a>", "<a > t </a>", "<a > u </a>", "<a > v </a>", "<a > w </a>", "<a > x </a>", "<a > y </a>", "<a > z </a>"]
   },
   "grammar": {
     "start": "main",
