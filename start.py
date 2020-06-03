@@ -90,6 +90,11 @@ def derive_classes(oracle, config, leaves):
     terminals = [t.replace('"', '') for t in terminals]
     uf = UnionFind(terminals)
 
+    # Check to make sure initial guide examples compile
+    if not replaces('', ''):
+        print('ERROR: Guide examples do not compile!')
+        exit(1)
+
     for i in range(len(terminals)):
         for j in range(i + 1, len(terminals)):
             # Iterate through each unique pair of terminals
@@ -109,6 +114,7 @@ def derive_classes(oracle, config, leaves):
         classes[class_nt] = cc
         for terminal in cc:
             get_class[terminal] = class_nt
+
     # Update each of the terminals in leaves to instead be a new nonterminal
     # ParseNode pointing to the original terminal. Return the updated list
     # as well as a mapping of nonterminal to the character class it defines.
