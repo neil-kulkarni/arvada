@@ -1,14 +1,14 @@
 {
   "config": {
-    "TERMINALS": ["'", "b", "u", "='", "x", "k", "j", "SPACE", "e", ">", "w", "i", "q", "y", "n", "<a", "d", "h", "</a>", "g", "p", "l", "f", "s", "r", "z", "m", "v", "t", "c", "o", "a"],
+    "TERMINALS": ["y", "<a", ">", "</a>", "a", "l", "i", "z", "m", "r", "v", "w", "c", "s", "o", "x", "j", "u", "SPACE", "q", "'", "='", "h", "k", "d", "e", "b", "t", "f", "p", "g", "n"],
     "NONTERMINALS": ["main", "body", "text", "attrlist", "attr", "spaces"],
     "NUM_RULES": 75,
-    "MAX_RHS_LEN" : 5,
+    "MAX_RHS_LEN" : 10,
     "POS_EXAMPLES": 100,
     "NEG_EXAMPLES": 100,
     "MAX_NEG_EXAMPLE_SIZE": 100,
     "MAX_TREE_DEPTH": 5,
-    "GUIDE": ["<a > a </a>", "<a > <a > b </a> </a>",  "<a > <a > c </a> d </a>", "<a > e <a > f </a> </a>", "<a SPACE g =' h ' > i </a>", "<a SPACE j =' k ' l =' m ' > <a > n </a> </a>", "<a > o </a>", "<a > p </a>", "<a > q </a>", "<a > r </a>", "<a > s </a>", "<a > t </a>", "<a > u </a>", "<a > v </a>", "<a > w </a>", "<a > x </a>", "<a > y </a>", "<a > z </a>"]
+    "GUIDE": ["<a > a </a>", "<a > <a > b </a> </a>",  "<a > <a > c </a> d </a>", "<a > e <a > f </a> </a>", "<a SPACE g =' h ' > i </a>", "<a SPACE j =' k ' SPACE l =' m ' > <a > n </a> </a>", "<a > o </a>", "<a > p </a>", "<a > q </a>", "<a > r </a>", "<a > s </a>", "<a > t </a>", "<a > u </a>", "<a > v </a>", "<a > w </a>", "<a > x </a>", "<a > y </a>", "<a > z </a>"]
   },
   "grammar": {
     "start": "main",
@@ -86,7 +86,7 @@
       "start": "attrlist",
       "bodies": [
         ["attr"],
-        ["attr", "attrlist"]
+        ["attr", "SPACE", "attrlist"]
       ]
     }, {
       "start": "attr",
