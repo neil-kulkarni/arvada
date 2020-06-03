@@ -607,10 +607,9 @@ def add_alternation(config, data, gen, classes):
     rule_nodes = list(gen.grammar_node.children)
     for i in range(len(rule_nodes)):
         rule_node = rule_nodes[i]
+        if rule_node.lhs in classes:
+            continue # Skip over character classes
         for j in range(len(rule_node.children)):
-            if rule_node.lhs in classes:
-                continue # Skip over character classes
-
             # Create a copy of the grammar
             gen_cpy = gen.copy()
             sn_cpy = gen_cpy.grammar_node.children[i].children[j]
