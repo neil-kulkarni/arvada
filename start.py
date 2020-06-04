@@ -605,6 +605,9 @@ def add_alternation(config, data, gen, classes):
     candidates.extend([SymbolNode(config, t, True) for t in gen.get_terminals() if t not in class_terminals])
     candidates.extend([SymbolNode(config, '', True)]) # Epsilon is a valid candidate
 
+    # Keep a map of created alternation rules, so we can ensure we don't duplicate rules
+    alternation_rules = {}
+
     # Iterate through the grammar, attempting to add an alternation rule at
     # each symbol, representing the OR of the current symbol and any nonterminal
     # that appears in the grammar, any terminal that doesn't appear in a
@@ -625,6 +628,7 @@ def add_alternation(config, data, gen, classes):
             or_nt = allocate_tid()
             or_rule = RuleNode(config, or_nt, [sn_cpy.copy()])
             gen_cpy.grammar_node.children.append(or_rule)
+            alternation_rules[or_nt] = [sn_cpy.choice]
             sn_cpy.choice = or_nt
             sn_cpy.is_terminal = False
 
@@ -642,8 +646,23 @@ def add_alternation(config, data, gen, classes):
                 if new_pos_score > pos_score:
                     or_used = True
                     pos_score = new_pos_score
+                    alternation_rules[or_nt].append(candidate.choice)
                 else:
                     gen_cpy.grammar_node.children.pop()
+
+            # If an alternation rule has been duplicated, use the old one
+            if or_used:
+                rest = {k:v for k, v in alternation_rules.items() if k != or_nt}
+                equal_nts = [k for k in rest if rest[k] == alternation_rules[or_nt]]
+                assert(len(equal_nts) <= 1)
+                if len(equal_nts) == 1:
+                    equal_nt = next(iter(equal_nts))
+                    sn_cpy.choice = equal_nt
+                    or_nt_rules = len(alternation_rules[or_nt])
+                    gen_cpy.grammar_node.children = gen_cpy.grammar_node.children[:-or_nt_rules]
+                    alternation_rules.pop(or_nt)
+            else:
+                alternation_rules.pop(or_nt)
 
             # Update the generator if this alternation helped
             if or_used:
