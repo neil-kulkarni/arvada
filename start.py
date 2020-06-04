@@ -98,7 +98,7 @@ def derive_classes(oracle, config, leaves):
     for i in range(len(terminals)):
         for j in range(i + 1, len(terminals)):
             # Iterate through each unique pair of terminals
-            print(('Terminal replacement (%d, %d, %d)...' % (i, j, len(terminals))).ljust(50), end='\r')
+            print(('Terminal replacement (%d, %d, %d)...' % (i + 1, j + 1, len(terminals))).ljust(50), end='\r')
             first, second = terminals[i], terminals[j]
 
             # If the terminals can replace each other in every context, they
@@ -167,8 +167,9 @@ def group(trees):
     counts = {k:v for k, v in counts.items() if not is_substr(counts, k)}
 
     # Sort first by frequency, then by key-length
-    counts = sorted(counts.items(), key=lambda elem: elem[1][0], reverse=True)
+    counts = counts.items()
     counts = sorted(counts, key=lambda elem: len(elem[1][1]), reverse=True)
+    counts = sorted(counts, key=lambda elem: elem[1][0], reverse=True)
     return counts
 
 def apply(grouping, trees):
@@ -437,7 +438,7 @@ def coalesce(oracle, config, trees, grammar):
     for i in range(len(nonterminals)):
         for j in range(i + 1, len(nonterminals)):
             # Iterate through each unique pair of nonterminals
-            print(('Nonterminal replacement (%d, %d, %d)...' % (i, j, len(nonterminals))).ljust(50), end='\r')
+            print(('Nonterminal replacement (%d, %d, %d)...' % (i + 1, j + 1, len(nonterminals))).ljust(50), end='\r')
             first, second = nonterminals[i], nonterminals[j]
 
             # If the nonterminals can replace each other in every context, they
@@ -640,7 +641,7 @@ def add_alternation(config, data, gen, classes):
                 new_or_rule = RuleNode(config, or_nt, [candidate])
                 gen_cpy.grammar_node.children.append(new_or_rule)
                 grammar_cpy = gen_cpy.generate_grammar()
-                print(('Scoring alternation (%d/%d, %d/%d, %d/%d)' % (i, len(rule_nodes), j, len(rule_node.children), k, len(candidates))).ljust(50), end='\r')
+                print(('Scoring alternation (%d/%d, %d/%d, %d/%d)...' % (i + 1, len(rule_nodes), j + 1, len(rule_node.children), k + 1, len(candidates))).ljust(50), end='\r')
                 scorer.score(grammar_cpy, gen_cpy)
                 new_pos_score = scorer.score_map['pos'][0]
                 if new_pos_score > pos_score:
@@ -677,7 +678,7 @@ def add_alternation(config, data, gen, classes):
         eps_rule = RuleNode(config, rule_node.lhs, [SymbolNode(config, '', True)])
         gen_cpy.grammar_node.children.append(eps_rule)
         grammar_cpy = gen_cpy.generate_grammar()
-        print(('Adding epsilon rule (%d/%d)' % (i, len(rule_nodes))).ljust(50), end='\r')
+        print(('Adding epsilon rule (%d/%d)...' % (i + 1, len(rule_nodes))).ljust(50), end='\r')
         scorer.score(grammar_cpy, gen_cpy)
         new_pos_score = scorer.score_map['pos'][0]
         if new_pos_score > pos_score:
@@ -725,7 +726,7 @@ def add_repetition(config, data, gen, classes):
             sn_cpy = gen_cpy.grammar_node.children[i].children[j]
             sn_cpy.choice = '%s+' % (sn_cpy.choice)
             grammar_cpy = gen_cpy.generate_grammar()
-            print(('Scoring repetition (%d/%d, %d/%d)' % (i, k, j, l)).ljust(50), end='\r')
+            print(('Scoring repetition (%d/%d, %d/%d)...' % (i + 1, k, j + 1, l)).ljust(50), end='\r')
             scorer.score(grammar_cpy, gen_cpy)
             new_pos_score = scorer.score_map['pos'][0]
             if new_pos_score > pos_score:

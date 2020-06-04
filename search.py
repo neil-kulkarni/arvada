@@ -62,6 +62,7 @@ def main(file_name, log_file, max_iters):
     # we arrived at earlier, which will add it to the "interesting" set for
     # future iterations. Then, sample many more random grammars so that overall
     # variance is reduced.
+    print('Scoring initial grammars...'.ljust(50), end='\r')
     gen = GrammarGenerator(CONFIG)
     grammar = gen.generate_grammar()
     scorer = Scorer(CONFIG, DATA, grammar, gen)
