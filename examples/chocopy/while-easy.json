@@ -1,0 +1,42 @@
+{
+  "config": {
+    "TERMINALS": ["n", "while", "do", "then", "false", "true", "+", "~", "if", ";", "==", "(", ")", "L", "=", "skip", "&", "else"],
+    "NONTERMINALS": ["c", "b", "e"],
+    "NUM_RULES": 30,
+    "MAX_RHS_LEN": 12,
+    "POS_EXAMPLES": 200,
+    "NEG_EXAMPLES": 100,
+    "MAX_NEG_EXAMPLE_SIZE": 50,
+    "MAX_TREE_DEPTH": 10,
+    "GUIDE": ["L = n", "L = ( n + n )", "L = ( ( n + n ) + n )", "L = n ; L = ( n + n )", "skip", "while true do L = n", "while false do skip", "while ( n + n ) == ( n + n ) do L = n", "while true & false do skip", "while ~ true do L = n", "while ~ n == n do skip", "if true then L = n else skip", "if false then skip else L = n", "if n == n then L = n else skip", "if true & false then skip else L = n", "if ~ true then L = n else skip", "if ~ n == n then skip else L = n", "while true do if false then L = n else skip"]
+  },
+  "grammar": {
+    "start": "c",
+    "rules": [{
+      "start": "c",
+      "bodies": [
+        ["L", "=", "e"],
+        ["if", "b", "then", "c", "else", "c"],
+        ["c", ";", "c"],
+        ["while", "b", "do", "c"],
+        ["skip"]
+      ]
+    }, {
+      "start": "b",
+      "bodies": [
+        ["true"],
+        ["false"],
+        ["e", "==", "e"],
+        ["b", "&", "b"],
+        ["~", "b"]
+      ]
+    }, {
+      "start": "e",
+      "bodies": [
+        ["L"],
+        ["n"],
+        ["(", "e", "+", "e", ")"]
+      ]
+    }]
+  }
+}

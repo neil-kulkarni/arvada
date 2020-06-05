@@ -1,0 +1,14 @@
+# Terminals
+L, =, if, then, else, ;, while, do, skip, true, false, ==, & , ~, n, (, ), +
+
+# Grammar
+# The first rule in the grammar specifies the start nonterminal
+c := L = e
+  | if b then c else c
+  | c ; c
+  | while b do c
+  | skip
+
+b := true | false | e == e | b & b | ~ b
+
+e := L | n | ( e + e )

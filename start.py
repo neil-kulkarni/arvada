@@ -284,7 +284,8 @@ def build_grammar(config, trees):
     def build_rules(grammar_node, parse_node, rule_map):
         """
         Adds the rules defined in PARSE_NODE and all of its subtrees to the
-        GRAMMAR_NODE via recursion.
+        GRAMMAR_NODE via recursion. RULE_MAP is used to keep track of duplicate
+        rules, so they are not added multiple times to the grammar.
         """
         # Terminals and nodes with no children do not define rules
         if parse_node.is_terminal or len(parse_node.children) == 0:
