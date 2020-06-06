@@ -130,24 +130,13 @@ def group(trees):
     nonterminals, both are treated the same. Each returned map entry is given a
     unique identifier ti for some i > 1, reserving i = 0 for the start node.
 
-    Trivial groups are filtered out, including groups that only appear once,
-    groups that only consist of one token, and groups that are substrings of
-    other groups.
+    Trivial groups are filtered out, including groups that only appear once
+    and groups that only consist of one token.
 
     Returns the group first sorted by frequency so that most frequently occuring
     substrings come first, then sorted by length, so that shorter substrings are
     preferred, like in the minimal-munch rule.
     """
-    def is_substr(counts, candidate):
-        """
-        Checks whether candidate is a substring of any string key in the count
-        dictionary, and returns True if so.
-        """
-        for key_str in counts:
-            if candidate != key_str and candidate in key_str:
-                return True
-        return False
-
     # Compute a map of substrings to their frequency of occurence over all trees
     counts = {}
     for tree_lst in trees:
@@ -162,9 +151,8 @@ def group(trees):
                     counts[tree_substr] = (1, tree_sublist, allocate_tid())
 
     # Filter out tokens that only appear once and nonterminals that are composed
-    # of only a single token. Filter out keys that are substrings of other keys.
+    # of only a single token
     counts = {k:v for k, v in counts.items() if v[0] > 1 and len(v[1]) > 1}
-    counts = {k:v for k, v in counts.items() if not is_substr(counts, k)}
 
     # Sort first by frequency, then by key-length
     counts = counts.items()
