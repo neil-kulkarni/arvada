@@ -135,8 +135,8 @@ def group(trees):
     other groups.
 
     Returns the group first sorted by frequency so that most frequently occuring
-    substrings come first, then sorted by length, so that longer substrings are
-    preferred, like in the maximal-munch rule.
+    substrings come first, then sorted by length, so that shorter substrings are
+    preferred, like in the minimal-munch rule.
     """
     def is_substr(counts, candidate):
         """
@@ -168,7 +168,7 @@ def group(trees):
 
     # Sort first by frequency, then by key-length
     counts = counts.items()
-    counts = sorted(counts, key=lambda elem: len(elem[1][1]), reverse=True)
+    counts = sorted(counts, key=lambda elem: len(elem[1][1]))
     counts = sorted(counts, key=lambda elem: elem[1][0], reverse=True)
     return counts
 
