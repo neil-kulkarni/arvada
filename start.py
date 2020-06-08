@@ -3,6 +3,7 @@ from generator import *
 from graph import Graph
 from union import UnionFind
 from score import Scorer
+import numpy as np
 
 def allocate_tid():
     """
@@ -39,8 +40,9 @@ def build_start_grammar(oracle, config, data, leaves):
     grammar = build_grammar(config, trees)
     print('Coalescing nonterminals...'.ljust(50), end='\r')
     grammar = coalesce(oracle, config, trees, grammar)
-    print('Minimizing and converting...'.ljust(50), end='\r')
+    print('Minimizing initial grammar...'.ljust(50), end='\r')
     grammar = minimize(config, grammar)
+    print('Converting into final grammar...'.ljust(50), end='\r')
     gen = convert(config, grammar)
     print('Adding alternation...'.ljust(50), end='\r')
     gen = add_alternation(config, data, gen, classes)
@@ -153,6 +155,11 @@ def group(trees):
     # Filter out tokens that only appear once and nonterminals that are composed
     # of only a single token
     counts = {k:v for k, v in counts.items() if v[0] > 1 and len(v[1]) > 1}
+
+    # Shuffle the counts dictionary randomly as a tie breaking mechanism
+    count_keys = list(counts.keys())
+    np.random.shuffle(count_keys)
+    counts = {k:counts[k] for k in count_keys}
 
     # Sort first by frequency, then by key-length
     counts = counts.items()
