@@ -8,7 +8,7 @@
     "NEG_EXAMPLES": 100,
     "MAX_NEG_EXAMPLE_SIZE": 50,
     "MAX_TREE_DEPTH": 10,
-    "GUIDE": ["L = n", "L = ( n + n )", "L = ( ( n + n ) + n )", "L = n ; L = ( n + n )", "skip", "while true do L = n", "while false do skip", "while ( n + n ) == ( n + n ) do L = n", "while true & false do skip", "while ~ true do L = n", "while ~ n == n do skip", "if true then L = n else skip", "if false then skip else L = n", "if n == n then L = n else skip", "if true & false then skip else L = n", "if ~ true then L = n else skip", "if ~ n == n then skip else L = n", "while true do if false then L = n else skip"]
+    "GUIDE": ["L = n", "L = ( n + n )", "skip", "skip ; skip", "while ( n + n ) == ( n + n ) do L = n", "while true & false & ~ false do skip", "while n == n do skip", "if true then L = n else skip", "if n == n then while ~ true do skip else L = n"]
   },
   "grammar": {
     "start": "c",
