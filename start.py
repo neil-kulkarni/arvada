@@ -140,16 +140,6 @@ def group(trees):
     substrings come first, then sorted by length, so that longer substrings are
     preferred, like in the maximal-munch rule.
     """
-    def is_substr(counts, candidate):
-        """
-        Checks whether candidate is a substring of any string key in the count
-        dictionary, and returns True if so.
-        """
-        for key_str in counts:
-            if candidate != key_str and candidate in key_str:
-                return True
-        return False
-
     # Compute a map of substrings to their frequency of occurence over all trees
     counts = {}
     for tree_lst in trees:
@@ -166,7 +156,6 @@ def group(trees):
     # Filter out tokens that only appear once and nonterminals that are composed
     # of only a single token. Filter out keys that are substrings of other keys.
     counts = {k:v for k, v in counts.items() if v[0] > 1 and len(v[1]) > 1}
-    counts = {k:v for k, v in counts.items() if not is_substr(counts, k)}
 
     # Shuffle the counts dictionary randomly as a tie breaking mechanism
     count_keys = list(counts.keys())
@@ -175,7 +164,7 @@ def group(trees):
 
     # Sort first by frequency, then by key-length
     counts = counts.items()
-    counts = sorted(counts, key=lambda elem: len(elem[1][1]), reverse=True)
+    counts = sorted(counts, key=lambda elem: len(elem[1][1]), reverse=False)
     counts = sorted(counts, key=lambda elem: elem[1][0], reverse=True)
     return counts
 
@@ -515,18 +504,43 @@ def minimize(config, grammar):
 
     CONFIG is the required configuration options for GrammarGenerator classes.
     """
-    # Create a unique set of rules represented as a map
-    grammar_map = {}
-    for rule in grammar.children:
-        if rule.lhs not in grammar_map:
-            grammar_map[rule.lhs] = ([], [])
-        rule_str = ''.join([sn.choice for sn in rule.children])
-        if rule_str not in grammar_map[rule.lhs][1]:
-            rules, rule_strings = grammar_map[rule.lhs]
-            rules.append(rule)
-            rule_strings.append(rule_str)
+    def get_grammar_map(grammar_node):
+        """
+        Create a unique set of rules in GRAMMAR_NODE represented as a map
+        """
+        grammar_map = {}
+        for rule in grammar_node.children:
+            if rule.lhs not in grammar_map:
+                grammar_map[rule.lhs] = ([], [])
+            rule_str = ''.join([sn.choice for sn in rule.children])
+            if rule_str not in grammar_map[rule.lhs][1]:
+                rules, rule_strings = grammar_map[rule.lhs]
+                rules.append(rule)
+                rule_strings.append(rule_str)
+        return grammar_map
 
-    # Turn the unique set of rules into a new GrammarNode object
+    def update(grammar_node, map):
+        """
+        Given a MAP with nonterminals as keys and list of symbols as values,
+        replaces every occurance of a nonterminal in MAP with its corresponding
+        list of SymbolNodes in the the GRAMMAR_NODE. Then, the rules defining
+        the keys in the grammar are removed.
+
+        The START nonterminal must not appear in MAP, because its rule cannot
+        be deleted.
+        """
+        for rule_node in grammar.children:
+            to_fix = [sn.choice in map for sn in rule_node.children]
+            while any(to_fix):
+                ind = to_fix.index(True)
+                nt = rule_node.children[ind]
+                rule_node.children[ind:ind+1] = map[nt.choice]
+                to_fix = [sn.choice in map for sn in rule_node.children]
+        grammar_node.children = [rule for rule in grammar_node.children if rule.lhs not in map]
+        return grammar_node
+
+    # Remove all the repeated rules from the grammar
+    grammar_map = get_grammar_map(grammar)
     new_grammar = GrammarNode(config, START, [])
     for rule_start in grammar_map:
         rules, _ = grammar_map[rule_start]
@@ -536,7 +550,7 @@ def minimize(config, grammar):
 
     # Finds the set of nonterminals that expand directly to a single terminal
     # Let the keys of X be the set of these nonterminals, and the corresponding
-    # values be the the strings derivable from those nonterminals
+    # values be the the SymbolNodes derivable from those nonterminals
     X, updated = {}, True # updated determines the stopping condition
 
     while updated:
@@ -545,26 +559,30 @@ def minimize(config, grammar):
             rules, _ = grammar_map[rule_start]
             if len(rules) == 1 and len(rules[0].children) == 1 and (rules[0].children[0].is_terminal or rules[0].children[0].choice in X):
                 rule = next(iter(rules))
-                if rule.lhs not in X:
-                    X[rule.lhs] = [X[sn.choice][0] if sn.choice in X else sn.choice for sn in rule.children]
+                if rule.lhs not in X and rule.lhs != START:
+                    X[rule.lhs] = [SymbolNode(config, X[sn.choice][0], True) if sn.choice in X else sn.copy() for sn in rule.children]
                     updated = True
 
-    # Update the set X so that the strings derivable from it are lists of
-    # SymbolNodes instead of lists of strings
-    for k in X: X[k] = [SymbolNode(config, s, True) for s in X[k]]
+    # Update the grammar so that keys in X are replaced by values
+    # Redefine the grammar map, since the grammar has likely changed
+    grammar = update(grammar, X)
+    grammar_map = get_grammar_map(grammar)
 
-    # Iterate through the grammar, and mutate any rules that use a nonterminal
-    # in X to contain the set of terminals instead
+    # Finds the set of nonterminals that expand to a single string and that are
+    # only used once in the grammar. Let the keys of Y be the set of these
+    # nonterminals, and the corresponding values be the SymbolNodes derivable
+    # from those nonterminals
+    counts = {}
     for rule_node in grammar.children:
-        to_fix = [sn.choice in X for sn in rule_node.children]
-        while any(to_fix):
-            ind = to_fix.index(True)
-            nt = rule_node.children[ind]
-            rule_node.children[ind:ind+1] = X[nt.choice]
-            to_fix = [sn.choice in X for sn in rule_node.children]
+        for symbol_node in rule_node.children:
+            if not symbol_node.is_terminal:
+                n = symbol_node.choice
+                counts[n] = counts.get(n, 0) + 1
 
-    # Now, remove all the rules that defined nonterminals in X
-    grammar.children = [rule for rule in grammar.children if rule.lhs not in X or rule.lhs == START]
+    # Update the grammar so that keys in X are replaced by values
+    used_once = [k for k in counts if counts[k] == 1 and k != START]
+    Y = {k:grammar_map[k][0][0].children for k in used_once if len(grammar_map[k][0]) == 1}
+    grammar = update(grammar, Y)
     return grammar
 
 def convert(config, grammar):
