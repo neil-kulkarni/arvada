@@ -560,8 +560,12 @@ def minimize(config, grammar):
             if len(rules) == 1 and len(rules[0].children) == 1 and (rules[0].children[0].is_terminal or rules[0].children[0].choice in X):
                 rule = next(iter(rules))
                 if rule.lhs not in X and rule.lhs != START:
-                    X[rule.lhs] = [SymbolNode(config, X[sn.choice][0], True) if sn.choice in X else sn.copy() for sn in rule.children]
+                    X[rule.lhs] = [X[sn.choice][0] if sn.choice in X else sn.choice for sn in rule.children]
                     updated = True
+
+    # Update the set X so that the strings derivable from it are lists of
+    # SymbolNodes instead of lists of strings
+    for k in X: X[k] = [SymbolNode(config, s, True) for s in X[k]]
 
     # Update the grammar so that keys in X are replaced by values
     # Redefine the grammar map, since the grammar has likely changed
