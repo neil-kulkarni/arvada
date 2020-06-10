@@ -6,32 +6,29 @@ class Graph():
     """
     def __init__(self, vertices):
         self.V = vertices
-        self.E = {v:[] for v in vertices}
+        self.E = {v:set() for v in vertices}
 
     def add_edge(self, from_node, to_node):
-        self.E[from_node].append(to_node)
+        self.E[from_node].add(to_node)
 
     def neighbors(self, v):
         return self.E[v]
 
-    def is_connected(self):
+    def reachable_from(self, start):
         visited = {v:False for v in self.V}
-        connected_components = 0
+        reachable = set()
 
         # Launches DFS from a given node
         def explore(v):
             visited[v] = True
+            reachable.add(v)
             for n in self.neighbors(v):
                 if not visited[n]:
                     explore(n)
 
-        # Launches DFS for each connected component in the graph
-        for node in self.V:
-            if not visited[node]:
-                connected_components += 1
-                explore(node)
-
-        return connected_components == 1
+        # Launch DFS from just the start and return
+        explore(start)
+        return reachable
 
     def has_cycle(self):
         visited = {v:False for v in self.V}

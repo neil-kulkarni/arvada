@@ -150,15 +150,17 @@ class Scorer():
         return compilation_score
 
     def recur_cc(self, grammar, gen):
-        nonterminals = gen.get_nonterminals()
-        graph = Graph(['start'] + list(nonterminals))
+        nonterminals = set(gen.get_nonterminals())
+        nonterminals.add('start')
+        graph = Graph(nonterminals)
         for rule_start, rule in grammar.rules.items():
             for rule_body in rule.bodies:
                 for elem in rule_body:
                     if elem in nonterminals:
                         graph.add_edge(rule_start, elem)
 
-        recur_cc_score = 1.0 if graph.is_connected() and graph.has_cycle() else 0.0
+        connected = nonterminals == graph.reachable_from('start')
+        recur_cc_score = 1.0 if connected and graph.has_cycle() else 0.0
         if recur_cc_score >= self.score_map['recur_cc'][0]:
             self.score_map['recur_cc'] = (recur_cc_score, grammar, gen)
         return recur_cc_score
