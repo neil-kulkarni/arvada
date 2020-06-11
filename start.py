@@ -50,6 +50,110 @@ def build_start_grammar(oracle, config, data, leaves):
     gen = add_repetition(config, data, gen, classes)
     return gen
 
+def derive_tokens(config, leaves):
+    """
+    Given a list of positive examples in LEAVES, updates LEAVES to be tokenized.
+    A token is generated for any maximal sequence of characters that appears
+    more than once in leaves and appear together in every example in leaves.
+
+    CONFIG is the required configuration options for GrammarGenerator classes.
+    """
+    def is_substr(counts, candidate):
+         """
+         Checks whether CANDIDATE is a substring of any other string key in
+         COUNTS, and returns True if so.
+         """
+         for key_str in counts:
+             if candidate != key_str and candidate in key_str:
+                 return True
+         return False
+
+    def unique_chars(candidate):
+        """
+        Determines the unique set of characters in CANDIDATE.
+        """
+        unique_chars = set()
+        for char in candidate:
+            unique_chars.add(char)
+        return unique_chars
+
+    def appears_together(candidate, anchor, example):
+        """
+        Check if CANDIDATE always appears together in EXAMPLE, relative to ANCHOR.
+        In other words, every time ANCHOR appears in EXAMPLE, it must be surrounded
+        by the rest of CANDIDATE.
+
+        ANCHOR is required to be a character present in CANDIDATE.
+        """
+        # If the anchor is not in example, we return True by defult
+        if anchor not in example:
+            return True
+
+        # When a match on the anchor is made, ensure the surrounding substring
+        # is the same as candidate
+        anchor_pos, n, i = candidate.find(anchor), len(candidate), 0
+        while i < len(example):
+            if example[i] == anchor:
+                s = i - anchor_pos
+                if example[s:s+n] != candidate:
+                    return False
+                else:
+                    i = s + n
+            else:
+                i += 1
+        return True
+
+    def always_appears_together(candidate, anchors, examples):
+        """
+        Check if CANDIDATE always appears together over all examples in EXAMPLES,
+        relative to each anchor in ANCHORS.
+        """
+        for anchor in anchors:
+            if all([appears_together(candidate, anchor, ex) for ex in examples]):
+                return True
+        return False
+
+    # Map substrings appearing in the leaves to their frequencies
+    leaf_strings, counts = [''.join([pn.payload for pn in tree]) for tree in leaves], {}
+    for leaf_string in leaf_strings:
+        for i in range(len(leaf_string)):
+            for j in range(i + 1, len(leaf_string) + 1):
+                leaf_substr = leaf_string[i:j]
+                counts[leaf_substr] = counts.get(leaf_substr, 0) + 1
+
+    # Remove singleton substrings and substrings that are substrings of other substrings
+    # Keep a holdout set of substrings that were not considered, because they will
+    # be considered later in the algorithm
+    counts = {k:v for k, v in counts.items() if v > 1 and len(k) > 1}
+    holdout = {k:v for k, v in counts.items() if is_substr(counts, k)}
+    counts = {k:v for k, v in counts.items() if not is_substr(counts, k)}
+
+    tokens = set()
+    while len(counts) > 0:
+        # Map each candidate to the set of unique characters in it. For each unique
+        # character, ensure that it is always contained in the candidate string
+        candidates = {k:unique_chars(k) for k in counts}
+
+        # Keep the candidates that always appear together, relative to their anchors
+        for tok in set([k for k, v in candidates.items() if always_appears_together(k, v, leaf_strings)]):
+            tokens.add(tok)
+
+        # Add the holdout strings back, except those that are substrings
+        # of committed tokens. We recompute the counts and holdout sets for the
+        # next iteration of the algorithm
+        counts = {k:v for k, v in holdout.items() if not is_substr(tokens, k)}
+        holdout = {k:v for k, v in counts.items() if is_substr(counts, k)}
+        counts = {k:v for k, v in counts.items() if not is_substr(counts, k)}
+
+    # Create a `fake` grouping data structure, apply it to the leaves, and return
+    grouping = [(group_str, (-1, [ParseNode(c, True, []) for c in group_str], allocate_tid())) for group_str in tokens]
+    id_map = {val[2]:grp_str for grp_str, val in grouping}
+    update = lambda p: id_map[p] if p in id_map else p
+    leaves = apply(grouping, leaves)
+    leaves = [[ParseNode(update(pn.payload), True, []) for pn in tree] for tree in leaves]
+    config['TERMINALS'] += tokens
+    return leaves
+
 def derive_classes(oracle, config, leaves):
     """
     Given a list of positive examples in LEAVES, uses a replacement algorithm
@@ -79,7 +183,7 @@ def derive_classes(oracle, config, leaves):
         Relies on the fact that LEAVES is unchanged from the time when it was
         inputted into derive_classes.
         """
-        replaced_leaves = [[ParseNode(replacer if leaf.payload == replacee else leaf.payload, leaf.is_terminal, leaf.children) for leaf in tree] for tree in leaves]
+        replaced_leaves = [[ParseNode(leaf.payload.replace(replacer, replacee), leaf.is_terminal, leaf.children) for leaf in tree] for tree in leaves]
         replaced_examples = [''.join([pn.payload for pn in tree]) for tree in replaced_leaves]
         for example in replaced_examples:
             try: oracle.parse(example)
@@ -212,15 +316,15 @@ def apply(grouping, trees):
             if group_ind == ng: return i
         return -1
 
-    def apply_single(group_lst, tree_lst):
+    def apply_single(grouping, tree_lst):
         """
-        Applies the grouping GROUP_LST to a single tree. For each grouping,
+        Applies the groupings in GROUPING to a single tree. For each grouping,
         processed in order, applies that grouping to TREE_LST as many times
         as possible.
 
         Returns the updated TREE_LST. If no groupings can be found, do nothing.
         """
-        if len(group_lst) == 0:
+        if len(grouping) == 0:
             return tree_lst
 
         for group_str, tup in grouping:
@@ -261,7 +365,8 @@ def build_trees(oracle, config, leaves):
         3. Add a start nonterminal to each ParseNode
         4. return the set of finished starts
     """
-    layers, classes = derive_classes(oracle, config, leaves)
+    layers = derive_tokens(config, leaves)
+    layers, classes = derive_classes(oracle, config, layers)
     grouping = group(layers)
 
     while len(grouping) > 0:

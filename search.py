@@ -33,7 +33,7 @@ def main(file_name, log_file, max_iters):
     DATA = {'positive_examples': positive_examples, 'negative_examples': negative_examples}
 
     # Generate guiding examples and corresponding ParseNodes
-    guide_nodes = [[ParseNode(tok, True, []) for tok in ex.split()] for ex in GUIDE_EXAMPLES]
+    guide_nodes = [[ParseNode(tok, True, []) for tok in ex.replace(' ', '')] for ex in GUIDE_EXAMPLES]
     if len(guide_nodes) == 0: guide_nodes = positive_nodes
 
     # Create the log file and write positive and negative examples to it
