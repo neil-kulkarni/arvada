@@ -1,0 +1,42 @@
+{
+  "config": {
+    "TERMINALS": [")", "~", ";", "k", "p", "n", "(", "d", "=", "r", "o", "u", "+", "L", "h", "e", "t", "&", "l", "w", "s", "f", "a", "i"],
+    "NONTERMINALS": ["stmt", "bool", "expr"],
+    "NUM_RULES": 30,
+    "MAX_RHS_LEN": 12,
+    "POS_EXAMPLES": 100,
+    "NEG_EXAMPLES": 100,
+    "MAX_NEG_EXAMPLE_SIZE": 50,
+    "MAX_TREE_DEPTH": 10,
+    "GUIDE": ["L = n", "L = ( n + n )", "L = ( L + L )", "skip", "skip ; skip", "while ( n + n ) == ( n + n ) do L = n", "while true & false & ~ false do skip", "while n == n & n == n do skip", "if true then L = n else skip", "if n == n then while ~ true do skip else L = n"]
+  },
+  "grammar": {
+    "start": "stmt",
+    "rules": [{
+      "start": "stmt",
+      "bodies": [
+        ["L", "=", "expr"],
+        ["i", "f", "bool", "t", "h", "e", "n", "stmt", "e", "l", "s", "e", "stmt"],
+        ["stmt", ";", "stmt"],
+        ["w", "h", "i", "l", "e", "bool", "d", "o", "stmt"],
+        ["s", "k", "i", "p"]
+      ]
+    }, {
+      "start": "bool",
+      "bodies": [
+        ["t", "r", "u", "e"],
+        ["f", "a", "l", "s", "e"],
+        ["expr", "=", "=", "expr"],
+        ["bool", "&", "bool"],
+        ["~", "bool"]
+      ]
+    }, {
+      "start": "expr",
+      "bodies": [
+        ["L"],
+        ["n"],
+        ["(", "expr", "+", "expr", ")"]
+      ]
+    }]
+  }
+}

@@ -3,12 +3,12 @@ L, =, if, then, else, ;, while, do, skip, true, false, ==, & , ~, n, (, ), +
 
 # Grammar
 # The first rule in the grammar specifies the start nonterminal
-c := L = e
-  | if b then c else c
-  | c ; c
-  | while b do c
+stmt := L = expr
+  | if bool then stmt else stmt
+  | stmt ; stmt
+  | while bool do stmt
   | skip
 
-b := true | false | e == e | b & b | ~ b
+bool := true | false | expr == expr | bool & bool | ~ bool
 
-e := L | n | ( e + e )
+expr := L | n | ( expr + expr )
