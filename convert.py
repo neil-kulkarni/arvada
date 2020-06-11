@@ -23,6 +23,10 @@ def main(txt_file_name, json_file_name):
     handle_star_rules(rule_map)
     handle_question_rules(rule_map)
 
+    # Untokenize the rule_map and terminals set before dumping
+    untokenize(rule_map, terminals)
+    terminals = list(set([c for s in terminals for c in s]))
+
     # Create dictionary mapping to be marshalled into a JSON representation
     json_repr = {}
     json_repr['config'] = {}
@@ -54,6 +58,16 @@ def main(txt_file_name, json_file_name):
     output_file.write(output)
     print('Conversion successful!')
     print('Remember to update the remainder of the configuration options!')
+
+# For every tokenized terminal (that is, a terminal that has more than one)
+# character in it, update the rule so that each character in the tokenized
+# terminal appears as a separate, untokenized character
+def untokenize(rule_map, terminals):
+    for rule_name, rule_bodies in list(rule_map.items()):
+        new_rule_bodies = []
+        for rule_body in rule_bodies:
+            new_rule_bodies.append(' '.join([' '.join(symbol) if symbol in terminals else symbol for symbol in rule_body.split()]))
+        rule_map[rule_name] = new_rule_bodies
 
 # Mutates the rule map to search for all expressions ending in the rule_token.
 # Adds a new rule corresponding to the expression via the passed-in rule_builder
