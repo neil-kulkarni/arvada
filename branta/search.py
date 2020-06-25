@@ -1,5 +1,5 @@
 from branta.oracle import Oracle
-from grammar import Grammar
+from grammar import Grammar, Rule
 from typing import List, Tuple
 import sys
 from lark import Lark
@@ -43,10 +43,27 @@ def score_is_good(score: float):
 
 def init_grammar(guides: List[str]) -> Grammar:
     """
-    Makes a naive grammar consisting of leaves for each character from the guides.
+    Makes a naive grammar consisting of leaves for each character from the guides. And the disjunction of all the guides.
     """
-    print("This is not implemented (init_grammar)!", file=sys.stderr)
-    return Grammar()
+    init_grammar = Grammar('t0')
+    all_chars = set(['"' + c + '"' for guide in guides for c in guide])
+    char_map = {}
+    for i, char in enumerate(all_chars):
+        idx = i + 1
+        init_grammar.add_rule(Rule(f't{idx}').add_body([char]))
+        char_map[char] = f't{idx}'
+
+    init_rule = Rule('t0')
+    for guide in guides:
+        body = []
+        for char in guide:
+            term = '"' + char + '"'
+            body.append(char_map[term])
+        init_rule.add_body(body)
+
+    init_grammar.add_rule(init_rule)
+
+    return init_grammar
 
 def mutate_bubble(grammar: Grammar) -> Grammar:
     """
@@ -83,8 +100,9 @@ def search(oracle: Oracle, guides: List[str], positives: List[str], negatives: L
     """
     Generic search for a grammar that matches the input space of the oracle as much as possible
     """
-    data = {'negative_examples' : negatives, 'positive_examples' : positives}
+    print("=====\nBeginning search with guides:\n", guides)
     initial_grammar = init_grammar(guides)
+    print(initial_grammar)
     cur_gram_id = 0
     scorer = Scorer(positives, negatives)
     minimum_score = scorer.score(initial_grammar)
