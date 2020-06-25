@@ -123,25 +123,40 @@ def mutate_coalesce(grammar: Grammar) -> Grammar:
     replacer.bodies = replacer_rules
     mutant.add_rule(replacer)
 
-    print("Orig: ", grammar)
-    print(f"Coalesced {to_coalesce} into {replacer_id}")
-    print("New: ", mutant)
-    print("--------------")
     return mutant
 
 def mutate_alternate(grammar: Grammar) -> Grammar:
     """
-    Allow some element to alternate
+    Allow some elements to alternate.
     """
     mutant = grammar.copy()
-    nonterminals = grammar.rules.keys()
+
+    nonterminals = list(mutant.rules.keys())
+    terminals = [elem for rule in mutant.rules.values() for body in rule.bodies for elem in body if elem not in nonterminals]
     nonterminals.remove('start')
-    #TODO IMPLEMENT
-    return grammar
+    alternates = terminals + nonterminals
+
+    rule_key = random.choice(nonterminals)
+    body_idx = random.choice(range(len(mutant.rules[rule_key].bodies)))
+    alternate_idx = random.choice(range(len(mutant.rules[rule_key].bodies[body_idx])))
+
+    alternates.remove(mutant.rules[rule_key].bodies[body_idx][alternate_idx])
+    alternate = random.choice(alternates)
+
+    new_body = mutant.rules[rule_key].bodies[body_idx][:]
+    new_body[alternate_idx] = alternate
+    mutant.rules[rule_key].add_body(new_body)
+
+    print("Orig: ", grammar)
+    print(f"Alternated at key {rule_key}")
+    print("New: ", mutant)
+    print("--------------")
+
+    return mutant
 
 def mutate_repeat(grammar: Grammar) -> Grammar:
     """
-    Allow some element to alternate
+    Allow some element to repeat
     """
     #TODO IMPLEMENT
     return grammar
@@ -183,7 +198,7 @@ def search(oracle: Oracle, guides: List[str], positives: List[str], negatives: L
         # for i in range(num_mutations):
         #     mutate_func = random.choice([mutate_bubble, mutate_coalesce, mutate_alternate, mutate_repeat])
         #     mutant = mutate_func(mutant)
-        mutant = mutate_coalesce(parent_grammar)
+        mutant = mutate_alternate(parent_grammar)
         mutant_score = scorer.score(mutant)
         if mutant_score > minimum_score:
             add_to_population(mutant, mutant_score, cur_gram_id)
