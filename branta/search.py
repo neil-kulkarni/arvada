@@ -1,6 +1,9 @@
+import copy
+
 from branta.oracle import Oracle
+from branta.util import strict_subsequences, find_subsequence, new_nonterminal, replace_all
 from grammar import Grammar, Rule
-from typing import List, Tuple
+from typing import List, Tuple, Set
 import sys
 from lark import Lark
 import random
@@ -65,12 +68,29 @@ def init_grammar(guides: List[str]) -> Grammar:
 
     return init_grammar
 
+
+
+
+
 def mutate_bubble(grammar: Grammar) -> Grammar:
     """
     Bubble up some subsequence of nonterminals
     """
-    # TODO IMPLEMENT
-    return grammar
+
+    mutant = grammar.copy()
+    sequences : Set[Tuple[str]] = set()
+    for rule in mutant.rules.values():
+        for body in rule.bodies:
+            sequences.update(strict_subsequences(body))
+    replace_seq = random.choice(list(sequences))
+    replace_name = new_nonterminal(mutant.rules.keys())
+
+    for rule in mutant.rules.values():
+        rule.bodies = [replace_all(body, replace_seq, replace_name) for body in rule.bodies]
+        rule.cache_valid = False
+
+    mutant.add_rule(Rule(replace_name).add_body(list(replace_seq)))
+    return mutant
 
 def mutate_coalesce(grammar: Grammar) -> Grammar:
     """
@@ -103,6 +123,7 @@ def search(oracle: Oracle, guides: List[str], positives: List[str], negatives: L
     print("=====\nBeginning search with guides:\n", guides)
     initial_grammar = init_grammar(guides)
     print(initial_grammar)
+    print("====================================")
     cur_gram_id = 0
     scorer = Scorer(positives, negatives)
     minimum_score = scorer.score(initial_grammar)
@@ -127,7 +148,7 @@ def search(oracle: Oracle, guides: List[str], positives: List[str], negatives: L
         num_mutations = random.choice([1, 2, 4, 8, 16])
         mutant = parent_grammar
         for i in range(num_mutations):
-            mutate_func = random.choice(mutate_bubble, mutate_coalesce, mutate_alternate, mutate_repeat)
+            mutate_func = random.choice([mutate_bubble, mutate_coalesce, mutate_alternate, mutate_repeat])
             mutant = mutate_func(mutant)
         mutant_score = scorer.score(mutant)
         if mutant_score > minimum_score:
@@ -159,6 +180,7 @@ def search(oracle: Oracle, guides: List[str], positives: List[str], negatives: L
     while not score_is_good(minimum_score):
         current_parent, parent_id, score = choose_parent(population)
         fuzz_one(current_parent)
+
 
 
 
