@@ -94,15 +94,48 @@ def mutate_bubble(grammar: Grammar) -> Grammar:
 
 def mutate_coalesce(grammar: Grammar) -> Grammar:
     """
-    Coalesce some nonterminals
+    Coalesce some elements together.
     """
-    # TODO IMPLEMENT
-    return grammar
+
+    mutant = grammar.copy()
+    nonterminals = list(mutant.rules.keys())
+    terminals = [elem for rule in mutant.rules.values() for body in rule.bodies for elem in body if elem not in nonterminals]
+    nonterminals.remove('start')
+    print(nonterminals)
+    print(terminals)
+
+    all = nonterminals
+    coalesce_num = random.choice(range(2,min(6, len(all))))
+    to_coalesce = random.sample(all, coalesce_num)
+
+    replacer_id = new_nonterminal(nonterminals)
+    for rule in mutant.rules.values():
+        # Replace all the things in "to_coalesce" with what we're coalescing
+        rule.bodies = [[replacer_id if e in to_coalesce else e for e in body] for body in rule.bodies]
+        rule.cache_valid = False
+
+    replacer_rules = []
+    for coalescee in to_coalesce:
+        if coalescee in mutant.rules:
+            rule = mutant.rules.pop(coalescee)
+            replacer_rules.extend(rule.bodies)
+    replacer = Rule(replacer_id)
+    replacer.bodies = replacer_rules
+    mutant.add_rule(replacer)
+
+    print("Orig: ", grammar)
+    print(f"Coalesced {to_coalesce} into {replacer_id}")
+    print("New: ", mutant)
+    print("--------------")
+    return mutant
 
 def mutate_alternate(grammar: Grammar) -> Grammar:
     """
     Allow some element to alternate
     """
+    mutant = grammar.copy()
+    nonterminals = grammar.rules.keys()
+    nonterminals.remove('start')
     #TODO IMPLEMENT
     return grammar
 
@@ -146,10 +179,11 @@ def search(oracle: Oracle, guides: List[str], positives: List[str], negatives: L
         nonlocal minimum_score
         cur_gram_id += 1
         num_mutations = random.choice([1, 2, 4, 8, 16])
-        mutant = parent_grammar
-        for i in range(num_mutations):
-            mutate_func = random.choice([mutate_bubble, mutate_coalesce, mutate_alternate, mutate_repeat])
-            mutant = mutate_func(mutant)
+        # mutant = parent_grammar
+        # for i in range(num_mutations):
+        #     mutate_func = random.choice([mutate_bubble, mutate_coalesce, mutate_alternate, mutate_repeat])
+        #     mutant = mutate_func(mutant)
+        mutant = mutate_coalesce(parent_grammar)
         mutant_score = scorer.score(mutant)
         if mutant_score > minimum_score:
             add_to_population(mutant, mutant_score, cur_gram_id)
@@ -180,6 +214,7 @@ def search(oracle: Oracle, guides: List[str], positives: List[str], negatives: L
     while not score_is_good(minimum_score):
         current_parent, parent_id, score = choose_parent(population)
         fuzz_one(current_parent)
+        break
 
 
 
