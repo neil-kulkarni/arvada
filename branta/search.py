@@ -136,7 +136,11 @@ def mutate_alternate(grammar: Grammar) -> Grammar:
     nonterminals.remove('start')
     alternates = terminals + nonterminals
 
-    rule_key = random.choice(nonterminals)
+    total_num_rules = len([body for nonterm in nonterminals for body in mutant.rules[nonterm].bodies])
+    weights = [len(mutant.rules[nonterm].bodies)/ total_num_rules for nonterm in nonterminals]
+    print(weights)
+
+    rule_key = random.choices(nonterminals, weights, k=1)[0]
     body_idx = random.choice(range(len(mutant.rules[rule_key].bodies)))
     alternate_idx = random.choice(range(len(mutant.rules[rule_key].bodies[body_idx])))
 
@@ -147,18 +151,38 @@ def mutate_alternate(grammar: Grammar) -> Grammar:
     new_body[alternate_idx] = alternate
     mutant.rules[rule_key].add_body(new_body)
 
-    print("Orig: ", grammar)
-    print(f"Alternated at key {rule_key}")
-    print("New: ", mutant)
-    print("--------------")
-
     return mutant
 
 def mutate_repeat(grammar: Grammar) -> Grammar:
     """
     Allow some element to repeat
     """
-    #TODO IMPLEMENT
+    mutant = grammar.copy()
+
+
+    nonterminals = list(mutant.rules.keys())
+    nonterminals.remove('start')
+
+    total_num_rules = len([body for nonterm in nonterminals for body in mutant.rules[nonterm].bodies])
+    weights = [len(mutant.rules[nonterm].bodies)/ total_num_rules for nonterm in nonterminals]
+    print(weights)
+
+    rule_key = random.choices(nonterminals, weights, k=1)[0]
+    body_idx = random.choice(range(len(mutant.rules[rule_key].bodies)))
+    repeat_idx = random.choice(range(len(mutant.rules[rule_key].bodies[body_idx])))
+
+    repeat_elem = mutant.rules[rule_key].bodies[body_idx][repeat_idx]
+    repeater_name = new_nonterminal(nonterminals)
+    mutant.rules[rule_key].bodies[body_idx][repeat_idx] = repeater_name
+    mutant.rules[rule_key].cache_valid = False
+
+    mutant.add_rule(Rule(repeater_name).add_body([repeat_elem]).add_body([repeat_elem, repeater_name]))
+
+    print("Orig: ", grammar)
+    print(f"Repeated at key {rule_key}")
+    print("New: ", mutant)
+    print("--------------")
+
     return grammar
 
 def minimize(grammar: Grammar) -> None:
@@ -198,7 +222,7 @@ def search(oracle: Oracle, guides: List[str], positives: List[str], negatives: L
         # for i in range(num_mutations):
         #     mutate_func = random.choice([mutate_bubble, mutate_coalesce, mutate_alternate, mutate_repeat])
         #     mutant = mutate_func(mutant)
-        mutant = mutate_alternate(parent_grammar)
+        mutant = mutate_repeat(parent_grammar)
         mutant_score = scorer.score(mutant)
         if mutant_score > minimum_score:
             add_to_population(mutant, mutant_score, cur_gram_id)
