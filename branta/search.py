@@ -138,7 +138,6 @@ def mutate_alternate(grammar: Grammar) -> Grammar:
 
     total_num_rules = len([body for nonterm in nonterminals for body in mutant.rules[nonterm].bodies])
     weights = [len(mutant.rules[nonterm].bodies)/ total_num_rules for nonterm in nonterminals]
-    print(weights)
 
     rule_key = random.choices(nonterminals, weights, k=1)[0]
     body_idx = random.choice(range(len(mutant.rules[rule_key].bodies)))
@@ -165,7 +164,6 @@ def mutate_repeat(grammar: Grammar) -> Grammar:
 
     total_num_rules = len([body for nonterm in nonterminals for body in mutant.rules[nonterm].bodies])
     weights = [len(mutant.rules[nonterm].bodies)/ total_num_rules for nonterm in nonterminals]
-    print(weights)
 
     rule_key = random.choices(nonterminals, weights, k=1)[0]
     body_idx = random.choice(range(len(mutant.rules[rule_key].bodies)))
@@ -177,11 +175,6 @@ def mutate_repeat(grammar: Grammar) -> Grammar:
     mutant.rules[rule_key].cache_valid = False
 
     mutant.add_rule(Rule(repeater_name).add_body([repeat_elem]).add_body([repeat_elem, repeater_name]))
-
-    print("Orig: ", grammar)
-    print(f"Repeated at key {rule_key}")
-    print("New: ", mutant)
-    print("--------------")
 
     return grammar
 
@@ -218,11 +211,10 @@ def search(oracle: Oracle, guides: List[str], positives: List[str], negatives: L
         nonlocal minimum_score
         cur_gram_id += 1
         num_mutations = random.choice([1, 2, 4, 8, 16])
-        # mutant = parent_grammar
-        # for i in range(num_mutations):
-        #     mutate_func = random.choice([mutate_bubble, mutate_coalesce, mutate_alternate, mutate_repeat])
-        #     mutant = mutate_func(mutant)
-        mutant = mutate_repeat(parent_grammar)
+        mutant = parent_grammar
+        for i in range(num_mutations):
+            mutate_func = random.choice([mutate_bubble, mutate_coalesce, mutate_alternate, mutate_repeat])
+            mutant = mutate_func(mutant)
         mutant_score = scorer.score(mutant)
         if mutant_score > minimum_score:
             add_to_population(mutant, mutant_score, cur_gram_id)
