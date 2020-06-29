@@ -7,7 +7,7 @@ from input import parse_input
 from typing import Union
 from parse_tree import ParseTree
 from branta.oracle import GrammarOracle, SubprocessOracle
-from branta.search import search
+from branta.search import Searcher
 
 def get_argparse():
     parser = argparse.ArgumentParser(description='Synthesize a grammar from an oracle + positive + negative examples.')
@@ -39,9 +39,9 @@ def internal_main(config_name: str, positives_name: Union[str, None] = None, neg
     GUIDE_EXAMPLES = CONFIG['GUIDE']
 
     oracle_parse_tree = ParseTree(ORACLE_GEN)
-    print('Generating positive examples...'.ljust(50), end='\r')
+    #print('Generating positive examples...'.ljust(50), end='\r')
     positive_examples, positive_nodes = oracle_parse_tree.sample_strings(POS_EXAMPLES, MAX_TREE_DEPTH)
-    print('Generating negative examples...'.ljust(50), end='\r')
+    #print('Generating negative examples...'.ljust(50), end='\r')
     negative_examples = grammar.sample_negatives(NEG_EXAMPLES, TERMINALS, MAX_NEG_EXAMPLE_SIZE)
 
     oracle = GrammarOracle(grammar)
@@ -50,7 +50,7 @@ def internal_main(config_name: str, positives_name: Union[str, None] = None, neg
 
 
 
-def main():
+def main(stdscr):
     arg_parser = get_argparse()
     args = arg_parser.parse_args(sys.argv[1:])
 
@@ -62,9 +62,10 @@ def main():
         log_name = args.log
         # TODO: support positive/negative examples provided on command line
 
-        print("HELLOOOO")
+        stdscr.addstr(0,0, "Initializing....")
         oracle, guides, positives, negatives = internal_main(config_name)
-        search(oracle, guides, positives, negatives)
+        searcher = Searcher(stdscr)
+        searcher.search(oracle, guides, positives, negatives)
     else:
         # External mode, not yet implemented.
         pass

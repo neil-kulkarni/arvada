@@ -96,7 +96,8 @@ class Rule():
 
     def add_body(self, body):
         self.cache_valid = False
-        self.bodies.append(body)
+        if body not in self.bodies:
+            self.bodies.append(body)
         return self
 
     def __str__(self):
