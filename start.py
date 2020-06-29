@@ -35,7 +35,7 @@ def build_start_grammar(oracle, config, data, leaves):
     each match at least one input example.
     """
     print('Building the starting trees...'.ljust(50), end='\r')
-    trees, classes = build_trees(oracle, config, leaves)
+    trees, classes = build_trees(oracle, config, data, leaves)
     print('Building initial grammar...'.ljust(50), end='\r')
     grammar = build_grammar(config, trees)
     print('Coalescing nonterminals...'.ljust(50), end='\r')
@@ -122,151 +122,157 @@ def derive_classes(oracle, config, leaves):
     # as well as a mapping of nonterminal to the character class it defines.
     return [[ParseNode(get_class[leaf.payload], False, [leaf]) for leaf in tree] for tree in leaves], classes
 
-def group(trees):
+def group(layers):
     """
-    TREES is composed of half-built ParseTrees. Each of the intermediate
-    ParseTrees are represented as a list of nodes at the top-most layer.
+    LAYERS is a set of top-layers of half-built Parse Trees. Each of the
+    intermediate ParseTrees are represented as a list of nodes at the top-most layer.
 
-    Given a list of TREES, computes and returns a map of the most common
-    payloads in the ParseNodes. These payloads can be either terminals or
-    nonterminals, both are treated the same. Each returned map entry is given a
-    unique identifier ti for some i > 1, reserving i = 0 for the start node.
+    Returns the set of all possible groupings of nonterminals in LAYERS,
+    where each grouping is a data structure holding information about a
+    gropuing of contiguous nonterminals in LAYERS.
 
-    Trivial groups are filtered out, including groups that only appear once,
-    groups that only consist of one token, and groups that are substrings of
-    other groups.
-
-    Returns the group first sorted by frequency so that most frequently occuring
-    substrings come first, then sorted by length, so that longer substrings are
-    preferred, like in the maximal-munch rule.
+    A grouping is a two-element tuple data structure that represents a contiguous
+    sequence of nonterminals that appears someplace in LAYERS. The first element
+    is a string representation of this sequence. The second element is itself
+    a two-element tuple that contains a list representation of the sequence, as
+    well as the fresh nonterminal assigned to the grouping.
     """
-    # Compute a map of substrings to their frequency of occurence over all trees
-    counts = {}
-    for tree_lst in trees:
+    # Compute a set of all possible groupings
+    groups = {}
+    for tree_lst in layers:
         for i in range(len(tree_lst)):
-            for j in range(i + 1, len(tree_lst) + 1):
+            for j in range(i + 2, len(tree_lst) + 1):
                 tree_sublist = tree_lst[i:j]
                 tree_substr = ''.join([t.payload for t in tree_sublist])
-                if tree_substr in counts:
-                    count, sublist, id = counts[tree_substr]
-                    counts[tree_substr] = (count + 1, sublist, id)
-                else:
-                    counts[tree_substr] = (1, tree_sublist, allocate_tid())
+                if not tree_substr in groups:
+                    groups[tree_substr] = (tree_sublist, allocate_tid())
 
-    # Filter out tokens that only appear once and nonterminals that are composed
-    # of only a single token. Filter out keys that are substrings of other keys.
-    counts = {k:v for k, v in counts.items() if v[0] > 1 and len(v[1]) > 1}
+    # Return the set of groupings as an iterable
+    return list(groups.items())
 
-    # Shuffle the counts dictionary randomly as a tie breaking mechanism
-    count_keys = list(counts.keys())
-    np.random.shuffle(count_keys)
-    counts = {k:counts[k] for k in count_keys}
-
-    # Sort first by frequency, then by key-length
-    counts = counts.items()
-    counts = sorted(counts, key=lambda elem: len(elem[1][1]), reverse=False)
-    counts = sorted(counts, key=lambda elem: elem[1][0], reverse=True)
-    return counts
-
-def apply(grouping, trees):
+def apply(grouping, layers):
     """
-    The GROUPING of the TREES is an implicit map of a list of tokens to the
-    frequency at which the list occurs in the top layer of TREES, with most
-    frequent token appearing first.
+    GROUPING is a two-element tuple data structure that represents a contiguous
+    sequence of nonterminals that appears someplace in LAYERS. The first element
+    is a string representation of this sequence. The second element is itself
+    a two-element tuple that contains a list representation of the sequence, as
+    well as the fresh nonterminal assigned to the grouping.
 
-    TREES is composed of half-built ParseTrees. Each of the intermediate
-    ParseTrees are represented as a list of nodes at the top-most layer. This
-    algorithm applies GROUPING to the topmost layer of each tree to progress
-    in building the tree. This algorithm should be repeatedly called until
-    the tree is fully built.
+    LAYERS is a set of top-layers of half-built Parse Trees. Each of the
+    intermediate ParseTrees are represented as a list of nodes at the top-most layer.
 
-    Algorithm: For each of the trees in TREES, greedily group the ParseNodes in
-    accord with GROUPING so that the most frequently appearing tokens are grouped
-    first. Perform only one iteration of this greedy grouping scheme, so that
-    in order to completely build the tree, this method must be called many times.
-    Grouped nodes become the children of new ParseNodes, which are inserted
-    into the top layer list of the trees. The updated top layer lists are returned.
-
-    In other words, this method, given the ith layer of the tree and the set of
-    groupings for that layer, returns the i + 1st layer of the tree, for each
-    of the input trees in TREES.
+    Applies a GROUPING data structure to LAYERS by bubbling up the grouping
+    to create a new top layer. Does not mutate LAYERS.
     """
-    def matches(grouping, layer):
+    def matches(group_lst, layer):
         """
-        LAYER is the top layer of one half-built ParseTree.
+        GROUP_LST is a contiguous subarray of ParseNodes that are grouped together.
+        This method requires that len(GRP_LST) > 0.
 
-        The GROUPING of the TREES is an implicit map of a list of tokens to the
-        frequency at which the list occurs in the top layer of TREES, with most
-        frequent token appearing first. Requires len(grouping) > 0.
+        LAYER is the top layer of one half-built ParseTree, implemented as a
+        list of ParseNodes.
 
-        Returns the index at which grouping appears in layer, and returns -1 if
-        the grouping does not appear in the layer.
+        Returns the index at which GROUP_LST appears in LAYER, and returns -1 if
+        the GROUP_LST does not appear in the LAYER. Does not mutate LAYER.
         """
-        ng, nl = len(grouping), len(layer)
+        ng, nl = len(group_lst), len(layer)
         for i in range(nl):
             layer_ind = i # Index into layer
             group_ind = 0 # Index into group
-            while group_ind < ng and layer_ind < nl and layer[layer_ind].payload == grouping[group_ind].payload:
+            while group_ind < ng and layer_ind < nl and layer[layer_ind].payload == group_lst[group_ind].payload:
                 layer_ind += 1
                 group_ind += 1
             if group_ind == ng: return i
         return -1
 
-    def apply_single(group_lst, tree_lst):
+    def apply_single(layer):
         """
-        Applies the grouping GROUP_LST to a single tree. For each grouping,
-        processed in order, applies that grouping to TREE_LST as many times
-        as possible.
+        LAYER is the top layer of one half-built ParseTree, implemented as a
+        list of ParseNodes.
 
-        Returns the updated TREE_LST. If no groupings can be found, do nothing.
+        Applies the GROUPING data structure to a single tree. Applies that
+        GROUPING to LAYER as many times as possible. Does not mutate LAYER.
+
+        Returns the new layer. If no updates can be made, do nothing.
         """
-        if len(group_lst) == 0:
-            return tree_lst
+        group_str, (group_lst, id) = grouping
+        new_layer, ng = layer[:], len(group_lst)
 
-        for group_str, tup in grouping:
-            count, group_lst, id = tup
-            ng = len(group_lst)
-            ind = matches(group_lst, tree_lst)
-            while ind != -1:
-                parent = ParseNode(id, False, tree_lst[ind : ind + ng])
-                tree_lst[ind : ind + ng] = [parent]
-                ind = matches(group_lst, tree_lst)
+        ind = matches(group_lst, new_layer)
+        while ind != -1:
+            parent = ParseNode(id, False, new_layer[ind : ind + ng])
+            new_layer[ind : ind + ng] = [parent]
+            ind = matches(group_lst, new_layer)
 
-        return tree_lst
+        return new_layer
 
-    return [apply_single(grouping, tree) for tree in trees]
+    return [apply_single(layer) for layer in layers]
 
-def build_trees(oracle, config, leaves):
+def build_trees(oracle, config, data, leaves):
     """
     ORACLE is a Lark parser for the grammar we seek to find. We ask the oracle
     yes or no replacement questions in this method.
 
     CONFIG is the required configuration options for GrammarGenerator classes.
 
+    DATA is a map containing both the positive and negative examples used to
+    train the stochastic search.
+
     LEAVES should be a list of lists (one list for each input example), where
     each sublist contains the tokens that built that example, as ParseNodes.
 
-    Iteratively builds parse trees from each of the examples and returns a list
-    of ParseNode references. Also returns the character classes for use in future
-    stages of the algorithm.
+    Iteratively builds parse trees by greedily choosing a substring to "bubble"
+    up that passes replacement tests at each point in the algorithm, until no
+    further bubble ups can be made.
+
+    Returns a list of finished ParseNode references. Also returns the character
+    classes for use in future stages of the algorithm.
 
     Algorithm:
-        1. Initialization
-            - S <- preprocessed input examples
-            - G <- group(S)
-        2. while grouping G is not empty:
-            a. Build new ParseNodes from S
-            b. S <- set of ParseNodes
-            c. G <- group(S)
-        3. Add a start nonterminal to each ParseNode
-        4. return the set of finished starts
+        1. Over all top-level substrings:
+            a. bubble up the substring
+            b. perform replacement if possible
+        2. If a replacement was possible, repeat (1)
     """
-    layers, classes = derive_classes(oracle, config, leaves)
-    grouping = group(layers)
+    def score(layers):
+        """
+        LAYERS is a set of top-layers of half-built Parse Trees. Each of the
+        intermediate ParseTrees are represented as a list of nodes at the top-most layer.
 
-    while len(grouping) > 0:
-        layers = apply(grouping, layers)
-        grouping = group(layers)
+        Assumes LAYERS is a half-formed parse tree that defines a valid grammar.
+        Converts LAYERS into a grammar and returns its positive score.
+        Does not mutate LAYERS in this process.
+        """
+        # Conver LAYERS into a grammar and generator
+        trees = [ParseNode(START, False, tree_lst[:]) for tree_lst in layers]
+        grammar = build_grammar(config, trees)
+        grammar = coalesce(oracle, config, trees, grammar)
+        grammar = minimize(config, grammar)
+        gen = convert(config, grammar)
+        grammar = gen.generate_grammar()
+
+        # Return the score of this grammar
+        scorer = Scorer(config, data, grammar, gen)
+        scorer.score(grammar, gen)
+        return scorer.score_map['pos'][0]
+
+    # Run the character class algorithm to create the first layer of tree
+    layers, classes = derive_classes(oracle, config, leaves)
+    best_score, best_layers, updated, count = score(layers), layers, True, 1
+
+    # Main algorithm loop
+    while updated:
+        layer_group = group(layers)
+        updated, nlg = False, len(layer_group)
+        for i, grouping in enumerate(layer_group):
+            print(('Bubbling iteration (%d, %d, %d)...' % (count, i + 1, nlg)).ljust(50), end='\r')
+            new_layers = apply(grouping, layers)
+            new_score = score(new_layers)
+            if new_score > best_score:
+                best_score = new_score
+                best_layers = new_layers
+                updated = True
+        layers, count = best_layers, count + 1
 
     return [ParseNode(START, False, tree_lst[:]) for tree_lst in layers], classes
 
@@ -435,7 +441,6 @@ def coalesce(oracle, config, trees, grammar):
     for i in range(len(nonterminals)):
         for j in range(i + 1, len(nonterminals)):
             # Iterate through each unique pair of nonterminals
-            print(('Nonterminal replacement (%d, %d, %d)...' % (i + 1, j + 1, len(nonterminals))).ljust(50), end='\r')
             first, second = nonterminals[i], nonterminals[j]
 
             # If the nonterminals can replace each other in every context, they
