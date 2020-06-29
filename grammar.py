@@ -75,12 +75,6 @@ class Grammar():
         self.cached_str_valid = True
         return self.cached_str
 
-    def copy(self):
-        start_prod = self.rules['start'].bodies[0][0]
-        copy = Grammar(start_prod)
-        copy.rules = self.rules.copy()
-        return copy
-
 class Rule():
     """
     Object representing the string-represenation of a rule of a CFG.

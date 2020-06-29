@@ -150,28 +150,34 @@ def mutate_alternate(grammar: Grammar) -> Grammar:
     """
     Allow some elements to alternate.
     """
-    mutant = grammar.copy()
+    mutant = Grammar(grammar.rules['start'].bodies[0][0])
     #print("===ALTERNATE===")
     #print(list(grammar.rules.keys()))
 
-    nonterminals = list(mutant.rules.keys())
-    terminals = [elem for rule in mutant.rules.values() for body in rule.bodies for elem in body if elem not in nonterminals]
+    nonterminals = list(grammar.rules.keys())
+    terminals = [elem for rule in grammar.rules.values() for body in rule.bodies for elem in body if elem not in nonterminals]
     nonterminals.remove('start')
     alternates = terminals + nonterminals
 
-    total_num_rules = len([body for nonterm in nonterminals for body in mutant.rules[nonterm].bodies])
-    weights = [len(mutant.rules[nonterm].bodies)/ total_num_rules for nonterm in nonterminals]
+    total_num_rules = len([body for nonterm in nonterminals for body in grammar.rules[nonterm].bodies])
+    weights = [len(grammar.rules[nonterm].bodies)/ total_num_rules for nonterm in nonterminals]
 
     rule_key = random.choices(nonterminals, weights, k=1)[0]
-    body_idx = random.choice(range(len(mutant.rules[rule_key].bodies)))
-    alternate_idx = random.choice(range(len(mutant.rules[rule_key].bodies[body_idx])))
+    body_idx = random.choice(range(len(grammar.rules[rule_key].bodies)))
+    alternate_idx = random.choice(range(len(grammar.rules[rule_key].bodies[body_idx])))
 
-    alternates.remove(mutant.rules[rule_key].bodies[body_idx][alternate_idx])
+    alternates.remove(grammar.rules[rule_key].bodies[body_idx][alternate_idx])
     alternate = random.choice(alternates)
 
-    new_body = mutant.rules[rule_key].bodies[body_idx][:]
-    new_body[alternate_idx] = alternate
-    mutant.rules[rule_key].add_body(new_body)
+    for rule in grammar.rules.values():
+        new_rule = Rule(rule.start)
+        for body in rule.bodies:
+            new_rule.add_body(body)
+        if rule.start == rule_key:
+            new_body = grammar.rules[rule_key].bodies[body_idx][:]
+            new_body[alternate_idx] = alternate
+            new_rule.add_body(new_body)
+        mutant.add_rule(new_rule)
 
     #print("keys before: ", nonterminals)
     #print("keys after: ", list(mutant.rules.keys()))
