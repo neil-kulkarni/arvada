@@ -1,15 +1,16 @@
 import copy
+from collections import defaultdict, Counter
 
 from branta.oracle import Oracle
 from branta.util import strict_subsequences, find_subsequence, new_nonterminal, replace_all
 from grammar import Grammar, Rule
-from typing import List, Tuple, Set
+from typing import List, Tuple, Set, Dict
 import sys
 from lark import Lark
 import random
 import curses
 
-
+random.seed(0)
 
 class Scorer:
     """
@@ -64,19 +65,24 @@ class Searcher:
         self.action = "Initializing"
         self.cur_grammar : Grammar= None
 
+    def log_debug(self, *args):
+        if self.window is None:
+            print(*args)
+
     def write_current_grammar(self):
         f = open(".cur_grammar", "w")
         f.write(self.cur_grammar.__str__())
         f.close()
 
     def print_status(self):
-        self.window.clear()
-        self.window.addstr(0,0, f"Current population size: {len(self.population)}")
-        self.window.addstr(1,0, f"Current parent under mutation: {self.cur_parent}")
-        self.window.addstr(2,0, f"Current best score: {self.population[-1][2]}")
-        self.window.addstr(3,0, "Current action:")
-        self.window.addstr(4,4, self.action)
-        self.window.refresh()
+        if self.window is not None:
+            self.window.clear()
+            self.window.addstr(0,0, f"Current population size: {len(self.population)}")
+            self.window.addstr(1,0, f"Current parent under mutation: {self.cur_parent}")
+            self.window.addstr(2,0, f"Current best score: {self.population[-1][2]}")
+            self.window.addstr(3,0, "Current action:")
+            self.window.addstr(4,4, self.action)
+            self.window.refresh()
 
     def progress(self, num_positives_parsed, num_negatives_parsed):
         self.action = f"Scoring...\n   {num_positives_parsed} positives done\n   {num_negatives_parsed} negatives done"
@@ -97,7 +103,7 @@ class Searcher:
         char_map = {}
         for i, char in enumerate(all_chars):
             idx = i + 1
-            init_grammar.add_rule(Rule(f't{idx}').add_body([char]))
+            #init_grammar.add_rule(Rule(f't{idx}').add_body([char]))
             char_map[char] = f't{idx}'
 
         init_rule = Rule('t0')
@@ -105,7 +111,7 @@ class Searcher:
             body = []
             for char in guide:
                 term = '"' + char + '"'
-                body.append(char_map[term])
+                body.append(term)
             init_rule.add_body(body)
 
         init_grammar.add_rule(init_rule)
@@ -114,10 +120,10 @@ class Searcher:
 
     def mutate_bubble(self, grammar: Grammar) -> Grammar:
         """
-        Bubble up some subsequence of nonterminals
+        Bubble up some subsequence of nonterminals/terminals
         """
 
-        #print("===BUBBLE===")
+        self.log_debug("===BUBBLE===")
         mutant = Grammar(grammar.rules['start'].bodies[0][0])
         sequences : Set[Tuple[str]] = set()
         for rule in grammar.rules.values():
@@ -143,9 +149,9 @@ class Searcher:
             mutant.add_rule(new_rule)
 
         mutant.add_rule(Rule(replace_name).add_body(list(replace_seq)))
-        #print(f"Bubbled up {replace_name}->{replace_seq}")
-        #print("keys before: ", list(grammar.rules.keys()))
-        #print("keys after: ", list(mutant.rules.keys()))
+        self.log_debug(f"Bubbled up {replace_name}->{replace_seq}")
+        self.log_debug("keys before: ", list(grammar.rules.keys()))
+        self.log_debug("keys after: ", list(mutant.rules.keys()))
         return mutant
 
     def mutate_coalesce(self, grammar: Grammar) -> Grammar:
@@ -153,15 +159,15 @@ class Searcher:
         Coalesce some elements together.
         """
 
-        #print("===COALESCE===")
+        self.log_debug("===COALESCE===")
         mutant = Grammar(grammar.rules['start'].bodies[0][0])
 
         nonterminals = list(grammar.rules.keys())
-        terminals = [elem for rule in grammar.rules.values() for body in rule.bodies for elem in body if elem not in nonterminals]
+        terminals = list(set([elem for rule in grammar.rules.values() for body in rule.bodies for elem in body if elem not in nonterminals]))
         nonterminals.remove('start')
 
-        all = nonterminals
-        coalesce_num = random.choice(range(2,min(6, len(all))))
+        all = nonterminals + terminals
+        coalesce_num = random.choice(range(2, min(6, len(all))))
         to_coalesce = random.sample(all, coalesce_num)
 
         replacer_id = new_nonterminal(nonterminals)
@@ -179,10 +185,15 @@ class Searcher:
                 rule = grammar.rules[coalescee]
                 for body in rule.bodies:
                     replacer_rules.append(body[:])
+            else:
+                # otherwise it's a terminal
+                replacer_rules.append([coalescee])
+
         replacer = Rule(replacer_id)
         replacer.bodies = replacer_rules
         mutant.add_rule(replacer)
-        #print(f"Coalesced up {to_coalesce}->{replacer_id}")
+        self.log_debug(f"Coalesced up {to_coalesce}->{replacer_id}")
+        self.log_debug(mutant)
 
         return mutant
 
@@ -191,8 +202,8 @@ class Searcher:
         Allow some elements to alternate.
         """
         mutant = Grammar(grammar.rules['start'].bodies[0][0])
-        #print("===ALTERNATE===")
-        #print(list(grammar.rules.keys()))
+        self.log_debug("===ALTERNATE===")
+        self.log_debug(list(grammar.rules.keys()))
 
         nonterminals = list(grammar.rules.keys())
         terminals = [elem for rule in grammar.rules.values() for body in rule.bodies for elem in body if elem not in nonterminals]
@@ -219,10 +230,10 @@ class Searcher:
                 new_rule.add_body(new_body)
             mutant.add_rule(new_rule)
 
-        #print("keys before: ", nonterminals)
-        #print("keys after: ", list(mutant.rules.keys()))
+        self.log_debug("keys before: ", nonterminals)
+        self.log_debug("keys after: ", list(mutant.rules.keys()))
 
-        #print(f"Alternated at {rule_key}->{mutant.rules[rule_key].bodies[body_idx][alternate_idx]}|{alternate}")
+        self.log_debug(f"Alternated at {rule_key}->{mutant.rules[rule_key].bodies[body_idx][alternate_idx]}|{alternate}")
         return mutant
 
     def mutate_repeat(self, grammar: Grammar) -> Grammar:
@@ -230,7 +241,7 @@ class Searcher:
         Allow some element to repeat
         """
         mutant = Grammar(grammar.rules['start'].bodies[0][0])
-        #print("===REPEAT===")
+        self.log_debug("===REPEAT===")
 
         nonterminals = list(grammar.rules.keys())
         nonterminals.remove('start')
@@ -245,7 +256,7 @@ class Searcher:
         repeat_elem = grammar.rules[rule_key].bodies[body_idx][repeat_idx]
         repeater_name = new_nonterminal(nonterminals)
 
-        #print(f"In rule {rule_key} -> {grammar.rules[rule_key].bodies[body_idx]} repeating {repeat_elem} into {repeater_name}")
+        self.log_debug(f"In rule {rule_key} -> {grammar.rules[rule_key].bodies[body_idx]} repeating {repeat_elem} into {repeater_name}")
         for rule in grammar.rules.values():
             new_rule = Rule(rule.start)
             if rule.start == rule_key:
@@ -265,7 +276,117 @@ class Searcher:
         return mutant
 
     def minimize(self, grammar: Grammar) -> None:
-        pass
+        """
+        'Minimize' a grammar. Taken straight out of mimid paper.
+        This is a mutative function.
+        """
+        self.action = "Minimizing"
+        orig_size : int = self.grammar_size(grammar)
+        def remove_single_keys(grammar: Grammar):
+            rule_starts_to_remove: List[str] = []
+            for rule_start, rule in grammar.rules.items():
+                if rule_start == "start":
+                    continue
+                if (len(rule.bodies) == 1):
+                    if len(rule.bodies[0]) == 1:
+                        rule_starts_to_remove.append(rule_start)
+
+            for replacee in rule_starts_to_remove:
+                replacer = grammar.rules[replacee].bodies[0]
+                for rule_start, rule in grammar.rules.items():
+                    rule.bodies = [[replacer if e == replacee else e for e in body] for body in rule.bodies]
+                    rule.cache_valid = False
+                    rule.cached_str = ""
+                grammar.rules.pop(replacee)
+            grammar.cached_str_valid = False
+            grammar.cached_parser_valid = False
+
+        def remove_redundant_nonterminals(grammar: Grammar):
+            rules_map : Dict[Tuple[Tuple[str]], List[str]]= defaultdict(list)
+            for rule in grammar.rules.values():
+                if rule.start == "start":
+                    continue
+                sorted_bodies : List[Tuple[str]] = [tuple(body) for body in rule.bodies]
+                self.log_debug(sorted_bodies)
+                sorted_bodies.sort()
+                tuple_bodies : Tuple[Tuple[str]] = tuple(sorted_bodies)
+                rules_map[tuple_bodies].append(rule.start)
+            for mergeables in rules_map.values():
+                if len(mergeables) > 1:
+                    replacer = mergeables[0]
+                    replacees = mergeables[1:]
+                    for replacee in replacees:
+                        for rule_start, rule in grammar.rules.items():
+                            rule.bodies = [[replacer if e == replacee else e for e in body] for body in rule.bodies]
+                            rule.cache_valid = False
+                            rule.cached_str = ""
+                        grammar.rules.pop(replacee)
+            grammar.cached_str_valid = False
+            grammar.cached_parser_valid = False
+
+        def remove_straight_recursion(grammar: Grammar):
+            remove_rules = []
+            for rule_start, rule in grammar.rules.items():
+                to_remove : List[int] = []
+                if rule_start == "start":
+                    continue
+                for body_idx, body in enumerate(rule.bodies):
+                    if len(body) == 1 and body[0] == rule_start:
+                        to_remove.append(body_idx)
+                for idx in reversed(to_remove):
+                    rule.bodies.pop(idx)
+                assert(len(rule.bodies) > 0)
+                rule.cache_valid = False
+                rule.cached_str = ""
+
+
+            grammar.cached_str_valid = False
+            grammar.cached_parser_valid = False
+
+        def remove_single_references(grammar: Grammar):
+            single_refs = {}
+            counter = Counter([e for rule in grammar.rules.values() for body in rule.bodies for e in body])
+            for elem in counter:
+                if elem in grammar.rules:
+                    if counter[elem] == 1:
+                        if len(grammar.rules[elem].bodies) == 1:
+                            single_refs[elem] = grammar.rules[elem].bodies[0]
+
+            for rule in grammar.rules.values():
+                new_bodies = []
+                for body in rule.bodies:
+                    new_body = []
+                    for e in body:
+                        if e in single_refs:
+                            new_body.extend(single_refs[e])
+                        else:
+                            new_body.append(e)
+                    new_bodies.append(new_body)
+                rule.bodies = new_bodies
+                rule.cache_valid = False
+                rule.cached_str = ""
+
+            for ref in single_refs:
+                grammar.rules.pop(ref)
+
+            grammar.cached_str_valid = False
+            grammar.cached_parser_valid = False
+
+        remove_single_keys(grammar)
+        remove_redundant_nonterminals(grammar)
+        remove_straight_recursion(grammar)
+        remove_single_references(grammar)
+        new_size : int = self.grammar_size(grammar)
+        while (new_size < orig_size):
+            orig_size = new_size
+            remove_single_keys(grammar)
+            remove_redundant_nonterminals(grammar)
+            remove_straight_recursion(grammar)
+            remove_single_references(grammar)
+            new_size: int = self.grammar_size(grammar)
+
+    def grammar_size(self, grammar: Grammar) -> int:
+        return sum([1 for rule in grammar.rules.values() for body in rule.bodies])
 
     def search(self, oracle: Oracle, guides: List[str], positives: List[str], negatives: List[str]) -> Grammar:
         """
@@ -297,15 +418,15 @@ class Searcher:
             nonlocal minimum_score
 
             cur_gram_id += 1
-            num_mutations = 8#random.choice([1, 2, 4, 8, 16])
+            num_mutations = random.choice([1, 2, 4, 8, 16])
             mutant = parent_grammar
             self.action = "Mutating"
             for i in range(num_mutations):
                 parent_grammar.cached_str_valid = False
                 # print("At topmost of iteration: ", mutant.rules.keys())
-
-                mutate_func = random.choice([self.mutate_bubble, self.mutate_coalesce, self.mutate_alternate, self.mutate_repeat])
+                mutate_func = random.choice([self.mutate_bubble, self.mutate_coalesce])#, self.mutate_alternate, self.mutate_repeat])
                 mutant = mutate_func(mutant)
+                self.log_debug("====== gram:\n", mutant, "\n============")
 
                 for rule in mutant.rules.values():
                     rule.cache_valid = False
@@ -321,6 +442,7 @@ class Searcher:
             self.write_current_grammar()
             self.action = "Scoring"
             #print("!!!!!done@!!!!!")
+            self.minimize(mutant)
             mutant_score = scorer.score(mutant, self.progress)
             if mutant_score > minimum_score:
                 add_to_population(mutant, mutant_score, cur_gram_id)
@@ -332,7 +454,6 @@ class Searcher:
             self.action = "Saving"
             nonlocal minimum_score
             assert(score > minimum_score)
-            #minimize(grammar)
 
             insert_idx = 0
             # TODO: assert that everything stays sorted
@@ -353,7 +474,7 @@ class Searcher:
 
         #################### END HELPERS #######################
 
-        for i in range(0, 20):
+        for i in range(0, 100):
             current_parent, parent_id, score = choose_parent(self.population)
             self.cur_parent = parent_id
             fuzz_one(current_parent)

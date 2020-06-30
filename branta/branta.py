@@ -61,8 +61,8 @@ def main(stdscr):
         config_name = args.config
         log_name = args.log
         # TODO: support positive/negative examples provided on command line
-
-        stdscr.addstr(0,0, "Initializing....")
+        if (stdscr is not None):
+            stdscr.addstr(0,0, "Initializing....")
         oracle, guides, positives, negatives = internal_main(config_name)
         searcher = Searcher(stdscr)
         searcher.search(oracle, guides, positives, negatives)
