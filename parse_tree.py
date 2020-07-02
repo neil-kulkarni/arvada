@@ -1,4 +1,7 @@
 import random
+from collections import defaultdict
+from typing import List
+
 
 class ParseTree():
 
@@ -109,3 +112,50 @@ class ParseNode():
 
     def is_leaf(self):
         return len(self.children) == 0
+
+    def __str__(self):
+        """
+        Print this parse node nicely.
+        """
+        def place_in_middle(char : str, strlen : int):
+            """
+            Assumes char is of len 1
+            """
+            # if strlen is even: leftpad = x/2 -1, rightpad = x/2
+            # if strlen iss odd: leftpad = rightpad = (x-1)/2
+            left_pad = (strlen - 1) // 2
+            right_pad = (strlen) // 2
+            return (' ' * left_pad) + char + (' ' * right_pad)
+
+        if self.is_terminal:
+            return " " + (self.payload if len(self.payload) > 0 else '\u03B5') + " "
+        else:
+            child_strs = [c.__str__() for c in self.children]
+            child_str_widths = [len(c_str.split('\n')[0]) for c_str in child_strs]
+            pointing_strs_left = [place_in_middle('/', w) for w in child_str_widths[:(len(self.children))//2]]
+            pointing_strs_mid = [place_in_middle('|', w) for w in child_str_widths[(len(self.children))//2:(len(self.children) + 1)//2]]
+            pointing_strs_right = [place_in_middle('\\', w) for w in child_str_widths[(len(self.children)+ 1)//2:]]
+            pointing_strs = pointing_strs_left + pointing_strs_mid + pointing_strs_right
+            pointing_str = ''.join(pointing_strs)
+            top = place_in_middle('X', len(pointing_str))
+            max_depth = max([len(child_str.split('\n')) for child_str in child_strs])
+            pasted_children_layers = defaultdict(str)
+            for child_str in child_strs:
+                splits = child_str.split('\n')
+                my_length = len(splits[0])
+                splits = splits + ([' ' * my_length] *(max_depth - len(splits)))
+                for layer, line in enumerate(splits):
+                    pasted_children_layers[layer] += line
+            pasted_children = '\n'.join([pasted_children_layers[i] for i in range(len(pasted_children_layers))])
+            return '\n'.join([top, pointing_str, pasted_children])
+
+def str_layer(layer: List[ParseNode]):
+    """
+    Gets a string for a ''layer'' of parse nodes in a nice format, e.g. assuming that all the parse nodes are for a
+    single input, and united those in a single parse node
+    """
+    top_node = ParseNode('', False, layer)
+    return top_node.__str__()
+
+
+
