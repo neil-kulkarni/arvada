@@ -1,3 +1,5 @@
+from typing import Optional
+
 from parse_tree import ParseNode
 from generator import *
 from graph import Graph
@@ -234,10 +236,12 @@ def build_trees(oracle, config, data, leaves):
             b. perform replacement if possible
         2. If a replacement was possible, repeat (1)
     """
-    def score(layers):
+    def score(layers, nonterm : Optional[str] = None):
         """
         LAYERS is a set of top-layers of half-built Parse Trees. Each of the
         intermediate ParseTrees are represented as a list of nodes at the top-most layer.
+
+        `nonterm` is the nonterminal that was just introduced to the parse trees.
 
         Assumes LAYERS is a half-formed parse tree that defines a valid grammar.
         Converts LAYERS into a grammar and returns its positive score.
@@ -246,11 +250,10 @@ def build_trees(oracle, config, data, leaves):
         # Conver LAYERS into a grammar and generator
         trees = [ParseNode(START, False, tree_lst[:]) for tree_lst in layers]
         grammar = build_grammar(config, trees)
-        grammar = coalesce(oracle, config, trees, grammar)
+        grammar = coalesce(oracle, config, trees, grammar, nonterm)
         grammar = minimize(config, grammar)
         gen = convert(config, grammar)
         grammar = gen.generate_grammar()
-
         # Return the score of this grammar
         scorer = Scorer(config, data, grammar, gen)
         scorer.score(grammar, gen)
@@ -267,13 +270,13 @@ def build_trees(oracle, config, data, leaves):
         for i, grouping in enumerate(layer_group):
             print(('Bubbling iteration (%d, %d, %d)...' % (count, i + 1, nlg)).ljust(50), end='\r')
             new_layers = apply(grouping, layers)
-            new_score = score(new_layers)
+            new_score = score(new_layers, grouping[1][1])
             if new_score > best_score:
                 best_score = new_score
                 best_layers = new_layers
                 updated = True
         layers, count = best_layers, count + 1
-
+    print(f"Best score is: {best_score}\n\n")
     return [ParseNode(START, False, tree_lst[:]) for tree_lst in layers], classes
 
 def build_grammar(config, trees):
@@ -320,7 +323,7 @@ def build_grammar(config, trees):
         build_rules(grammar_node, tree, rule_map)
     return grammar_node
 
-def coalesce(oracle, config, trees, grammar):
+def coalesce(oracle, config, trees, grammar, nonterm: Optional[str] = None):
     """
     ORACLE is a Lark parser for the grammar we seek to find. We ask the oracle
     yes or no replacement questions in this method.
@@ -331,7 +334,10 @@ def coalesce(oracle, config, trees, grammar):
 
     GRAMMAR is a GrammarNode that is the disjunction of the TREES.
 
-    This method coalesces nonterminals that are equivalent to each other.
+    NONTERM is a nonterminal to coalesce with.
+
+    This method coalesces nonterminals that are equivalent to each other. If
+    `nonterm` is provided, only consider nonterminals equivalent to `nonterm`.
     Equivalence is determined by replacement.
     """
     def replaced_string(tree, replacer_string, replacee_nt):
@@ -438,13 +444,22 @@ def coalesce(oracle, config, trees, grammar):
     nonterminals = list(set([rule.lhs for rule in grammar.children]))
     uf = UnionFind(nonterminals)
 
-    for i in range(len(nonterminals)):
-        for j in range(i + 1, len(nonterminals)):
-            # Iterate through each unique pair of nonterminals
-            first, second = nonterminals[i], nonterminals[j]
+    if nonterm is not None:
+        assert(nonterm in nonterminals, "Error: {nonterm} is not in the grammar's nonterminals. Cannot coalesce")
 
-            # If the nonterminals can replace each other in every context, they
-            # must belong to the same character class
+    for i in range(len(nonterminals)):
+        if nonterm is None:
+            for j in range(i + 1, len(nonterminals)):
+                first, second = nonterminals[i], nonterminals[j]
+                # If the nonterminals can replace each other in every context, they
+                # must belong to the same character class
+                if not uf.is_connected(first, second) and replaces(first, second) and replaces(second, first):
+                    uf.connect(first, second)
+        # If `nonterm` is given, only try the pairs that contain it.
+        else:
+            first, second = nonterminals[i], nonterm
+            if first == second:
+                continue
             if not uf.is_connected(first, second) and replaces(first, second) and replaces(second, first):
                 uf.connect(first, second)
 
