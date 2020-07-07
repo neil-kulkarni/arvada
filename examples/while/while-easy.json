@@ -4,7 +4,7 @@
     "NONTERMINALS": ["c", "b", "e"],
     "NUM_RULES": 30,
     "MAX_RHS_LEN": 12,
-    "POS_EXAMPLES": 100,
+    "POS_EXAMPLES": 200,
     "NEG_EXAMPLES": 100,
     "MAX_NEG_EXAMPLE_SIZE": 50,
     "MAX_TREE_DEPTH": 10,

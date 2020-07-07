@@ -145,9 +145,13 @@ def group(layers):
                 tree_sublist = tree_lst[i:j]
                 tree_substr = ''.join([t.payload for t in tree_sublist])
                 if not tree_substr in groups:
-                    groups[tree_substr] = (tree_sublist, allocate_tid())
+                    groups[tree_substr] = (tree_sublist, allocate_tid(), 1)
+                else:
+                    tree_sublist, tid, count = groups[tree_substr]
+                    groups[tree_substr] = (tree_sublist, tid, count + 1)
 
-    # Return the set of groupings as an iterable
+    # Return the set of repeated groupings as an iterable
+    groups = {k:v for k, v in groups.items() if v[2] > 1}
     return list(groups.items())
 
 def apply(grouping, layers):
@@ -195,7 +199,7 @@ def apply(grouping, layers):
 
         Returns the new layer. If no updates can be made, do nothing.
         """
-        group_str, (group_lst, id) = grouping
+        group_str, (group_lst, id, _) = grouping
         new_layer, ng = layer[:], len(group_lst)
 
         ind = matches(group_lst, new_layer)
