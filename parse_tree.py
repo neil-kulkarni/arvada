@@ -142,3 +142,9 @@ class ParseNode():
                 pasted_children_layers[layer] += line
         pasted_children = '\n'.join([pasted_children_layers[i] for i in range(len(pasted_children_layers))])
         return '\n'.join([top, pointing_str, pasted_children])
+
+    def __repr__(self):
+        if len(self.children) == 1 and self.children[0].is_terminal:
+            return self.children[0].payload
+        else:
+            return self.payload

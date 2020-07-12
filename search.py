@@ -58,23 +58,12 @@ def main(file_name, log_file, max_iters):
             print('\n\nInitial grammar does not compile! %s' % str(e), file=f)
             exit()
 
-    # Generate random intial grammar and score it. Then, score the start grammar
-    # we arrived at earlier, which will add it to the "interesting" set for
-    # future iterations. Then, sample many more random grammars so that overall
-    # variance is reduced.
+    # Score the start grammar we arrived at earlier, which will add it to the
+    # "interesting" set for future iterations
     print('Scoring initial grammars...'.ljust(50), end='\r')
-    gen = GrammarGenerator(CONFIG)
-    grammar = gen.generate_grammar()
-    scorer = Scorer(CONFIG, DATA, grammar, gen)
-    scorer.score(grammar, gen)
-
     start_grammar = start_gen.generate_grammar()
+    scorer = Scorer(CONFIG, DATA, start_grammar, start_gen)
     scorer.score(start_grammar, start_gen)
-
-    for _ in range(len(positive_examples)):
-        gen = GrammarGenerator(CONFIG)
-        grammar = gen.generate_grammar()
-        scorer.score(grammar, gen)
 
     # Prints iteration information to the log file
     def log_results(scorer, log_file):
