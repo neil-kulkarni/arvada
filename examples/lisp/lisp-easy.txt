@@ -1,0 +1,11 @@
+# Terminals
+., (, ), ATOM, SPACE
+
+# Grammar
+# The first rule in the grammar specifies the start nonterminal
+sexpr := ATOM
+  | ( sexpr . sexpr )
+  | ( sexpr_lst )
+
+sexpr_lst := sexpr
+  | sexpr SPACE sexpr_lst

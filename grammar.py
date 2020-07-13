@@ -63,7 +63,7 @@ class Grammar():
         # Check if the negative example is in the grammar. Try again if so.
         try:
             self.parser().parse(negative_example)
-            return self.generate_negative_example()
+            return self.generate_negative_example(terminals, max_size)
         except:
             return negative_example
 
