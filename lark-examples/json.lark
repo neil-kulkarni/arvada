@@ -1,0 +1,15 @@
+start: value 
+escapable: "\"" | "\\" | "\/" | "b" | "f" | "n" | "r" | "t" | "u" ("0".."9" | "A".."F")~4
+escapedchar: "\\" escapable
+char : "a".."z" | "A".."Z" | "0".."9"  | escapedchar | "_" | " " | "!" | "?" | "." | ":" | ";" | "(" | ")" | "/" | "@" | "#" | "=" | "+" | "-" | "&" | "*"
+chars : char | char chars
+string: "\"" chars "\""
+digits: ("0".."9")+
+number: ("-")? ("1".."9" digits | digits ("." digits)? (("e" | "E") ("-" | "+")? digits)?)
+whitespace: (" " | "\n" | "\r" | "\t")*
+value: object | array | string | number | "true" | "false" | "null"
+array: "[" whitespace "]" | "[" whitespace* list whitespace* "]"
+list: value | list whitespace* "," whitespace* value
+object: "{" whitespace "}" | "{" objlist "}"
+objtuple: whitespace* string whitespace* ":" whitespace* value whitespace*
+objlist: objtuple | objlist "," objtuple
