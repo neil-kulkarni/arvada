@@ -1,0 +1,39 @@
+char: "a".."z"
+var: char | var char | var "0".."9" | var "_"
+number: int | float | "-" int | "-" float
+int: ("0".."9")+
+float: int "." int
+constant: "pi" | "phi" | "e"
+func : "abs"
+    | "acos" 
+    | "asin" 
+    | "atan" 
+    | "atan2" 
+    | "ceil" 
+    | "cos" 
+    | "cosh" 
+    | "degrees" 
+    | "exp"
+    | "fabs" 
+    | "floor" 
+    | "fmod" 
+    | "frexp" 
+    | "hypot" 
+    | "ldexp" 
+    | "log"
+    | "log10" 
+    | "modf" 
+    | "pow"
+    | "radians" 
+    | "sin" 
+    | "sinh" 
+    | "sqrt" 
+    | "tan" 
+    | "tanh"
+funccall: func "(" arglist ")"
+space: " "*
+arglist: expr | expr "," space arglist
+binop: expr space op space expr
+op : "+" | "-" | "*" | "/"
+expr: funccall | var | number | constant | binop | "(" expr ")"
+start: expr
