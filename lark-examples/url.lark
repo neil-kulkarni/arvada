@@ -1,0 +1,39 @@
+start: uri
+
+uri: scheme ":" hierpart ("?" query)? ("#" fragment)?
+scheme: "http" | "https" | "ftp" | "mailto" | "file" | "irc"
+
+hierpart: "//" authority pathabempty 
+		| pathabsolute
+		| pathrootless
+		| pathempty
+
+
+authority: (userinfo "@")? host (":" port)?
+
+userinfo: (unreserved | subdelims)*
+
+host: label | host "." label
+label: ALPHA (ldhstr? alnum)?
+ldhstr: letdighyp | letdighyp ldhstr
+letdighyp: ALPHA | DIGIT | "-"
+
+port: DIGIT*
+
+pathabempty: ("/" segment)*
+pathabsolute: "/" (segmentnz ("/" segment)*)?
+pathrootless: segmentnz ("/" segment)*
+pathempty: 
+segment: (unreserved|subdelims)*
+segmentnz: (unreserved|subdelims)+
+
+query: (unreserved|subdelims | "/" | "?")*
+
+fragment: (unreserved|subdelims | "/" | "?")*
+
+unreserved: ALPHA | DIGIT | "-" | "." | "_" | "~"
+subdelims: "!" | "$" | "&" | "'" | "(" | ")" | "*" | "+" | "," | ";" | "="
+
+ALPHA: "a".."z" 
+DIGIT: "0".."9"
+alnum: ALPHA | DIGIT
