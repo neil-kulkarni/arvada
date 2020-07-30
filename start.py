@@ -440,7 +440,6 @@ def coalesce(oracle, config, trees, grammar : Grammar):
                 if len(body) == 1 and body[0] in grammar.rules.keys():
                     X.add(body)
                     F.append(body)
-                    rule.cache_valid = False
 
         # Continue searching in a BFS-like style until there is nothing left
         while len(F) > 0:
@@ -452,7 +451,6 @@ def coalesce(oracle, config, trees, grammar : Grammar):
                     if len(body) == 1 and body[0] in grammar.rules.keys():
                         X.add(body)
                         F.append(body)
-                        rule.cache_valid = False
 
         # Filter the final set of SymbolNode references by NT and return
         output = set()
@@ -500,8 +498,6 @@ def coalesce(oracle, config, trees, grammar : Grammar):
                 # The keys of the rules determine the set of nonterminals
                 if body[i] in grammar.rules.keys():
                     body[i] = get_class[body[i]]
-                    # For printing we need to invalidate the cache for this rule
-                    grammar.rules[nonterm].cache_valid = False
 
     # Add the alternation rules for each class into the grammar
     for class_nt, nts in classes.items():
@@ -528,7 +524,6 @@ def coalesce(oracle, config, trees, grammar : Grammar):
                 for i in range(len(body)):
                     if body[i] == conservative_class_nt:
                         body[i] = new_class_nt
-                        rule_node.cache_valid = False
 
         for rule_body in nt_derivable(new_class_nt):
             rule_body[0] = conservative_class_nt
@@ -541,7 +536,6 @@ def coalesce(oracle, config, trees, grammar : Grammar):
             body = conservative_rule.bodies[i]
             if len(body) == 1 and body[0] == START:
                 to_pop.append(i)
-                conservative_rule.cache_valid = False
 
         for i in reversed(to_pop):
             conservative_rule.bodies.pop(i)
@@ -572,7 +566,6 @@ def minimize(config, grammar):
                 body_str = ''.join(body)
                 if body_str in bodies_so_far:
                     remove_idxs.append(i)
-                    rule.cache_valid = False
                 else:
                     bodies_so_far.add(body_str)
             for idx in reversed(remove_idxs):
@@ -596,8 +589,6 @@ def minimize(config, grammar):
                 for ind in reversed(to_fix_idxs):
                     nt = body[ind]
                     body[ind:ind+1] = map[nt]
-                if len(to_fix_idxs) > 0:
-                    rule.cache_valid = False
         remove_lhs = [lhs for lhs in grammar.rules.keys() if lhs in map]
         for lhs in remove_lhs:
             grammar.rules.pop(lhs)

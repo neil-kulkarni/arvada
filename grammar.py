@@ -136,22 +136,28 @@ class Rule():
         self.start = start
         self.bodies = []
         self.cached_str = ""
-        self.cache_valid = False
+        self.cache_hash = self._body_hash()
 
     def add_body(self, body):
         self.cache_valid = False
         self.bodies.append(body)
         return self
 
+    def _cache_valid(self):
+        return self.cache_hash == self._body_hash()
+
+    def _body_hash(self):
+        return hash(tuple([tuple(body) for body in self.bodies]))
+
     def __str__(self):
-        if self.cache_valid:
+        if self._cache_valid():
             return self.cached_str
 
         self.cached_str = '%s: %s' % (self.start, self._body_str(self.bodies[0]))
         for i in range(1, len(self.bodies)):
             self.cached_str += '\n    | %s' % (self._body_str(self.bodies[i]))
 
-        self.cache_valid = True
+        self.cache_hash = self._body_hash()
         return self.cached_str
 
     def _body_str(self, body):
