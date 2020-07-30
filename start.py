@@ -1,8 +1,10 @@
+from collections import defaultdict
+
 from parse_tree import ParseNode
-from generator import *
+from grammar import *
 from graph import Graph
+from input import clean_terminal
 from union import UnionFind
-from score import Scorer
 import numpy as np
 
 def allocate_tid():
@@ -18,7 +20,7 @@ def allocate_tid():
 next_tid = 0
 START = allocate_tid() # The start nonterminal is t0
 
-def build_start_grammar(oracle, config, data, leaves):
+def build_start_grammar(oracle, config, leaves):
     """
     ORACLE is a Lark parser for the grammar we seek to find. We ask the oracle
     yes or no replacement questions in this method.
@@ -35,16 +37,14 @@ def build_start_grammar(oracle, config, data, leaves):
     each match at least one input example.
     """
     print('Building the starting trees...'.ljust(50), end='\r')
-    trees, classes = build_trees(oracle, config, data, leaves)
+    trees, classes = build_trees(oracle, config, leaves)
     print('Building initial grammar...'.ljust(50), end='\r')
     grammar = build_grammar(config, trees)
     print('Coalescing nonterminals...'.ljust(50), end='\r')
     grammar, coalesce_caused = coalesce(oracle, config, trees, grammar)
-    print('Minimizing initial grammar...'.ljust(50), end='\r')
-    grammar = minimize(config, grammar)
-    print('Converting into final grammar...'.ljust(50), end='\r')
-    gen = convert(config, grammar)
-    return gen
+    #print('Minimizing initial grammar...'.ljust(50), end='\r')
+    #grammar = minimize(config, grammar)
+    return grammar
 
 def derive_classes(oracle, config, leaves):
     """
@@ -208,7 +208,7 @@ def apply(grouping, layers):
 
     return [apply_single(layer) for layer in layers]
 
-def build_trees(oracle, config, data, leaves):
+def build_trees(oracle, config, leaves):
     """
     ORACLE is a Lark parser for the grammar we seek to find. We ask the oracle
     yes or no replacement questions in this method.
@@ -243,7 +243,7 @@ def build_trees(oracle, config, data, leaves):
         Converts LAYERS into a grammar and returns its positive score.
         Does not mutate LAYERS in this process.
         """
-        # Conver LAYERS into a grammar and generator
+        # Convert LAYERS into a grammar and generator
         trees = [ParseNode(START, False, tree_lst[:]) for tree_lst in layers]
         grammar = build_grammar(config, trees)
         grammar, coalesce_caused = coalesce(oracle, config, trees, grammar)
@@ -296,13 +296,16 @@ def build_grammar(config, trees):
         #    / |
         #    ...
         # E.g. the ParseNode t0 defines the rule t0 -> t1 a b
-        rule_body = [SymbolNode(config, child.payload, child.is_terminal) for child in parse_node.children]
-        rule = RuleNode(config, parse_node.payload, rule_body)
-        rule_str = ''.join([sn.choice for sn in rule.children])
-        if rule.lhs not in rule_map: rule_map[rule.lhs] = set()
-        if rule_str not in rule_map[rule.lhs]:
-            grammar_node.children.append(rule)
-            rule_map[rule.lhs].add(rule_str)
+        rule_body = [clean_terminal(child.payload) if child.is_terminal
+                     else child.payload
+                     for child in parse_node.children]
+        rule = Rule(parse_node.payload)
+        rule.add_body(rule_body)
+        rule_str = ''.join([elem for elem in rule_body])
+        if rule.start not in rule_map: rule_map[rule.start] = set()
+        if rule_str not in rule_map[rule.start]:
+            grammar_node.add_rule(rule)
+            rule_map[rule.start].add(rule_str)
 
         # Recurse on the children of this ParseNode so the rule they define
         # are also added to the grammar.
@@ -310,13 +313,12 @@ def build_grammar(config, trees):
             build_rules(grammar_node, child, rule_map)
 
     # Construct the initial grammar node without children, then fill them.
-    # Return the corresponding GrammarNode
-    grammar_node, rule_map = GrammarNode(config, START, []), {}
+    grammar, rule_map = Grammar(START), {}
     for tree in trees:
-        build_rules(grammar_node, tree, rule_map)
-    return grammar_node
+        build_rules(grammar, tree, rule_map)
+    return grammar
 
-def coalesce(oracle, config, trees, grammar):
+def coalesce(oracle, config, trees, grammar : Grammar):
     """
     ORACLE is a Lark parser for the grammar we seek to find. We ask the oracle
     yes or no replacement questions in this method.
@@ -421,8 +423,8 @@ def coalesce(oracle, config, trees, grammar):
 
     def nt_derivable(nt):
         """
-        Returns a set of references to SymbolNodes of type NT that are derivable
-        directly from the start nonterminal in GRAMMAR.
+        Returns a set of references to Rule Bodies containing a single nonterminal,
+        of type NT, that are derivable directly from the start nonterminal in GRAMMAR.
 
         A nonterminal is directly derivable from the start nonterminal if it can
         be derived by a series of replacement rules from the start nonterminal,
@@ -433,32 +435,36 @@ def coalesce(oracle, config, trees, grammar):
 
         # Initialize X and F to those nonterminals directly derivable from t0
         # with a derivability depth of one
-        for rule in [rule_node for rule_node in grammar.children if rule_node.lhs == START]:
-            symbol = next(iter(rule.children))
-            if len(rule.children) == 1 and not symbol.is_terminal:
-                X.add(symbol)
-                F.append(symbol)
+        for rule in [rule_node for rule_node in grammar.rules.values() if rule_node.start == START]:
+            for body in rule.bodies:
+                if len(body) == 1 and body[0] in grammar.rules.keys():
+                    X.add(body)
+                    F.append(body)
+                    rule.cache_valid = False
 
         # Continue searching in a BFS-like style until there is nothing left
         while len(F) > 0:
             nt_node = F.pop()
-            for rule in [rule_node for rule_node in grammar.children if rule_node.lhs == nt_node.choice]:
+            for rule in [rule_node for rule_node in grammar.rules.values() if rule_node.start == nt_node[0]]:
                 # Since each nonterminal expands to a finite and positive length
                 # string, it suffices to check that the rule is just one nonterminal
-                symbol = next(iter(rule.children))
-                if len(rule.children) == 1 and not symbol.is_terminal and symbol not in X:
-                    X.add(symbol)
-                    F.append(symbol)
+                for body in rule.bodies:
+                    if len(body) == 1 and body[0] in grammar.rules.keys():
+                        X.add(body)
+                        F.append(body)
+                        rule.cache_valid = False
 
         # Filter the final set of SymbolNode references by NT and return
         output = set()
-        for symbol_node in X:
-            if symbol_node.choice == nt:
-                output.add(symbol_node)
+        for body in X:
+            if body[0] == nt:
+                output.add(body)
         return output
 
     # Define helpful data structures
-    nonterminals = list(set([rule.lhs for rule in grammar.children]))
+    nonterminals = set(grammar.rules.keys())
+    nonterminals.remove("start")
+    nonterminals = list(nonterminals)
     uf = UnionFind(nonterminals)
 
     coalesce_caused = False
@@ -488,16 +494,21 @@ def coalesce(oracle, config, trees, grammar):
 
     # Traverse through the grammar, and update each nonterminal to point to
     # its class nonterminal
-    for rule_node in grammar.children:
-        for symbol_node in rule_node.children:
-            if not symbol_node.is_terminal:
-                symbol_node.choice = get_class[symbol_node.choice]
+    for nonterm in grammar.rules:
+        for body in grammar.rules[nonterm].bodies:
+            for i in range(len(body)):
+                # The keys of the rules determine the set of nonterminals
+                if body[i] in grammar.rules.keys():
+                    body[i] = get_class[body[i]]
+                    # For printing we need to invalidate the cache for this rule
+                    grammar.rules[nonterm].cache_valid = False
 
     # Add the alternation rules for each class into the grammar
     for class_nt, nts in classes.items():
         for nt in nts:
-            rule = RuleNode(config, class_nt, [SymbolNode(config, nt, False)])
-            grammar.children.append(rule)
+            rule = Rule(class_nt)
+            rule.add_body([nt])
+            grammar.add_rule(rule)
 
     # In this case, t0 was assigned to a class. We must ensure that under this
     # scheme, t0 is not derivable from itself, which causes infinite recursion
@@ -512,18 +523,33 @@ def coalesce(oracle, config, trees, grammar):
         # We accomplish this by first pointing all the conservative_class_nts
         # to new_class_nt, then searching for all new_class_nts that are directly
         # derivable from START, and replacing those back with conservative_class_nt
-        for rule_node in grammar.children:
-            for symbol_node in rule_node.children:
-                if symbol_node.choice == conservative_class_nt:
-                    symbol_node.choice = new_class_nt
+        for rule_node in grammar.rules.values():
+            for body in rule_node.bodies:
+                for i in range(len(body)):
+                    if body[i] == conservative_class_nt:
+                        body[i] = new_class_nt
+                        rule_node.cache_valid = False
 
-        for symbol_node in nt_derivable(new_class_nt):
-            symbol_node.choice = conservative_class_nt
+        for rule_body in nt_derivable(new_class_nt):
+            rule_body[0] = conservative_class_nt
 
         # Update the final rules for the conservative and new class nonterminals
-        grammar.children = [rule_node for rule_node in grammar.children if not (rule_node.lhs == conservative_class_nt and next(iter(rule_node.children)).choice == START)]
-        grammar.children.append(RuleNode(config, new_class_nt, [SymbolNode(config, conservative_class_nt, False)]))
-        grammar.children.append(RuleNode(config, new_class_nt, [SymbolNode(config, START, False)]))
+        # Remove rules of the form conservative_class_nt -> START
+        conservative_rule : Rule = grammar.rules[conservative_class_nt]
+        to_pop = []
+        for i in range(len(conservative_rule.bodies)):
+            body = conservative_rule.bodies[i]
+            if len(body) == 1 and body[0] == START:
+                to_pop.append(i)
+                conservative_rule.cache_valid = False
+
+        for i in reversed(to_pop):
+            conservative_rule.bodies.pop(i)
+
+        new_class_rule : Rule = Rule(new_class_nt)
+        new_class_rule.add_body([conservative_class_nt])
+        new_class_rule.add_body([START])
+        grammar.add_rule(new_class_rule)
 
     return grammar, coalesce_caused
 
@@ -534,49 +560,53 @@ def minimize(config, grammar):
 
     CONFIG is the required configuration options for GrammarGenerator classes.
     """
-    def get_grammar_map(grammar_node):
-        """
-        Create a unique set of rules in GRAMMAR_NODE represented as a map
-        """
-        grammar_map = {}
-        for rule in grammar_node.children:
-            if rule.lhs not in grammar_map:
-                grammar_map[rule.lhs] = ([], [])
-            rule_str = ''.join([sn.choice for sn in rule.children])
-            if rule_str not in grammar_map[rule.lhs][1]:
-                rules, rule_strings = grammar_map[rule.lhs]
-                rules.append(rule)
-                rule_strings.append(rule_str)
-        return grammar_map
 
-    def update(grammar_node, map):
+    def remove_repeated_rules(grammar: Grammar):
         """
-        Given a MAP with nonterminals as keys and list of symbols as values,
+        Mutative method that removes all repeated rule bodies in GRAMMAR.
+        """
+        for rule in grammar.rules.values():
+            remove_idxs = []
+            bodies_so_far = set()
+            for i, body in enumerate(rule.bodies):
+                body_str = ''.join(body)
+                if body_str in bodies_so_far:
+                    remove_idxs.append(i)
+                    rule.cache_valid = False
+                else:
+                    bodies_so_far.add(body_str)
+            for idx in reversed(remove_idxs):
+                rule.bodies.pop(idx)
+
+    def update(grammar: Grammar, map):
+        """
+        Given a MAP with nonterminals as keys and list of strings as values,
         replaces every occurance of a nonterminal in MAP with its corresponding
-        list of SymbolNodes in the the GRAMMAR_NODE. Then, the rules defining
-        the keys in the grammar are removed.
+        list of symbols in the GRAMMAR. Then, the rules defining
+        the keys nonterminals in MAP in the grammar are removed.
 
         The START nonterminal must not appear in MAP, because its rule cannot
         be deleted.
         """
-        for rule_node in grammar.children:
-            to_fix = [sn.choice in map for sn in rule_node.children]
-            while any(to_fix):
-                ind = to_fix.index(True)
-                nt = rule_node.children[ind]
-                rule_node.children[ind:ind+1] = map[nt.choice]
-                to_fix = [sn.choice in map for sn in rule_node.children]
-        grammar_node.children = [rule for rule in grammar_node.children if rule.lhs not in map]
-        return grammar_node
+        assert(START not in map)
+        for rule in grammar.rules.values():
+            for body in rule.bodies:
+                to_fix_idxs = [i for i, elem in enumerate(body) if elem in map]
+                # Reverse to ensure that we don't mess up the indices
+                for ind in reversed(to_fix_idxs):
+                    nt = body[ind]
+                    body[ind:ind+1] = map[nt]
+                if len(to_fix_idxs) > 0:
+                    rule.cache_valid = False
+        remove_lhs = [lhs for lhs in grammar.rules.keys() if lhs in map]
+        for lhs in remove_lhs:
+            grammar.rules.pop(lhs)
+        grammar.cached_parser_valid = False
+        grammar.cached_str_valid = False
+        return grammar
 
     # Remove all the repeated rules from the grammar
-    grammar_map = get_grammar_map(grammar)
-    new_grammar = GrammarNode(config, START, [])
-    for rule_start in grammar_map:
-        rules, _ = grammar_map[rule_start]
-        for rule in rules:
-            new_grammar.children.append(rule)
-    grammar = new_grammar
+    remove_repeated_rules(grammar)
 
     # Finds the set of nonterminals that expand directly to a single terminal
     # Let the keys of X be the set of these nonterminals, and the corresponding
@@ -585,55 +615,35 @@ def minimize(config, grammar):
 
     while updated:
         updated = False
-        for rule_start in grammar_map:
-            rules, _ = grammar_map[rule_start]
-            if len(rules) == 1 and len(rules[0].children) == 1 and (rules[0].children[0].is_terminal or rules[0].children[0].choice in X):
-                rule = next(iter(rules))
-                if rule.lhs not in X and rule.lhs != START:
-                    X[rule.lhs] = [X[sn.choice][0] if sn.choice in X else sn.choice for sn in rule.children]
+        for rule_start in grammar.rules:
+            rule = grammar.rules[rule_start]
+            bodies = rule.bodies
+            if len(bodies) == 1 and len(bodies[0]) == 1 and (bodies[0][0] not in grammar.rules or bodies[0][0] in X):
+                body = bodies[0]
+                if rule.start not in X and rule.start != START:
+                    X[rule.start] = [X[elem][0] if elem in X else elem for elem in body]
                     updated = True
 
-    # Update the set X so that the strings derivable from it are lists of
-    # SymbolNodes instead of lists of strings
-    for k in X: X[k] = [SymbolNode(config, s, True) for s in X[k]]
-
     # Update the grammar so that keys in X are replaced by values
-    # Redefine the grammar map, since the grammar has likely changed
     grammar = update(grammar, X)
-    grammar_map = get_grammar_map(grammar)
 
     # Finds the set of nonterminals that expand to a single string and that are
     # only used once in the grammar. Let the keys of Y be the set of these
     # nonterminals, and the corresponding values be the SymbolNodes derivable
     # from those nonterminals
-    counts = {}
-    for rule_node in grammar.children:
-        for symbol_node in rule_node.children:
-            if not symbol_node.is_terminal:
-                n = symbol_node.choice
-                counts[n] = counts.get(n, 0) + 1
+    counts = defaultdict(int)
+    for rule_node in grammar.rules.values():
+        for rule_body in rule_node.bodies:
+            for symbol in rule_body:
+                if symbol in grammar.rules:
+                    n = symbol
+                    counts[n] += 1
 
     # Update the grammar so that keys in X are replaced by values
     used_once = [k for k in counts if counts[k] == 1 and k != START]
-    Y = {k:grammar_map[k][0][0].children for k in used_once if len(grammar_map[k][0]) == 1}
+    Y = {k:grammar.rules[k].bodies[0] for k in used_once if len(grammar.rules[k].bodies) == 1}
     grammar = update(grammar, Y)
     return grammar
-
-def convert(config, grammar):
-    """
-    Adds the finishing touches to the GRAMMAR, then returns the corresponding
-    GrammarGenerator object.
-
-    CONFIG is the required configuration options for GrammarGenerator classes.
-    """
-    # Wrap each terminal in the grammar in quotations
-    for rule_node in grammar.children:
-        for symbol_node in rule_node.children:
-            if symbol_node.is_terminal and symbol_node.choice[0] != '"':
-                symbol_node.choice = '"%s"' % (symbol_node.choice)
-
-    # Return the GrammarGenerator
-    return GrammarGenerator(config, grammar)
 
 
 # Example:

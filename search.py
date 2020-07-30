@@ -1,16 +1,16 @@
 import random, sys, os, time
-from score import Scorer
 from input import parse_input
 from parse_tree import ParseTree, ParseNode
 from grammar import Grammar, Rule
-from generator import GrammarGenerator
 from start import build_start_grammar
+from lark import Lark
 
 def main(file_name, log_file):
     start_time = time.time() # To compute elapsed time
 
     # Generate configuration options and oracle grammar
-    CONFIG, ORACLE_GEN, ORACLE = parse_input(file_name)
+    ORACLE: Grammar
+    CONFIG, ORACLE = parse_input(file_name)
     POS_EXAMPLES, NEG_EXAMPLES = CONFIG['POS_EXAMPLES'], CONFIG['NEG_EXAMPLES']
     MAX_NEG_EXAMPLE_SIZE = CONFIG['MAX_NEG_EXAMPLE_SIZE']
     TERMINALS, MAX_TREE_DEPTH = CONFIG['TERMINALS'], CONFIG['MAX_TREE_DEPTH']
@@ -24,46 +24,57 @@ def main(file_name, log_file):
         print('Fix your grammar. Exiting now.')
         exit(1)
 
-    # Generate positive examples
-    oracle_parse_tree = ParseTree(ORACLE_GEN)
-    print('Generating positive examples...'.ljust(50), end='\r')
-    positive_examples, positive_nodes = oracle_parse_tree.sample_strings(POS_EXAMPLES, MAX_TREE_DEPTH)
-    print('Generating negative examples...'.ljust(50), end='\r')
-    negative_examples = ORACLE.sample_negatives(NEG_EXAMPLES, TERMINALS, MAX_NEG_EXAMPLE_SIZE)
-    DATA = {'positive_examples': positive_examples, 'negative_examples': negative_examples}
+
 
     # Generate guiding examples and corresponding ParseNodes
     guide_nodes = [[ParseNode(tok, True, []) for tok in ex.split()] for ex in GUIDE_EXAMPLES]
-    if len(guide_nodes) == 0: guide_nodes = positive_nodes
 
     # Create the log file and write positive and negative examples to it
     # Also write the initial starting grammar to the file
     with open(log_file, 'w+') as f:
-        # Print the positive and negative examples
-        print('\n\nPositive Examples:\n', file=f)
-        for pos in positive_examples:
-            print(pos, file=f)
-
-        print('\n\nNegative Examples:\n', file=f)
-        for neg in negative_examples:
-            print(neg, file=f)
 
         # Build the starting grammars and test them for compilation
         print('Building the starting grammar...'.ljust(50), end='\r')
-        start_gen = build_start_grammar(OR_PARSER, CONFIG, DATA, guide_nodes)
+        start_grammar : Grammar = build_start_grammar(OR_PARSER, CONFIG, guide_nodes)
         try:
-            start_gen.generate_grammar().parser()
-            print('\n\nInitial Grammar Created:\n%s' % str(start_gen.generate_grammar()), file=f)
+            start_grammar.parser()
+            print('\n\nInitial Grammar Created:\n%s' % str(start_grammar), file=f)
         except Exception as e:
             print('\n\nInitial grammar does not compile! %s' % str(e), file=f)
+            print(start_grammar, file = f)
             exit()
 
-    # Score the start grammar we arrived at earlier, which will add it to the
-    # "interesting" set for future iterations
-    print('Scoring initial grammars...'.ljust(50), end='\r')
-    start_grammar = start_gen.generate_grammar()
-    scorer = Scorer(CONFIG, DATA, start_grammar, start_gen)
-    scorer.score(start_grammar, start_gen)
+        # Score the start grammar we arrived at earlier, which will add it to the
+        # "interesting" set for future iterations
+        print('Scoring grammar....'.ljust(50), end='\r')
+        recall_set = start_grammar.sample_positives(100, 5)
+        precision_set = ORACLE.sample_positives(100, 5)
+
+        parser : Lark = start_grammar.parser()
+
+        recall_num = 0
+        print(f"Recall set (size {len(recall_set)}):", file=f)
+        for example in recall_set:
+            try:
+                print("   ", example, file=f)
+                OR_PARSER.parse(example)
+                recall_num += 1
+            except Exception as e:
+                continue
+
+        precision_num = 0
+
+        print(f"Precision set (size {len(precision_set)}):", file=f)
+        for example in precision_set:
+            try:
+                print("   ", example, file=f)
+                parser.parse(example)
+                precision_num += 1
+            except Exception as e:
+                continue
+
+        print(f'Precision: {precision_num/len(precision_set)}, Recall: {recall_num/len(recall_set)}', file=f)
+
 
 
 if __name__ == '__main__':
@@ -71,3 +82,4 @@ if __name__ == '__main__':
         print(f'Usage: python3 {sys.argv[0]} <input_file> <log_file>')
     else:
         main(sys.argv[1], sys.argv[2])
+
