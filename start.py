@@ -43,8 +43,8 @@ def build_start_grammar(oracle, config, leaves):
     grammar = build_grammar(config, trees)
     print('Coalescing nonterminals...'.ljust(50), end='\r')
     grammar, coalesce_caused = coalesce(oracle, config, trees, grammar)
-    #print('Minimizing initial grammar...'.ljust(50), end='\r')
-    #grammar = minimize(config, grammar)
+    print('Minimizing initial grammar...'.ljust(50), end='\r')
+    grammar = minimize(config, grammar)
     return grammar
 
 def derive_classes(oracle, config, leaves):
@@ -590,11 +590,13 @@ def minimize(config, grammar):
         assert(START not in map)
         for rule in grammar.rules.values():
             for body in rule.bodies:
-                to_fix_idxs = [i for i, elem in enumerate(body) if elem in map]
+                to_fix = [elem in map for elem in body]
                 # Reverse to ensure that we don't mess up the indices
-                for ind in reversed(to_fix_idxs):
+                while any(to_fix):
+                    ind = to_fix.index(True)
                     nt = body[ind]
                     body[ind:ind+1] = map[nt]
+                    to_fix = [elem in map for elem in body]
         remove_lhs = [lhs for lhs in grammar.rules.keys() if lhs in map]
         for lhs in remove_lhs:
             grammar.rules.pop(lhs)
