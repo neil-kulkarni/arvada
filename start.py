@@ -1,3 +1,4 @@
+import re
 from collections import defaultdict
 
 from parse_tree import ParseNode
@@ -430,15 +431,18 @@ def coalesce(oracle, config, trees, grammar : Grammar):
         be derived by a series of replacement rules from the start nonterminal,
         where none of those replacement rules contain any terminals.
         """
-        X = set() # The set of nonterminal SymbolNodes directly derivable from START
+        X = [] # The set of nonterminal SymbolNodes directly derivable from START
         F = [] # The search fringe of SymbolNodes
+
+        def is_nonterm(term):
+            return re.match("t[0-9]+", term) is not None
 
         # Initialize X and F to those nonterminals directly derivable from t0
         # with a derivability depth of one
         for rule in [rule_node for rule_node in grammar.rules.values() if rule_node.start == START]:
             for body in rule.bodies:
-                if len(body) == 1 and body[0] in grammar.rules.keys():
-                    X.add(body)
+                if len(body) == 1 and is_nonterm(body[0]):
+                    X.append(body)
                     F.append(body)
 
         # Continue searching in a BFS-like style until there is nothing left
@@ -448,15 +452,15 @@ def coalesce(oracle, config, trees, grammar : Grammar):
                 # Since each nonterminal expands to a finite and positive length
                 # string, it suffices to check that the rule is just one nonterminal
                 for body in rule.bodies:
-                    if len(body) == 1 and body[0] in grammar.rules.keys():
-                        X.add(body)
+                    if len(body) == 1 and is_nonterm(body[0]):
+                        X.append(body)
                         F.append(body)
 
         # Filter the final set of SymbolNode references by NT and return
-        output = set()
+        output = []
         for body in X:
             if body[0] == nt:
-                output.add(body)
+                output.append(body)
         return output
 
     # Define helpful data structures
@@ -493,6 +497,8 @@ def coalesce(oracle, config, trees, grammar : Grammar):
     # Traverse through the grammar, and update each nonterminal to point to
     # its class nonterminal
     for nonterm in grammar.rules:
+        if nonterm == "start":
+            continue
         for body in grammar.rules[nonterm].bodies:
             for i in range(len(body)):
                 # The keys of the rules determine the set of nonterminals
