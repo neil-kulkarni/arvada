@@ -571,45 +571,6 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar : Grammar, coalesce_t
                 rule.add_body(body)
         grammar.add_rule(rule)
 
-    # In this case, t0 was assigned to a class. We must ensure that under this
-    # scheme, t0 is not derivable from itself, which causes infinite recursion
-    # if get_class[START] != START:
-    #     # Derive the rules for the conservative_class_nt and new_class_nt
-    #     conservative_class_nt = get_class[START]
-    #     new_class_nt = allocate_tid()
-    #
-    #     # Find all the conservative_class_nts that are directly derivable from
-    #     # start, and leave them alone. Update all the rest of the
-    #     # conservative_class_nts to point to new_class_nt
-    #     # We accomplish this by first pointing all the conservative_class_nts
-    #     # to new_class_nt, then searching for all new_class_nts that are directly
-    #     # derivable from START, and replacing those back with conservative_class_nt
-    #     for rule_node in grammar.rules.values():
-    #         for body in rule_node.bodies:
-    #             for i in range(len(body)):
-    #                 if body[i] == conservative_class_nt:
-    #                     body[i] = new_class_nt
-    #
-    #     for rule_body in nt_derivable(new_class_nt):
-    #         rule_body[0] = conservative_class_nt
-    #
-    #     # Update the final rules for the conservative and new class nonterminals
-    #     # Remove rules of the form conservative_class_nt -> START
-    #     conservative_rule : Rule = grammar.rules[conservative_class_nt]
-    #     to_pop = []
-    #     for i in range(len(conservative_rule.bodies)):
-    #         body = conservative_rule.bodies[i]
-    #         if len(body) == 1 and body[0] == START:
-    #             to_pop.append(i)
-    #
-    #     for i in reversed(to_pop):
-    #         conservative_rule.bodies.pop(i)
-    #
-    #     new_class_rule : Rule = Rule(new_class_nt)
-    #     new_class_rule.add_body([conservative_class_nt])
-    #     new_class_rule.add_body([START])
-    #    grammar.add_rule(new_class_rule)
-
     return grammar, new_trees, coalesce_caused
 
 def minimize(config, grammar):
