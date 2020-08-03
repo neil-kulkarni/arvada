@@ -35,6 +35,7 @@ def main(file_name, log_file):
 
         # Build the starting grammars and test them for compilation
         print('Building the starting grammar...'.ljust(50), end='\r')
+        start_time = time.time()
         start_grammar : Grammar = build_start_grammar(OR_PARSER, CONFIG, guide_nodes)
         try:
             start_grammar.parser()
@@ -43,6 +44,7 @@ def main(file_name, log_file):
             print('\n\nInitial grammar does not compile! %s' % str(e), file=f)
             print(start_grammar, file = f)
             exit()
+        build_time = time.time() - start_time
 
         # Score the start grammar we arrived at earlier, which will add it to the
         # "interesting" set for future iterations
@@ -74,6 +76,8 @@ def main(file_name, log_file):
                 continue
 
         print(f'Precision: {precision_num/len(precision_set)}, Recall: {recall_num/len(recall_set)}', file=f)
+        print(f'Time spent building grammar: {build_time}s', file = f)
+        print(f'Time spent building + scoring grammar: {time.time() - start_time}s', file = f)
 
 
 
