@@ -115,6 +115,34 @@ class ParseNode():
     def pretty_payload(self):
         return '  ' + (self.payload if len(self.payload) > 0 else '\u03B5') + '  '
 
+    def copy(self):
+        """
+        Produces a new object that is logically equal to this ParseNode, but
+        does not reference the same object.
+        """
+        if self.is_terminal:
+            assert(len(self.children) == 0)
+            return ParseNode(self.payload, True, [])
+        else:
+            copy_children : List[ParseNode] = [child.copy() for child in self.children]
+            return ParseNode(self.payload, False, copy_children)
+
+    def __eq__(self, other):
+        if not isinstance(other, ParseNode):
+            return False
+        if self.payload != other.payload or self.is_terminal != other.is_terminal or len(self.children) != len(other.children):
+            return False
+        for idx in range(len(self.children)):
+            if not self.children[idx] == other.children[idx]:
+                return False
+        return True
+
+    def __ne__(self, other):
+        return not self == other
+
+    def __hash__(self):
+        return hash((self.payload, self.is_terminal, tuple(self.children)))
+
     def __str__(self):
         def place_in_middle(s : str, strlen : int):
             # Creates a string of length STRLEN in which s is placed in the middle
