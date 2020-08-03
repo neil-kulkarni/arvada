@@ -211,20 +211,17 @@ def apply(grouping : Tuple[str, Tuple[List[ParseNode], str]], trees : List[Parse
         group_str, (group_lst, id, _) = grouping
         new_tree, ng = tree.copy(), len(group_lst)
 
+        # Do replacments in all the children first
+        for index in range(len(new_tree.children)):
+            # (self, payload, is_terminal, children)
+            old_node = new_tree.children[index]
+            new_tree.children[index] = apply_single(old_node)
+
         ind = matches(group_lst, new_tree.children)
         while ind != -1:
             parent = ParseNode(id, False, new_tree.children[ind : ind + ng])
             new_tree.children[ind : ind + ng] = [parent]
             ind = matches(group_lst, new_tree.children)
-
-        # Now apply grouping to each of the parse nodes in the list individually
-        for index in range(len(new_tree.children)):
-            # (self, payload, is_terminal, children)
-            old_node = new_tree.children[index]
-            if not old_node.is_terminal and len(old_node.children) > 1:
-                new_children = [apply_single(child) for child in old_node.children]
-                new_node = ParseNode(old_node.payload, old_node.is_terminal, new_children)
-                new_tree.children[index] = new_node
 
         return new_tree
 
