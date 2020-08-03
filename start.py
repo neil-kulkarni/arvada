@@ -1,5 +1,6 @@
 import re
 from collections import defaultdict
+from typing import List, Tuple, Set, Dict
 
 from parse_tree import ParseNode
 from grammar import *
@@ -42,7 +43,7 @@ def build_start_grammar(oracle, config, leaves):
     print('Building initial grammar...'.ljust(50), end='\r')
     grammar = build_grammar(config, trees)
     print('Coalescing nonterminals...'.ljust(50), end='\r')
-    grammar, coalesce_caused = coalesce(oracle, config, trees, grammar)
+    grammar, new_trees, coalesce_caused = coalesce(oracle, trees, grammar)
     print('Minimizing initial grammar...'.ljust(50), end='\r')
     grammar = minimize(config, grammar)
     return grammar
@@ -53,8 +54,8 @@ def derive_classes(oracle, config, leaves):
     to determine which tokens belong to the same character classes. Each character
     class is given a new nonterminal, which will be the disjunction of each of
     the characters in the class in every grammar. Characters that do not belong
-    to any classes are still given a unique nonterminal. Returns the new layer
-    in the tree that is created by bubbling up each of the terminals to their
+    to any classes are still given a unique nonterminal. Returns the new tree
+    that is created by bubbling up each of the terminals to their
     corresponding class. Also returns a map of nonterminal to the character
     class that it defines.
 
@@ -115,31 +116,36 @@ def derive_classes(oracle, config, leaves):
             get_class[terminal] = class_nt
 
     # Update each of the terminals in leaves to instead be a new nonterminal
-    # ParseNode pointing to the original terminal. Return the updated list
-    # as well as a mapping of nonterminal to the character class it defines.
-    return [[ParseNode(get_class[leaf.payload], False, [leaf]) for leaf in tree] for tree in leaves], classes
+    # ParseNode pointing to the original terminal. Return the resulting parse
+    # trees as well as a mapping of nonterminal to its character class.
+    return [ParseNode(START, False, [ParseNode(get_class[leaf.payload], False, [leaf]) for leaf in tree])
+            for tree in leaves], classes
 
-def group(layers):
+def group(trees):
     """
-    LAYERS is a set of top-layers of half-built Parse Trees. Each of the
-    intermediate ParseTrees are represented as a list of nodes at the top-most layer.
+    TREES is a set of ParseTrees.
 
-    Returns the set of all possible groupings of nonterminals in LAYERS,
+    Returns the set of all possible groupings of nonterminals in TREES,
     where each grouping is a data structure holding information about a
-    gropuing of contiguous nonterminals in LAYERS.
+    grouing of contiguous nonterminals in TREES.
 
     A grouping is a two-element tuple data structure that represents a contiguous
-    sequence of nonterminals that appears someplace in LAYERS. The first element
+    sequence of nonterminals that appears someplace in TREES. The first element
     is a string representation of this sequence. The second element is itself
     a two-element tuple that contains a list representation of the sequence, as
     well as the fresh nonterminal assigned to the grouping.
     """
-    # Compute a set of all possible groupings
-    groups = {}
-    for tree_lst in layers:
-        for i in range(len(tree_lst)):
-            for j in range(i + 2, len(tree_lst) + 1):
-                tree_sublist = tree_lst[i:j]
+
+    def add_groups_for_tree(tree: ParseNode, groups: Dict[str, Tuple[List[ParseNode], str, int]]):
+        """
+        Add all groups possible groupings derived from the parse tree `tree` to `groups`.
+        """
+        children_lst = tree.children
+        for i in range(len(children_lst)):
+            for j in range(i + 2, len(children_lst) + 1):
+                if i == 0 and j == len(children_lst):
+                    continue
+                tree_sublist = children_lst[i:j]
                 tree_substr = ''.join([t.payload for t in tree_sublist])
                 if not tree_substr in groups:
                     groups[tree_substr] = (tree_sublist, allocate_tid(), 1)
@@ -147,11 +153,20 @@ def group(layers):
                     tree_sublist, tid, count = groups[tree_substr]
                     groups[tree_substr] = (tree_sublist, tid, count + 1)
 
-    # Return the set of repeated groupings as an iterable
-    groups = {k:v for k, v in groups.items() if v[2] > 1}
-    return list(groups.items())
+        # Recurse down in the other layers
+        for child in tree.children:
+            if not child.is_terminal:
+                add_groups_for_tree(child, groups)
 
-def apply(grouping, layers):
+    # Compute a set of all possible groupings
+    groups = {}
+    for tree in trees:
+        add_groups_for_tree(tree, groups)
+
+    # Return the set of repeated groupings as an iterable
+    return sorted(list(groups.items()), key= lambda x: len(x[1][0]))
+
+def apply(grouping : Tuple[str, Tuple[List[ParseNode], str]], trees : List[ParseNode]):
     """
     GROUPING is a two-element tuple data structure that represents a contiguous
     sequence of nonterminals that appears someplace in LAYERS. The first element
@@ -159,19 +174,17 @@ def apply(grouping, layers):
     a two-element tuple that contains a list representation of the sequence, as
     well as the fresh nonterminal assigned to the grouping.
 
-    LAYERS is a set of top-layers of half-built Parse Trees. Each of the
-    intermediate ParseTrees are represented as a list of nodes at the top-most layer.
+    TREES is a set of parse trees
 
-    Applies a GROUPING data structure to LAYERS by bubbling up the grouping
-    to create a new top layer. Does not mutate LAYERS.
+    Returns a new list of trees consisting of applying the bubbling up the grouping
+    in GROUPING for each tree in TREES
     """
     def matches(group_lst, layer):
         """
         GROUP_LST is a contiguous subarray of ParseNodes that are grouped together.
         This method requires that len(GRP_LST) > 0.
 
-        LAYER is the top layer of one half-built ParseTree, implemented as a
-        list of ParseNodes.
+        LAYER another a list of ParseNodes.
 
         Returns the index at which GROUP_LST appears in LAYER, and returns -1 if
         the GROUP_LST does not appear in the LAYER. Does not mutate LAYER.
@@ -186,28 +199,36 @@ def apply(grouping, layers):
             if group_ind == ng: return i
         return -1
 
-    def apply_single(layer):
+    def apply_single(tree: ParseNode):
         """
-        LAYER is the top layer of one half-built ParseTree, implemented as a
-        list of ParseNodes.
+        TREE is a parse tree.
 
         Applies the GROUPING data structure to a single tree. Applies that
-        GROUPING to LAYER as many times as possible. Does not mutate LAYER.
+        GROUPING to LAYER as many times as possible. Does not mutate TREE.
 
         Returns the new layer. If no updates can be made, do nothing.
         """
         group_str, (group_lst, id, _) = grouping
-        new_layer, ng = layer[:], len(group_lst)
+        new_tree, ng = tree.copy(), len(group_lst)
 
-        ind = matches(group_lst, new_layer)
+        ind = matches(group_lst, new_tree.children)
         while ind != -1:
-            parent = ParseNode(id, False, new_layer[ind : ind + ng])
-            new_layer[ind : ind + ng] = [parent]
-            ind = matches(group_lst, new_layer)
+            parent = ParseNode(id, False, new_tree.children[ind : ind + ng])
+            new_tree.children[ind : ind + ng] = [parent]
+            ind = matches(group_lst, new_tree.children)
 
-        return new_layer
+        # Now apply grouping to each of the parse nodes in the list individually
+        for index in range(len(new_tree.children)):
+            # (self, payload, is_terminal, children)
+            old_node = new_tree.children[index]
+            if not old_node.is_terminal and len(old_node.children) > 1:
+                new_children = [apply_single(child) for child in old_node.children]
+                new_node = ParseNode(old_node.payload, old_node.is_terminal, new_children)
+                new_tree.children[index] = new_node
 
-    return [apply_single(layer) for layer in layers]
+        return new_tree
+
+    return [apply_single(tree) for tree in trees]
 
 def build_trees(oracle, config, leaves):
     """
@@ -235,43 +256,43 @@ def build_trees(oracle, config, leaves):
             b. perform replacement if possible
         2. If a replacement was possible, repeat (1)
     """
-    def score(layers):
+    def score(trees: List[ParseNode]) -> Tuple[int, List[ParseNode]]:
         """
-        LAYERS is a set of top-layers of half-built Parse Trees. Each of the
-        intermediate ParseTrees are represented as a list of nodes at the top-most layer.
+        TREES is a list of Parse Trees.
 
-        Assumes LAYERS is a half-formed parse tree that defines a valid grammar.
-        Converts LAYERS into a grammar and returns its positive score.
+        Converts TREES into a grammar and returns its positive score, and the new
+        set of trees corresponding to the coalescing.
         Does not mutate LAYERS in this process.
         """
         # Convert LAYERS into a grammar and generator
-        trees = [ParseNode(START, False, tree_lst[:]) for tree_lst in layers]
         grammar = build_grammar(config, trees)
-        grammar, coalesce_caused = coalesce(oracle, config, trees, grammar)
+        grammar, new_trees, coalesce_caused = coalesce(oracle, trees, grammar)
         if coalesce_caused:
-            return 1
+            return 1, new_trees
         else:
-            return 0
+            return 0, trees
 
     # Run the character class algorithm to create the first layer of tree
-    layers, classes = derive_classes(oracle, config, leaves)
-    best_score, best_layers, updated, count = score(layers), layers, True, 1
+    trees, classes = derive_classes(oracle, config, leaves)
+    best_score, best_trees = score(trees)
+    updated = True
+    count = 1
 
     # Main algorithm loop
     while updated:
-        layer_group = group(layers)
-        updated, nlg = False, len(layer_group)
-        for i, grouping in enumerate(layer_group):
+        all_groupings = group(best_trees)
+        updated, nlg = False, len(all_groupings)
+        for i, grouping in enumerate(all_groupings):
             print(('Bubbling iteration (%d, %d, %d)...' % (count, i + 1, nlg)).ljust(50), end='\r')
-            new_layers = apply(grouping, layers)
-            new_score = score(new_layers)
+            new_trees = apply(grouping, best_trees)
+            new_score, new_trees = score(new_trees)
             if new_score > 0:
-                best_layers = new_layers
+                best_trees = new_trees
                 updated = True
                 break
-        layers, count = best_layers, count + 1
+        layers, count = best_trees, count + 1
 
-    return [ParseNode(START, False, tree_lst[:]) for tree_lst in layers], classes
+    return best_trees, classes
 
 def build_grammar(config, trees):
     """
@@ -319,12 +340,10 @@ def build_grammar(config, trees):
         build_rules(grammar, tree, rule_map)
     return grammar
 
-def coalesce(oracle, config, trees, grammar : Grammar):
+def coalesce(oracle: Lark, trees: List[ParseNode], grammar : Grammar):
     """
     ORACLE is a Lark parser for the grammar we seek to find. We ask the oracle
     yes or no replacement questions in this method.
-
-    CONFIG is the required configuration options for GrammarGenerator classes.
 
     TREES is a list of fully constructed parse trees.
 
@@ -333,8 +352,9 @@ def coalesce(oracle, config, trees, grammar : Grammar):
     This method coalesces nonterminals that are equivalent to each other.
     Equivalence is determined by replacement.
 
-    RETURNS: the grammar after coalescing, and whether any nonterminals were
-    actually coalesced with each other (found equivalent).
+    RETURNS: the grammar after coalescing, the parse trees after coalescing,
+    and whether any nonterminals were actually coalesced with each other
+    (found equivalent).
     """
     def replaced_string(tree, replacer_string, replacee_nt):
         """
@@ -396,30 +416,6 @@ def coalesce(oracle, config, trees, grammar : Grammar):
         for s in replaced_strings:
             try: oracle.parse(s)
             except: return False
-        return True
-
-    def epsilon_replaces(replacee):
-        """
-        For every string derived from REPLACEE, replace it with epsilon,
-         and check if the resulting string is still valid.
-
-        Return True if this is the always the case.
-
-        Relies on the fact that TREES is unchanged from the time when it was
-        inputted into coalesce.
-        """
-        # Get the set of positive examples with strings derivable replacee
-        # replaced with epsilon
-        replaced_strings = set()
-        for tree in trees:
-            replaced_strings.add(replaced_string(tree, '', replacee))
-
-        # Return True if all the replaced_strings are valid
-        for s in replaced_strings:
-            try:
-                oracle.parse(s)
-            except:
-                return False
         return True
 
     def nt_derivable(nt):
@@ -486,8 +482,12 @@ def coalesce(oracle, config, trees, grammar : Grammar):
     classes, get_class = {}, {}
     for leader, nts in uf.classes().items():
         if len(nts) > 1:
-            class_nt = allocate_tid()
+            if START in nts:
+                class_nt = START
+            else:
+                class_nt = allocate_tid()
             classes[class_nt] = nts
+            print(f"Coalescing {nts} into {class_nt}\n")
         for nt in nts:
             if len(nts) == 1:
                 get_class[nt] = nt
@@ -505,53 +505,100 @@ def coalesce(oracle, config, trees, grammar : Grammar):
                 if body[i] in grammar.rules.keys():
                     body[i] = get_class[body[i]]
 
+    new_trees = trees
+    # Update the parse trees accordingly:
+    if coalesce_caused:
+        def replace_coalesced_nonterminals(node: ParseNode):
+            """
+            Rewrites node so that coalesced nonterminals point to their
+            class nonterminal. For non-coalesced nonterminals, get_class
+            just gives the original nonterminal
+            """
+            if node.is_terminal:
+                return
+            else:
+                node.payload = get_class[node.payload]
+                for child in node.children:
+                    replace_coalesced_nonterminals(child)
+
+        def fix_double_indirection(node: ParseNode):
+            """
+            Fix parse trees that have an expansion of the for tx->tx (only one child)
+            since we've removed such double indirection while merging nonterminals
+            """
+            if node.is_terminal:
+                return
+
+            while len(node.children) == 1 and node.children[0].payload == node.payload:
+                # Won't go on forever because eventually length of children will be not 1,
+                # or the children's payload will not be the same as the top node (e.g. if
+                # the child is a terminal)
+                node.children = node.children[0].children
+
+            for child in node.children:
+                fix_double_indirection(child)
+
+
+        new_trees = []
+        for tree in trees:
+            new_tree = tree.copy()
+            replace_coalesced_nonterminals(new_tree)
+            fix_double_indirection(new_tree)
+            new_trees.append(new_tree)
+
+
     # Add the alternation rules for each class into the grammar
     for class_nt, nts in classes.items():
+        rule = Rule(class_nt)
         for nt in nts:
-            rule = Rule(class_nt)
-            rule.add_body([nt])
-            grammar.add_rule(rule)
+            old_rule = grammar.rules.pop(nt)
+            for body in old_rule.bodies:
+                # Remove infinite recursions
+                if body == [class_nt]:
+                    continue
+                rule.add_body(body)
+        grammar.add_rule(rule)
 
     # In this case, t0 was assigned to a class. We must ensure that under this
     # scheme, t0 is not derivable from itself, which causes infinite recursion
-    if get_class[START] != START:
-        # Derive the rules for the conservative_class_nt and new_class_nt
-        conservative_class_nt = get_class[START]
-        new_class_nt = allocate_tid()
+    # if get_class[START] != START:
+    #     # Derive the rules for the conservative_class_nt and new_class_nt
+    #     conservative_class_nt = get_class[START]
+    #     new_class_nt = allocate_tid()
+    #
+    #     # Find all the conservative_class_nts that are directly derivable from
+    #     # start, and leave them alone. Update all the rest of the
+    #     # conservative_class_nts to point to new_class_nt
+    #     # We accomplish this by first pointing all the conservative_class_nts
+    #     # to new_class_nt, then searching for all new_class_nts that are directly
+    #     # derivable from START, and replacing those back with conservative_class_nt
+    #     for rule_node in grammar.rules.values():
+    #         for body in rule_node.bodies:
+    #             for i in range(len(body)):
+    #                 if body[i] == conservative_class_nt:
+    #                     body[i] = new_class_nt
+    #
+    #     for rule_body in nt_derivable(new_class_nt):
+    #         rule_body[0] = conservative_class_nt
+    #
+    #     # Update the final rules for the conservative and new class nonterminals
+    #     # Remove rules of the form conservative_class_nt -> START
+    #     conservative_rule : Rule = grammar.rules[conservative_class_nt]
+    #     to_pop = []
+    #     for i in range(len(conservative_rule.bodies)):
+    #         body = conservative_rule.bodies[i]
+    #         if len(body) == 1 and body[0] == START:
+    #             to_pop.append(i)
+    #
+    #     for i in reversed(to_pop):
+    #         conservative_rule.bodies.pop(i)
+    #
+    #     new_class_rule : Rule = Rule(new_class_nt)
+    #     new_class_rule.add_body([conservative_class_nt])
+    #     new_class_rule.add_body([START])
+    #    grammar.add_rule(new_class_rule)
 
-        # Find all the conservative_class_nts that are directly derivable from
-        # start, and leave them alone. Update all the rest of the
-        # conservative_class_nts to point to new_class_nt
-        # We accomplish this by first pointing all the conservative_class_nts
-        # to new_class_nt, then searching for all new_class_nts that are directly
-        # derivable from START, and replacing those back with conservative_class_nt
-        for rule_node in grammar.rules.values():
-            for body in rule_node.bodies:
-                for i in range(len(body)):
-                    if body[i] == conservative_class_nt:
-                        body[i] = new_class_nt
-
-        for rule_body in nt_derivable(new_class_nt):
-            rule_body[0] = conservative_class_nt
-
-        # Update the final rules for the conservative and new class nonterminals
-        # Remove rules of the form conservative_class_nt -> START
-        conservative_rule : Rule = grammar.rules[conservative_class_nt]
-        to_pop = []
-        for i in range(len(conservative_rule.bodies)):
-            body = conservative_rule.bodies[i]
-            if len(body) == 1 and body[0] == START:
-                to_pop.append(i)
-
-        for i in reversed(to_pop):
-            conservative_rule.bodies.pop(i)
-
-        new_class_rule : Rule = Rule(new_class_nt)
-        new_class_rule.add_body([conservative_class_nt])
-        new_class_rule.add_body([START])
-        grammar.add_rule(new_class_rule)
-
-    return grammar, coalesce_caused
+    return grammar, new_trees, coalesce_caused
 
 def minimize(config, grammar):
     """
@@ -560,7 +607,6 @@ def minimize(config, grammar):
 
     CONFIG is the required configuration options for GrammarGenerator classes.
     """
-
     def remove_repeated_rules(grammar: Grammar):
         """
         Mutative method that removes all repeated rule bodies in GRAMMAR.
@@ -642,6 +688,9 @@ def minimize(config, grammar):
     used_once = [k for k in counts if counts[k] == 1 and k != START]
     Y = {k:grammar.rules[k].bodies[0] for k in used_once if len(grammar.rules[k].bodies) == 1}
     grammar = update(grammar, Y)
+
+    remove_repeated_rules(grammar)
+
     return grammar
 
 
