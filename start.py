@@ -1,6 +1,6 @@
 import re
 from collections import defaultdict
-from typing import List, Tuple, Set, Dict
+from typing import List, Tuple, Set, Dict, Optional
 
 from parse_tree import ParseNode
 from grammar import *
@@ -253,7 +253,7 @@ def build_trees(oracle, config, leaves):
             b. perform replacement if possible
         2. If a replacement was possible, repeat (1)
     """
-    def score(trees: List[ParseNode]) -> Tuple[int, List[ParseNode]]:
+    def score(trees: List[ParseNode], new_bubble: Optional[str] = None) -> Tuple[int, List[ParseNode]]:
         """
         TREES is a list of Parse Trees.
 
@@ -262,8 +262,9 @@ def build_trees(oracle, config, leaves):
         Does not mutate LAYERS in this process.
         """
         # Convert LAYERS into a grammar and generator
+        assert(new_bubble is None or isinstance(new_bubble, str))
         grammar = build_grammar(config, trees)
-        grammar, new_trees, coalesce_caused = coalesce(oracle, trees, grammar)
+        grammar, new_trees, coalesce_caused = coalesce(oracle, trees, grammar, new_bubble)
         if coalesce_caused:
             return 1, new_trees
         else:
@@ -282,7 +283,7 @@ def build_trees(oracle, config, leaves):
         for i, grouping in enumerate(all_groupings):
             print(('Bubbling iteration (%d, %d, %d)...' % (count, i + 1, nlg)).ljust(50), end='\r')
             new_trees = apply(grouping, best_trees)
-            new_score, new_trees = score(new_trees)
+            new_score, new_trees = score(new_trees, grouping[1][1])
             if new_score > 0:
                 best_trees = new_trees
                 updated = True
@@ -337,7 +338,7 @@ def build_grammar(config, trees):
         build_rules(grammar, tree, rule_map)
     return grammar
 
-def coalesce(oracle: Lark, trees: List[ParseNode], grammar : Grammar):
+def coalesce(oracle: Lark, trees: List[ParseNode], grammar : Grammar, coalesce_target : Optional[str] = None):
     """
     ORACLE is a Lark parser for the grammar we seek to find. We ask the oracle
     yes or no replacement questions in this method.
@@ -345,6 +346,9 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar : Grammar):
     TREES is a list of fully constructed parse trees.
 
     GRAMMAR is a GrammarNode that is the disjunction of the TREES.
+
+    COALESCE_TARGET is the nonterminal we should be checking coalescing against,
+    else due a quadratic check of all nonterminals against each other.
 
     This method coalesces nonterminals that are equivalent to each other.
     Equivalence is determined by replacement.
@@ -462,17 +466,28 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar : Grammar):
     nonterminals = list(nonterminals)
     uf = UnionFind(nonterminals)
 
-    coalesce_caused = False
-    for i in range(len(nonterminals)):
-        for j in range(i + 1, len(nonterminals)):
-            # Iterate through each unique pair of nonterminals
-            first, second = nonterminals[i], nonterminals[j]
+    # Get all unique pairs of nonterminals
+    pairs = []
+    if coalesce_target is not None:
+        first = coalesce_target
+        for second in nonterminals:
+            if first == second:
+                continue
+            pairs.append((first,second))
+    else:
+        for i in range(len(nonterminals)):
+            for j in range(i + 1, len(nonterminals)):
+                first, second = nonterminals[i], nonterminals[j]
+                pairs.append((first, second))
 
-            # If the nonterminals can replace each other in every context, they
-            # must belong to the same character class
-            if not uf.is_connected(first, second) and replaces(first, second) and replaces(second, first):
-                coalesce_caused = True
-                uf.connect(first, second)
+    coalesce_caused = False
+    for pair in pairs:
+        first, second = pair
+        # If the nonterminals can replace each other in every context, they
+        # must belong to the same character class
+        if not uf.is_connected(first, second) and replaces(first, second) and replaces(second, first):
+            coalesce_caused = True
+            uf.connect(first, second)
 
     # Define a mapping and a reverse mapping between a set of equivalent
     # nonterminals and the newly generated nonterminal for that class
