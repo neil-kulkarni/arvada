@@ -278,7 +278,7 @@ def build_trees(oracle, config, leaves):
     count = 1
 
     # Main algorithm loop
-    while count < 10:
+    while updated:
         all_groupings = group(best_trees)
         updated, nlg = False, len(all_groupings)
         for i, grouping in enumerate(all_groupings):
