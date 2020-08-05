@@ -115,11 +115,14 @@ def derive_classes(oracle, config, leaves):
         for terminal in cc:
             get_class[terminal] = class_nt
 
+    trees = [ParseNode(allocate_tid(), False, [ParseNode(get_class[leaf.payload], False, [leaf]) for leaf in leaf_lst])
+             for leaf_lst in leaves]
+
     # Update each of the terminals in leaves to instead be a new nonterminal
     # ParseNode pointing to the original terminal. Return the resulting parse
     # trees as well as a mapping of nonterminal to its character class.
-    return [ParseNode(START, False, [ParseNode(get_class[leaf.payload], False, [leaf]) for leaf in tree])
-            for tree in leaves], classes
+    return [ParseNode(START, False, [tree])
+            for tree in trees], classes
 
 def group(trees):
     """
@@ -136,7 +139,7 @@ def group(trees):
     well as the fresh nonterminal assigned to the grouping.
     """
 
-    def add_groups_for_tree(tree: ParseNode, groups: Dict[str, Tuple[List[ParseNode], str, Optional[str], int]]):
+    def add_groups_for_tree(tree: ParseNode, groups: Dict[str, Tuple[List[ParseNode], str, int]]):
         """
         Add all groups possible groupings derived from the parse tree `tree` to `groups`.
         """
@@ -144,18 +147,14 @@ def group(trees):
         for i in range(len(children_lst)):
             for j in range(i + 2, len(children_lst) + 1):
                 if i == 0 and j == len(children_lst):
-                    if tree.payload != START:
-                        continue
-                    direct_pars = [tree.payload]
-                else:
-                    direct_pars = []
+                    continue
                 tree_sublist = children_lst[i:j]
                 tree_substr = ''.join([t.payload for t in tree_sublist])
                 if not tree_substr in groups:
-                    groups[tree_substr] = (tree_sublist, allocate_tid(), direct_pars, 1)
+                    groups[tree_substr] = (tree_sublist, allocate_tid(),  1)
                 else:
-                    tree_sublist, tid, pars, count = groups[tree_substr]
-                    groups[tree_substr] = (tree_sublist, tid, pars + direct_pars, count + 1)
+                    tree_sublist, tid, count = groups[tree_substr]
+                    groups[tree_substr] = (tree_sublist, tid, count + 1)
 
         # Recurse down in the other layers
         for child in tree.children:
@@ -214,7 +213,7 @@ def apply(grouping : Tuple[str, Tuple[List[ParseNode], str]], trees : List[Parse
 
         Returns the new layer. If no updates can be made, do nothing.
         """
-        group_str, (group_lst, id, _, _) = grouping
+        group_str, (group_lst, id, _) = grouping
         new_tree, ng = tree.copy(), len(group_lst)
 
         # Do replacments in all the children first
@@ -259,7 +258,7 @@ def build_trees(oracle, config, leaves):
             b. perform replacement if possible
         2. If a replacement was possible, repeat (1)
     """
-    def score(trees: List[ParseNode], new_bubble: Optional[Tuple[str, List[ParseNode], Optional[str], int]] = None) -> Tuple[int, List[ParseNode]]:
+    def score(trees: List[ParseNode], new_bubble: Optional[Tuple[str, List[ParseNode], int]] = None) -> Tuple[int, List[ParseNode]]:
         """[
         TREES is a list of Parse Trees.
 
@@ -344,7 +343,7 @@ def build_grammar(config, trees):
         build_rules(grammar, tree, rule_map)
     return grammar
 
-def coalesce(oracle: Lark, trees: List[ParseNode], grammar : Grammar, coalesce_target : Tuple[str, List[ParseNode], Optional[str], int] = None):
+def coalesce(oracle: Lark, trees: List[ParseNode], grammar : Grammar, coalesce_target : Tuple[str, List[ParseNode], int] = None):
     """
     ORACLE is a Lark parser for the grammar we seek to find. We ask the oracle
     yes or no replacement questions in this method.
@@ -492,13 +491,6 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar : Grammar, coalesce_t
         # If the nonterminals can replace each other in every context, they
         # must belong to the same character class
         if not uf.is_connected(first, second) and replaces(first, second) and replaces(second, first):
-            if coalesce_target is not None:
-                assert(first == coalesce_target[1])
-                # TODO: document what's going on here. This is a hack to prevent eternal useless bubbles. There may
-                # be a clearner way around.
-                if second in set(coalesce_target[2]):
-                    uf.connect(first, second)
-                    continue
             coalesce_caused = True
             uf.connect(first, second)
 
