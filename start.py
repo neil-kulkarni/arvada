@@ -144,6 +144,8 @@ def group(trees):
         for i in range(len(children_lst)):
             for j in range(i + 2, len(children_lst) + 1):
                 if i == 0 and j == len(children_lst):
+                    if tree.payload != START:
+                        continue
                     direct_pars = [tree.payload]
                 else:
                     direct_pars = []
@@ -166,7 +168,9 @@ def group(trees):
         add_groups_for_tree(tree, groups)
 
     # Return the set of repeated groupings as an iterable
-    return sorted(list(groups.items()), key= lambda x: len(x[1][0]))
+    groups = list(groups.items())
+    random.shuffle(groups)
+    return groups
 
 def apply(grouping : Tuple[str, Tuple[List[ParseNode], str]], trees : List[ParseNode]):
     """
@@ -272,8 +276,8 @@ def build_trees(oracle, config, leaves):
             return 0, trees
 
     # Run the character class algorithm to create the first layer of tree
-    trees, classes = derive_classes(oracle, config, leaves)
-    best_score, best_trees = score(trees)
+    best_trees, classes = derive_classes(oracle, config, leaves)
+    best_score, _= score(best_trees)
     updated = True
     count = 1
 
@@ -284,8 +288,9 @@ def build_trees(oracle, config, leaves):
         for i, grouping in enumerate(all_groupings):
             print(('Bubbling iteration (%d, %d, %d)...' % (count, i + 1, nlg)).ljust(50), end='\r')
             new_trees = apply(grouping, best_trees)
-            new_score, new_trees = score(new_trees, grouping[1])
+            new_score, _ = score(new_trees, grouping[1])
             if new_score > 0:
+                print(f"Successful grouping: {grouping}")
                 best_trees = new_trees
                 updated = True
                 break
