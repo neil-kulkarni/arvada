@@ -1,3 +1,5 @@
+import re
+
 from lark import Lark
 import random
 
@@ -119,6 +121,16 @@ class Grammar():
         self.cached_str_valid = True
         return self.cached_str
 
+    def pretty_print(self):
+
+        ret = '\n'.join([rule.pretty_print() for rule in self.rules.values()])
+
+        return ret
+
+
+    def size(self):
+        return sum([rule.size() for rule in self.rules.values()])
+
 class Rule():
     """
     Object representing the string-represenation of a rule of a CFG.
@@ -163,6 +175,48 @@ class Rule():
 
     def _body_str(self, body):
         return ' '.join([b if len(b) > 0 else '\u03B5' for b in body])
+
+    def size(self):
+        return sum([len(body) for body in self.bodies])
+
+    def pretty_print(self):
+
+        ret = '%s: %s' % (self.start, self.pretty_body(self.bodies[0]))
+        for i in range(1, len(self.bodies)):
+            ret += '\n    | %s' % (self.pretty_body(self.bodies[i]))
+
+        return ret
+
+    def pretty_body(self, body):
+        ret = ""
+        built_up_terminals = ""
+        is_first = True
+        for child in body:
+            if re.match("t[0-9]+", child):
+                if not is_first:
+                    ret += " "
+                if len(built_up_terminals) > 0:
+                    ret += '"' +built_up_terminals + '"'
+                    built_up_terminals = ""
+                    ret += " "
+                ret += child
+            elif child == '':
+                if not is_first:
+                    ret += " "
+                ret += '\u03B5'
+            else:
+                built_up_terminals += child.strip('"')
+            is_first = False
+
+        if len(built_up_terminals) > 0:
+            if len(ret) > 0:
+                ret += " "
+            if len(built_up_terminals) > 0:
+                ret += '"' + built_up_terminals + '"'
+
+        return ret
+
+
 
 # Example grammar with nonterminals n1, n2 and terminals a, b
 # grammar = Grammar('n1')
