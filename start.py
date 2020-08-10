@@ -68,9 +68,11 @@ def build_start_grammar(oracle, config, leaves):
     grammar = build_grammar(config, trees)
     print('Coalescing nonterminals...'.ljust(50), end='\r')
     grammar, new_trees, coalesce_caused = coalesce(oracle, trees, grammar)
+    grammar, new_trees, partial_coalesces = coalesce_partial(oracle, new_trees, grammar)
     print('Minimizing initial grammar...'.ljust(50), end='\r')
-    grammar = minimize(config, grammar)
+    grammar = minimize(grammar)
     return grammar
+
 
 def derive_classes(oracle, config, leaves):
     """
@@ -101,17 +103,23 @@ def derive_classes(oracle, config, leaves):
         Relies on the fact that LEAVES is unchanged from the time when it was
         inputted into derive_classes.
         """
-        replaced_leaves = [[ParseNode(replacer if leaf.payload == replacee else leaf.payload, leaf.is_terminal, leaf.children) for leaf in tree] for tree in leaves]
+        replaced_leaves = [
+            [ParseNode(replacer if leaf.payload == replacee else leaf.payload, leaf.is_terminal, leaf.children) for leaf
+             in tree] for tree in leaves]
         replaced_examples = [''.join([pn.payload for pn in tree]) for tree in replaced_leaves]
         for example in replaced_examples:
-            try: oracle.parse(example)
-            except: return False
+            try:
+                oracle.parse(example)
+            except:
+                return False
         return True
 
     # Define helpful data structures
-    terminals = list(config['TERMINALS'])
-    terminals.remove('') # Remove epsilon terminal
-    terminals = [t.replace('"', '') for t in terminals]
+    # terminals = list(config['TERMINALS'])
+    # terminals.remove('') # Remove epsilon terminal
+    # terminals = [t.replace('"', '') for t in terminals]
+    terminals = list(set([leaf.payload for leaf_lst in leaves for leaf in leaf_lst]))
+    print(terminals)
     uf = UnionFind(terminals)
 
     # Check to make sure initial guide examples compile
@@ -163,6 +171,10 @@ def group(trees):
     well as the fresh nonterminal assigned to the grouping.
     """
 
+    # Helper tracking if a subsequence is only seen as the "full" child of another nonterminal,
+    # I.e. t2 t3 t4 in t1 -> t2 t3 t4, but not in t1 -> t2 t2 t3 t4
+    full_bubbles = defaultdict(int)
+
     def add_groups_for_tree(tree: ParseNode, groups: Dict[str, Tuple[List[ParseNode], str, int]]):
         """
         Add all groups possible groupings derived from the parse tree `tree` to `groups`.
@@ -170,12 +182,12 @@ def group(trees):
         children_lst = tree.children
         for i in range(len(children_lst)):
             for j in range(i + 2, len(children_lst) + 1):
-                if i == 0 and j == len(children_lst):
-                    continue
                 tree_sublist = children_lst[i:j]
                 tree_substr = ''.join([t.payload for t in tree_sublist])
+                if i == 0 and j == len(children_lst):
+                    full_bubbles[tree_substr] += 1
                 if not tree_substr in groups:
-                    groups[tree_substr] = (tree_sublist, allocate_tid(),  1)
+                    groups[tree_substr] = (tree_sublist, allocate_tid(), 1)
                 else:
                     tree_sublist, tid, count = groups[tree_substr]
                     groups[tree_substr] = (tree_sublist, tid, count + 1)
@@ -190,12 +202,19 @@ def group(trees):
     for tree in trees:
         add_groups_for_tree(tree, groups)
 
+    # Remove sequences if they're the full list of children of a rule and don't appear anywhere else
+    for bubble in full_bubbles:
+        if groups[bubble][2] == full_bubbles[bubble]:
+            groups.pop(bubble)
+
     # Return the set of repeated groupings as an iterable
     groups = list(groups.items())
-    random.shuffle(groups)
+    # random.shuffle(groups)
+    groups = sorted(groups, key=lambda group: (group[1][2], len(group[1][0])), reverse=True)
     return groups
 
-def apply(grouping : Tuple[str, Tuple[List[ParseNode], str]], trees : List[ParseNode]):
+
+def apply(grouping: Tuple[str, Tuple[List[ParseNode], str]], trees: List[ParseNode]):
     """
     GROUPING is a two-element tuple data structure that represents a contiguous
     sequence of nonterminals that appears someplace in LAYERS. The first element
@@ -292,15 +311,24 @@ def build_trees(oracle, config, leaves):
         """
         # Convert LAYERS into a grammar and generator
         grammar = build_grammar(config, trees)
+
         grammar, new_trees, coalesce_caused = coalesce(oracle, trees, grammar, new_bubble)
+        if not coalesce_caused:
+            grammar, new_trees, partial_coalesces = coalesce_partial(oracle, trees, grammar, new_bubble)
+            if len(partial_coalesces) > 0:
+                coalesce_caused = True
+
+        grammar = minimize(grammar)
+        new_size = grammar.size()
         if coalesce_caused:
-            return 1, new_trees
+            return 1, new_size, new_trees
         else:
-            return 0, trees
+            return 0, new_size, trees
 
     # Run the character class algorithm to create the first layer of tree
     best_trees, classes = derive_classes(oracle, config, leaves)
-    best_score, _= score(best_trees)
+    print("Scoring...")
+    best_score, best_size, _ = score(best_trees)
     updated = True
     count = 1
 
@@ -311,15 +339,22 @@ def build_trees(oracle, config, leaves):
         for i, grouping in enumerate(all_groupings):
             print(('Bubbling iteration (%d, %d, %d)...' % (count, i + 1, nlg)).ljust(50), end='\r')
             new_trees = apply(grouping, best_trees)
-            new_score, _ = score(new_trees, grouping[1])
+            new_score, size, _ = score(new_trees, grouping[1])
             if new_score > 0:
                 print(f"Successful grouping: {grouping}")
                 best_trees = new_trees
                 updated = True
                 break
+            elif size < best_size:
+                print(f"Successful grouping: {grouping}")
+                best_trees = new_trees
+                updated = True
+                best_size = size
+                break
         layers, count = best_trees, count + 1
 
     return best_trees, classes
+
 
 def build_grammar(config, trees):
     """
@@ -667,50 +702,11 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
 
         # Return True if all the replaced_strings are valid
         for s in replaced_strings:
-            try: oracle.parse(s)
-            except: return False
+            try:
+                oracle.parse(s)
+            except:
+                return False
         return True
-
-    def nt_derivable(nt):
-        """
-        Returns a set of references to Rule Bodies containing a single nonterminal,
-        of type NT, that are derivable directly from the start nonterminal in GRAMMAR.
-
-        A nonterminal is directly derivable from the start nonterminal if it can
-        be derived by a series of replacement rules from the start nonterminal,
-        where none of those replacement rules contain any terminals.
-        """
-        X = [] # The set of nonterminal SymbolNodes directly derivable from START
-        F = [] # The search fringe of SymbolNodes
-
-        def is_nonterm(term):
-            return re.match("t[0-9]+", term) is not None
-
-        # Initialize X and F to those nonterminals directly derivable from t0
-        # with a derivability depth of one
-        for rule in [rule_node for rule_node in grammar.rules.values() if rule_node.start == START]:
-            for body in rule.bodies:
-                if len(body) == 1 and is_nonterm(body[0]):
-                    X.append(body)
-                    F.append(body)
-
-        # Continue searching in a BFS-like style until there is nothing left
-        while len(F) > 0:
-            nt_node = F.pop()
-            for rule in [rule_node for rule_node in grammar.rules.values() if rule_node.start == nt_node[0]]:
-                # Since each nonterminal expands to a finite and positive length
-                # string, it suffices to check that the rule is just one nonterminal
-                for body in rule.bodies:
-                    if len(body) == 1 and is_nonterm(body[0]):
-                        X.append(body)
-                        F.append(body)
-
-        # Filter the final set of SymbolNode references by NT and return
-        output = []
-        for body in X:
-            if body[0] == nt:
-                output.append(body)
-        return output
 
     # Define helpful data structures
     nonterminals = set(grammar.rules.keys())
@@ -824,13 +820,15 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
 
     return grammar, new_trees, coalesce_caused
 
-def minimize(config, grammar):
+
+def minimize(grammar):
     """
     Mutative method that deletes repeated rules from GRAMMAR and removes
     unnecessary layers of indirection.
 
     CONFIG is the required configuration options for GrammarGenerator classes.
     """
+
     def remove_repeated_rules(grammar: Grammar):
         """
         Mutative method that removes all repeated rule bodies in GRAMMAR.
@@ -857,7 +855,7 @@ def minimize(config, grammar):
         The START nonterminal must not appear in MAP, because its rule cannot
         be deleted.
         """
-        assert(START not in map)
+        assert (START not in map)
         for rule in grammar.rules.values():
             for body in rule.bodies:
                 to_fix = [elem in map for elem in body]
