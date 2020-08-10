@@ -27,7 +27,9 @@ def main(file_name, log_file):
 
 
     # Generate guiding examples and corresponding ParseNodes
-    guide_nodes = [[ParseNode(tok, True, []) for tok in ex.split()] for ex in GUIDE_EXAMPLES]
+    #guide_nodes = [[ParseNode(tok, True, []) for tok in ex.split()] for ex in GUIDE_EXAMPLES]
+    # TODO: this assumes there are no spaces in the inputs...
+    guide_nodes = [[ParseNode(tok, True, []) for tok in ex.replace(' ', '')] for ex in GUIDE_EXAMPLES]
 
     # Create the log file and write positive and negative examples to it
     # Also write the initial starting grammar to the file
@@ -40,14 +42,17 @@ def main(file_name, log_file):
         try:
             start_grammar.parser()
             print('\n\nInitial Grammar Created:\n%s' % str(start_grammar), file=f)
+            print(f"AKA:\n{start_grammar.pretty_print()}")
         except Exception as e:
             print('\n\nInitial grammar does not compile! %s' % str(e), file=f)
             print(start_grammar, file = f)
             exit()
         build_time = time.time() - start_time
 
+
         # Score the start grammar we arrived at earlier, which will add it to the
         # "interesting" set for future iterations
+
         print('Scoring grammar....'.ljust(50), end='\r')
         recall_set = start_grammar.sample_positives(100, 5)
         precision_set = ORACLE.sample_positives(100, 5)
@@ -76,6 +81,8 @@ def main(file_name, log_file):
                 continue
 
         print(f'Precision: {precision_num/len(precision_set)}, Recall: {recall_num/len(recall_set)}', file=f)
+        print(f"Build_time: {build_time}")
+        print(f'Precision: {precision_num/len(precision_set)}, Recall: {recall_num/len(recall_set)}')
         print(f'Time spent building grammar: {build_time}s', file = f)
         print(f'Time spent building + scoring grammar: {time.time() - start_time}s', file = f)
 
