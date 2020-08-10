@@ -9,6 +9,7 @@ from input import clean_terminal
 from union import UnionFind
 import numpy as np
 
+
 def allocate_tid():
     """
     Returns a new, unqiue nonterminal name.
@@ -18,9 +19,10 @@ def allocate_tid():
     next_tid += 1
     return nt_name
 
+
 # Globally unique nonterminal number
 next_tid = 0
-START = allocate_tid() # The start nonterminal is t0
+START = allocate_tid()  # The start nonterminal is t0
 
 
 class CachingOracle:
@@ -41,8 +43,6 @@ class CachingOracle:
             except Exception as e:
                 self.cache_set[string] = False
                 raise e
-
-
 
 
 def build_start_grammar(oracle, config, leaves):
@@ -93,6 +93,7 @@ def derive_classes(oracle, config, leaves):
     LEAVES is a list of positive examples, each expressed as a list of tokens
     (ParseNode objects).
     """
+
     def replaces(replacer, replacee):
         """
         For every string in which REPLACEE appears, replace it with REPLACER,
@@ -132,7 +133,6 @@ def derive_classes(oracle, config, leaves):
             # Iterate through each unique pair of terminals
             print(('Terminal replacement (%d, %d, %d)...' % (i + 1, j + 1, len(terminals))).ljust(50), end='\r')
             first, second = terminals[i], terminals[j]
-
             # If the terminals can replace each other in every context, they
             # must belong to the same character class
             if not uf.is_connected(first, second) and replaces(first, second) and replaces(second, first):
@@ -147,7 +147,8 @@ def derive_classes(oracle, config, leaves):
         for terminal in cc:
             get_class[terminal] = class_nt
 
-    trees = [ParseNode(allocate_tid(), False, [ParseNode(get_class[leaf.payload], False, [leaf]) for leaf in leaf_lst])
+    trees = [ParseNode(allocate_tid(), False, [ParseNode(get_class[leaf.payload], False, [leaf]) for leaf in leaf_lst]
+                       )
              for leaf_lst in leaves]
 
     # Update each of the terminals in leaves to instead be a new nonterminal
@@ -155,6 +156,7 @@ def derive_classes(oracle, config, leaves):
     # trees as well as a mapping of nonterminal to its character class.
     return [ParseNode(START, False, [tree])
             for tree in trees], classes
+
 
 def group(trees):
     """
@@ -227,6 +229,7 @@ def apply(grouping: Tuple[str, Tuple[List[ParseNode], str]], trees: List[ParseNo
     Returns a new list of trees consisting of applying the bubbling up the grouping
     in GROUPING for each tree in TREES
     """
+
     def matches(group_lst, layer):
         """
         GROUP_LST is a contiguous subarray of ParseNodes that are grouped together.
@@ -239,8 +242,8 @@ def apply(grouping: Tuple[str, Tuple[List[ParseNode], str]], trees: List[ParseNo
         """
         ng, nl = len(group_lst), len(layer)
         for i in range(nl):
-            layer_ind = i # Index into layer
-            group_ind = 0 # Index into group
+            layer_ind = i  # Index into layer
+            group_ind = 0  # Index into group
             while group_ind < ng and layer_ind < nl and layer[layer_ind].payload == group_lst[group_ind].payload:
                 layer_ind += 1
                 group_ind += 1
@@ -267,13 +270,14 @@ def apply(grouping: Tuple[str, Tuple[List[ParseNode], str]], trees: List[ParseNo
 
         ind = matches(group_lst, new_tree.children)
         while ind != -1:
-            parent = ParseNode(id, False, new_tree.children[ind : ind + ng])
-            new_tree.children[ind : ind + ng] = [parent]
+            parent = ParseNode(id, False, new_tree.children[ind: ind + ng])
+            new_tree.children[ind: ind + ng] = [parent]
             ind = matches(group_lst, new_tree.children)
 
         return new_tree
 
     return [apply_single(tree) for tree in trees]
+
 
 def build_trees(oracle, config, leaves):
     """
@@ -301,7 +305,9 @@ def build_trees(oracle, config, leaves):
             b. perform replacement if possible
         2. If a replacement was possible, repeat (1)
     """
-    def score(trees: List[ParseNode], new_bubble: Optional[Tuple[str, List[ParseNode], int]] = None) -> Tuple[int, List[ParseNode]]:
+
+    def score(trees: List[ParseNode], new_bubble: Optional[Tuple[List[ParseNode], str, int]] = None) \
+            -> Tuple[int, List[ParseNode]]:
         """[
         TREES is a list of Parse Trees.
 
@@ -363,6 +369,7 @@ def build_grammar(config, trees):
     TREES is a list of fully constructed parse trees. This method builds a
     GrammarNode that is the disjunction of the parse trees, and returns it.
     """
+
     def build_rules(grammar_node, parse_node, rule_map):
         """
         Adds the rules defined in PARSE_NODE and all of its subtrees to the
@@ -662,6 +669,7 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
         Adds to the set DERIVABLE all those strings derivable from the
         REPLACER_NT in TREE.
         """
+
         def node_string(tree):
             """
             Returns the string derived from the leaves of this tree.
@@ -797,14 +805,12 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
             for child in node.children:
                 fix_double_indirection(child)
 
-
         new_trees = []
         for tree in trees:
             new_tree = tree.copy()
             replace_coalesced_nonterminals(new_tree)
             fix_double_indirection(new_tree)
             new_trees.append(new_tree)
-
 
     # Add the alternation rules for each class into the grammar
     for class_nt, nts in classes.items():
@@ -863,7 +869,7 @@ def minimize(grammar):
                 while any(to_fix):
                     ind = to_fix.index(True)
                     nt = body[ind]
-                    body[ind:ind+1] = map[nt]
+                    body[ind:ind + 1] = map[nt]
                     to_fix = [elem in map for elem in body]
         remove_lhs = [lhs for lhs in grammar.rules.keys() if lhs in map]
         for lhs in remove_lhs:
@@ -878,7 +884,7 @@ def minimize(grammar):
     # Finds the set of nonterminals that expand directly to a single terminal
     # Let the keys of X be the set of these nonterminals, and the corresponding
     # values be the the SymbolNodes derivable from those nonterminals
-    X, updated = {}, True # updated determines the stopping condition
+    X, updated = {}, True  # updated determines the stopping condition
 
     while updated:
         updated = False
@@ -908,13 +914,12 @@ def minimize(grammar):
 
     # Update the grammar so that keys in X are replaced by values
     used_once = [k for k in counts if counts[k] == 1 and k != START]
-    Y = {k:grammar.rules[k].bodies[0] for k in used_once if len(grammar.rules[k].bodies) == 1}
+    Y = {k: grammar.rules[k].bodies[0] for k in used_once if len(grammar.rules[k].bodies) == 1}
     grammar = update(grammar, Y)
 
     remove_repeated_rules(grammar)
 
     return grammar
-
 
 # Example:
 # from input import parse_input
