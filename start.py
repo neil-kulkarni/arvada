@@ -22,6 +22,29 @@ def allocate_tid():
 next_tid = 0
 START = allocate_tid() # The start nonterminal is t0
 
+
+class CachingOracle:
+    def __init__(self, oracle: Lark):
+        self.oracle = oracle
+        self.cache_set = {}
+
+    def parse(self, string):
+        if string in self.cache_set:
+            if self.cache_set[string]:
+                return True
+            else:
+                raise Exception("doesn't parse")
+        else:
+            try:
+                self.oracle.parse(string)
+                self.cache_set[string] = True
+            except Exception as e:
+                self.cache_set[string] = False
+                raise e
+
+
+
+
 def build_start_grammar(oracle, config, leaves):
     """
     ORACLE is a Lark parser for the grammar we seek to find. We ask the oracle
@@ -38,6 +61,7 @@ def build_start_grammar(oracle, config, leaves):
     Returns a set of starting grammar generators whose corresponding grammars
     each match at least one input example.
     """
+    oracle = CachingOracle(oracle)
     print('Building the starting trees...'.ljust(50), end='\r')
     trees, classes = build_trees(oracle, config, leaves)
     print('Building initial grammar...'.ljust(50), end='\r')
