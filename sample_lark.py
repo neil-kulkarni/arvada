@@ -122,6 +122,31 @@ def sample_from_rules(start: str, generic_rule_map: Dict[str, GenericRule]) -> T
             rules_samples.update(elem_rules)
         return sampled_str, rules_samples
 
+def sample_minimal(start: str, generic_rules: Set[GenericRule]) -> Set[str] :
+    """
+    Given the grammar with start symbol `start` and rules `generic_rules`, creates
+    a sample set of inputs that cover every rule in `generic_rules`. Try to minimize
+    the size of each individual input.
+    """
+    pass
+
+
+def sample_random_bound(start: str, generic_rules: Set[GenericRule]) -> Set[str] :
+    """
+    Given the grammar with start symbol `start` and rules `generic_rules`, samples
+    random inputs until an input is found that covers every rule in `generic_rules`.
+    Attempts to bound the size of each individual input
+    """
+    pass
+
+
+def sample_random_nobound(start: str, generic_rules: Set[GenericRule]) -> Set[str] :
+    """
+    Given the grammar with start symbol `start` and rules `generic_rules`, samples
+    random inputs until an input is found that covers every rule in `generic_rules`.
+    """
+    pass
+
 
 def sample_grammar(grammar_contents: str):
     grammar = load_grammar(grammar_contents, "?")
