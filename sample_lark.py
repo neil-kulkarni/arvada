@@ -9,6 +9,7 @@ import sys
 
 import random
 
+INFINITY = 1_000_000
 
 class GenericRule:
     def __init__(self, start, expansion, is_terminal):
@@ -67,6 +68,40 @@ def make_generic_terminal(terminal: TerminalDef) -> List[GenericRule]:
         ret_rules.append(GenericRule(lhs, [rhs], True))
     return ret_rules
 
+def get_min_expansion_depth(nt: str, all_rules: Dict[str, List[GenericRule]], nt_depths: Dict[str, int]):
+    rules = all_rules[nt]
+    min_depth = INFINITY
+    for rule in rules:
+        if rule.is_terminal:
+            min_depth = 0
+        else:
+            expansion_depths = [nt_depths[elem] for elem in rule.expansion]
+            if all([depth != INFINITY for depth in expansion_depths]):
+                min_depth = min(min_depth, min(expansion_depths) + 1)
+    if nt_depths[nt] > min_depth:
+        nt_depths[nt] = min_depth
+        return True
+    else:
+        return False
+
+def get_min_expansion_depth_for_gram(all_rules: Dict[str, List[GenericRule]]):
+    nt_depths = {nt: INFINITY for nt in all_rules}
+
+    updated = True
+    while updated:
+        updated = False
+        for nt in all_rules:
+            nt_updated = get_min_expansion_depth(nt, all_rules, nt_depths)
+            if nt_updated:
+                updated = True
+
+    return nt_depths
+
+def get_min_expansion_depth_for_rule(rule: GenericRule, nt_depths: Dict[str, int]):
+    if rule.is_terminal:
+        return 0
+    else:
+        return max([nt_depths[nt] + 1 for nt in rule.expansion])
 
 def make_generic_rule(rule: Rule) -> List[GenericRule]:
     lhs = rule.origin.name
@@ -120,6 +155,11 @@ def sample_grammar(grammar_contents: str):
 
     print(f"Iteration {count}, {len(sampled_rules)*100/len(generic_rules_set)}% sampled")
 
+    nt_depths = get_min_expansion_depth_for_gram(generic_rule_map)
+    print(nt_depths)
+    for rule in generic_rules_set:
+        print(f"{rule} has min expansion depth {get_min_expansion_depth_for_rule(rule, nt_depths)}")
+
     return samples
 
 
@@ -127,4 +167,4 @@ if __name__ == "__main__":
     grammar_contents = open(sys.argv[1]).read()
     examples = sample_grammar(grammar_contents)
     for example in examples:
-        print(example)
+        pass#print(example)
