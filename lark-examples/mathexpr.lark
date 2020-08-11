@@ -1,7 +1,7 @@
 char: "a".."z"
 var: char | var char | var "0".."9" | var "_"
 number: int | float | "-" int | "-" float
-int: ("0".."9")+
+int: ("0".."9") | ("1".."9") ("0".."9")+
 float: int "." int
 constant: "pi" | "phi" | "e"
 func : "abs"
@@ -31,7 +31,7 @@ func : "abs"
     | "tan" 
     | "tanh"
 funccall: func "(" arglist ")"
-space: " "*
+space: " "
 arglist: expr | expr "," space arglist
 binop: expr space op space expr
 op : "+" | "-" | "*" | "/"
