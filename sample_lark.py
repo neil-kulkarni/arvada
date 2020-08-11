@@ -1,10 +1,13 @@
-from typing import List
+from collections import defaultdict
+from typing import List, Dict, Tuple, Set
 
 from lark.load_grammar import GrammarLoader, load_grammar
 from lark.grammar import *
 from lark.lexer import TerminalDef
 import re
 import sys
+
+import random
 
 
 class GenericRule:
@@ -53,9 +56,11 @@ def get_range(range_str: str):
 
 def make_generic_terminal(terminal: TerminalDef) -> List[GenericRule]:
     lhs = terminal.name
+    if lhs == 'LSQB':
+        pass
     rhs = terminal.pattern.value
     ret_rules = []
-    if rhs.startswith("["):
+    if rhs.startswith("[") and rhs.endswith("]"):
         for elem in get_range(rhs.strip("[]")):
             ret_rules.append(GenericRule(lhs, [elem], True))
     else:
@@ -68,20 +73,58 @@ def make_generic_rule(rule: Rule) -> List[GenericRule]:
     rhs = [elem.name for elem in rule.expansion]
     return [GenericRule(lhs, rhs, False)]
 
+def sample_from_rules(start: str, generic_rule_map: Dict[str, GenericRule]) -> Tuple[str, Set[GenericRule]]:
+    assert(start in generic_rule_map)
+    chosen_expansion: GenericRule = random.choice(generic_rule_map[start])
+    if chosen_expansion.is_terminal:
+        return chosen_expansion.expansion[0], {chosen_expansion}
+    else:
+        sampled_str = ''
+        rules_samples = {chosen_expansion}
+        for elem in chosen_expansion.expansion:
+            elem_str, elem_rules = sample_from_rules(elem, generic_rule_map)
+            sampled_str += elem_str
+            rules_samples.update(elem_rules)
+        return sampled_str, rules_samples
+
 
 def sample_grammar(grammar_contents: str):
     grammar = load_grammar(grammar_contents, "?")
-    terms, rules, ignore = grammar.compile('start')
+    all_rules = [rdef[0] for rdef in grammar.rule_defs]
+    terms, rules, ignore = grammar.compile(all_rules)
     generic_rules: List[GenericRule] = []
     for term in terms:
+        print(term)
         generic_rules.extend(make_generic_terminal(term))
     for rule in rules:
-        generic_rules.extend(make_generic_rule(rule))
-    print("GENERIC RULES==================")
-    for rule in generic_rules:
         print(rule)
+        generic_rules.extend(make_generic_rule(rule))
+    generic_rule_map = defaultdict(list)
+    for rule in generic_rules:
+        generic_rule_map[rule.start].append(rule)
+
+    generic_rules_set : Set[GenericRule] = set(generic_rules)
+    sampled_rules : Set[GenericRule] = set()
+    samples : Set[str] = set()
+    count = 0
+    while len(generic_rules_set.difference(sampled_rules)) > 0 and count < 5000:
+        try:
+            count += 1
+            print(f"Iteration {count}, {len(sampled_rules)/len(generic_rules_set)*100}% sampled", end='\r')
+            sample, rules_expanded = sample_from_rules('start', generic_rule_map)
+            if len(sampled_rules.union(rules_expanded)) > len(sampled_rules):
+                samples.add(sample)
+                sampled_rules.update(rules_expanded)
+        except RecursionError as e:
+            continue
+
+    print(f"Iteration {count}, {len(sampled_rules)*100/len(generic_rules_set)}% sampled")
+
+    return samples
 
 
 if __name__ == "__main__":
     grammar_contents = open(sys.argv[1]).read()
-    sample_grammar(grammar_contents)
+    examples = sample_grammar(grammar_contents)
+    for example in examples:
+        print(example)
