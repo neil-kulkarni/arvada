@@ -18,6 +18,17 @@ class GenericRule:
     def __repr__(self):
         return self.__str__()
 
+    def __eq__(self, other):
+        if not isinstance(other, GenericRule):
+            return False
+        return self.start == other.start and self.is_terminal == other.is_terminal and self.expansion == other.expansion
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __hash__(self):
+        return hash((self.start, tuple(self.expansion), self.is_terminal))
+
 def get_range(range_str: str):
     ranges = []
     is_first = True
