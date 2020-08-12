@@ -1,0 +1,16 @@
+@regex
+
+genchar ::= alphanum
+nbchar ::= genchar | s | t | n | '!' | '"' | '#' | '$' | '%' | '&' | ''' | '(' | ')' | '*' | '+' | ',' | '-' | '.' | '/' | ':' | ';' | '<' | '=' | '>' | '?' | '@' | '[' | ']' | '^' | '_' | '`' | '{' | p | '}' | '~'
+npchar ::= genchar | s | t | n | '!' | '"' | '#' | '$' | '%' | '&' | ''' | '*' | '+' | ',' | '-' | '.' | '/' | ':' | ';' | '<' | '=' | '>' | '?' | '@' | '[' | '\' | ']' | '^' | '_' | '`' | p | '~'
+char ::= nbchar | '\' npchar
+
+nums ::= e | nums numall
+tok ::= e | tok char
+
+single ::= e | single tok
+single ::= single '\' '{' nums '\' '}' | single '\' '{' nums ',' nums '\' '}'
+single ::= single '[' tok ']' | single '[' '^' tok ']' | single '[' '=' tok '=' ']' | single '[' '.' tok '.' ']' | single '[' ':' tok ':' ']'
+
+regex ::= single | regex single
+regex ::= regex '\' '(' regex '\' ')'

@@ -1,0 +1,32 @@
+@url
+
+sep ::= ':' '/' '/' | ':' '/' '/' 'w' 'w' 'w' '.'
+
+#sitechar ::= alphanum   | alphanum '-' alphanum | alphanum '.' alphanum
+sitechar ::= alphanum   | alphanum '-' alphanum
+site ::= alphanum | site sitechar
+
+domainchar ::= lower 
+#domain ::= alphanum | domain domainchar
+domain ::= lower | domain domainchar
+
+
+login ::= domain '@' site '.' domain
+
+#tailchar ::= alphanum | '-' | '@' | ':' | '%' | '_' | '+' | '.' | '~' | '#' | '?' | '&' | '/' | '='
+tailchar ::= alphanum  | '-' | '@' | ':' | '%' | '_' | '+' | '~' | '#' | '&' | '='
+tailseq ::= e | tailseq tailchar
+tail ::= e | '/' tailseq | '?' tailseq
+#tail ::= e 
+
+
+mailtoaddress ::=  'm' 'a' 'i' 'l' 't' 'o' sep site '.' domain tail | 'm' 'a' 'i' 'l' 't' 'o' sep login tail
+gopheraddress ::=  'g' 'o' 'p' 'h' 'e' 'r' sep site '.' domain tail
+#newsaddress ::=  'n' 'e' 'w' 's' sep site '.' domain tail | 'n' 'e' 'w' 's' sep login tail |'n' 'e' 'w' 's' ':' site '.' domain tail |  'n' 'e' 'w' 's' ':' login tail
+newsaddress ::=  'n' 'e' 'w' 's' sep site '.' domain tail | 'n' 'e' 'w' 's' sep login tail
+ftpaddress ::=  'f' 't' 'p' sep site '.' domain tail | 'f' 't' 'p' sep login tail
+nntpaddress ::=  'n' 'n' 't' 'p' sep site '.' domain tail
+httpsaddress ::=  'h' 't' 't' 'p' 's' sep site '.' domain tail
+httpaddress ::=   'h' 't' 't' 'p'  sep site '.' domain tail
+url ::= httpaddress | httpsaddress | nntpaddress | ftpaddress | newsaddress | gopheraddress | mailtoaddress
+#url ::= scheme sep site '.' domain tail
