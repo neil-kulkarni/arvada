@@ -12,6 +12,3 @@ list: value | list  ","  value
 object: "{"  "}" | "{" objlist "}"
 objtuple:  string  ":"  value
 objlist: objtuple | objlist "," objtuple
-
-%import common.WS
-%ignore WS
