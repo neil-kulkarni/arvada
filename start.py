@@ -25,27 +25,7 @@ next_tid = 0
 START = allocate_tid()  # The start nonterminal is t0
 
 
-class CachingOracle:
-    def __init__(self, oracle: Lark):
-        self.oracle = oracle
-        self.cache_set = {}
-
-    def parse(self, string):
-        if string in self.cache_set:
-            if self.cache_set[string]:
-                return True
-            else:
-                raise Exception("doesn't parse")
-        else:
-            try:
-                self.oracle.parse(string)
-                self.cache_set[string] = True
-            except Exception as e:
-                self.cache_set[string] = False
-                raise e
-
-
-def build_start_grammar(oracle, config, leaves):
+def build_start_grammar(oracle, leaves):
     """
     ORACLE is a Lark parser for the grammar we seek to find. We ask the oracle
     yes or no replacement questions in this method.
@@ -61,11 +41,10 @@ def build_start_grammar(oracle, config, leaves):
     Returns a set of starting grammar generators whose corresponding grammars
     each match at least one input example.
     """
-    oracle = CachingOracle(oracle)
     print('Building the starting trees...'.ljust(50), end='\r')
-    trees, classes = build_trees(oracle, config, leaves)
+    trees, classes = build_trees(oracle, leaves)
     print('Building initial grammar...'.ljust(50), end='\r')
-    grammar = build_grammar(config, trees)
+    grammar = build_grammar(trees)
     print('Coalescing nonterminals...'.ljust(50), end='\r')
     grammar, new_trees, coalesce_caused = coalesce(oracle, trees, grammar)
     grammar, new_trees, partial_coalesces = coalesce_partial(oracle, new_trees, grammar)
@@ -74,7 +53,7 @@ def build_start_grammar(oracle, config, leaves):
     return grammar
 
 
-def derive_classes(oracle, config, leaves):
+def derive_classes(oracle, leaves):
     """
     Given a list of positive examples in LEAVES, uses a replacement algorithm
     to determine which tokens belong to the same character classes. Each character
@@ -279,15 +258,10 @@ def apply(grouping: Tuple[str, Tuple[List[ParseNode], str]], trees: List[ParseNo
     return [apply_single(tree) for tree in trees]
 
 
-def build_trees(oracle, config, leaves):
+def build_trees(oracle, leaves):
     """
-    ORACLE is a Lark parser for the grammar we seek to find. We ask the oracle
+    ORACLE is an oracle for the grammar we seek to find. We ask the oracle
     yes or no replacement questions in this method.
-
-    CONFIG is the required configuration options for GrammarGenerator classes.
-
-    DATA is a map containing both the positive and negative examples used to
-    train the stochastic search.
 
     LEAVES should be a list of lists (one list for each input example), where
     each sublist contains the tokens that built that example, as ParseNodes.
@@ -316,7 +290,7 @@ def build_trees(oracle, config, leaves):
         Does not mutate LAYERS in this process.
         """
         # Convert LAYERS into a grammar and generator
-        grammar = build_grammar(config, trees)
+        grammar = build_grammar(trees)
 
         grammar, new_trees, coalesce_caused = coalesce(oracle, trees, grammar, new_bubble)
         if not coalesce_caused:
@@ -332,7 +306,7 @@ def build_trees(oracle, config, leaves):
             return 0, new_size, trees
 
     # Run the character class algorithm to create the first layer of tree
-    best_trees, classes = derive_classes(oracle, config, leaves)
+    best_trees, classes = derive_classes(oracle, leaves)
     print("Scoring...")
     best_score, best_size, _ = score(best_trees)
     updated = True
@@ -362,7 +336,7 @@ def build_trees(oracle, config, leaves):
     return best_trees, classes
 
 
-def build_grammar(config, trees):
+def build_grammar(trees):
     """
     CONFIG is the required configuration options for GrammarGenerator classes.
 
