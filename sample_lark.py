@@ -52,6 +52,8 @@ class GrammarStats:
                 min_depth = 0
             else:
                 expansion_depths = [self.nt_depths[elem] for elem in rule.expansion]
+                if len(expansion_depths) ==0:
+                    expansion_depths = [0]
                 if all([depth != INFINITY for depth in expansion_depths]):
                     min_depth = min(min_depth, max(expansion_depths) + 1)
         if self.nt_depths[nt] > min_depth:
@@ -100,7 +102,9 @@ class GrammarStats:
         if rule.is_terminal:
             return 0
         else:
-            return max([self.nt_depths[nt] + 1 for nt in rule.expansion])
+            if len(rule.expansion) > 0:
+                return max([self.nt_depths[nt] + 1 for nt in rule.expansion])
+            else: return 0
 
     def get_min_nt_depth(self, nt: str):
         return self.nt_depths[nt]
@@ -119,11 +123,13 @@ class GenericRuleCreator:
         grammar = load_grammar(grammar_contents, "?")
         all_rules = [rdef[0] for rdef in grammar.rule_defs]
         terms, rules, ignore = grammar.compile(all_rules)
+
         self.generic_rules: List[GenericRule] = []
         for term in terms:
             self.generic_rules.extend(self.make_generic_terminal(term))
         for rule in rules:
             self.generic_rules.extend(self.make_generic_rule(rule))
+        print(self.generic_rules)
 
     def get_range(self, range_str: str):
         ranges = []
@@ -267,6 +273,53 @@ def sample_minimal(start: str, generic_rules: Set[GenericRule]) -> Set[str]:
             raise NotImplementedError("Every sample_next should add a new rule...")
     return samples
 
+def sample_n_random(start: str, generic_rules: Set[GenericRule], n) -> Set[str]:
+    """
+    Given the grammar with start symbol `start` and rules `generic_rules`, samples
+    n random inputs.
+    """
+    generic_rule_map = get_rule_map(generic_rules)
+    samples: Set[str] = set()
+    grammar_stats = GrammarStats(generic_rules)
+
+    def one_random_sample(start: str, bound, depth = 0) -> str:
+        """
+        Samples one random input starting at symbol `start`
+        """
+        assert (start in generic_rule_map)
+        if depth > bound:
+            minimal_expansion_depth = min([grammar_stats.get_min_rule_depth(rule) for rule in generic_rule_map[start]])
+            minimal_expansions = [rule for rule in generic_rule_map[start]
+                                  if grammar_stats.get_min_rule_depth(rule) == minimal_expansion_depth]
+            chosen_expansion: GenericRule = random.choice(minimal_expansions)
+        else:
+            chosen_expansion: GenericRule = random.choice(generic_rule_map[start])
+        if chosen_expansion.is_terminal:
+            return chosen_expansion.expansion[0]
+        else:
+            sampled_str = ''
+            for elem in chosen_expansion.expansion:
+                elem_str = one_random_sample(elem, bound, depth + 1)
+                sampled_str += elem_str
+            return sampled_str
+
+
+    last_update_count = 0
+    while len(samples) < n:
+        if len(samples) < n/3:
+            bound = 5
+        elif len(samples) < 2 * n/3:
+            bound = 10
+        else:
+            bound = 15
+        try:
+            sample = one_random_sample('start', bound)
+            samples.add(sample)
+        except RecursionError as e:
+            continue
+
+    return samples
+
 
 def sample_random_bound(start: str, generic_rules: Set[GenericRule], bound=2) -> Set[str]:
     """
@@ -278,7 +331,6 @@ def sample_random_bound(start: str, generic_rules: Set[GenericRule], bound=2) ->
     sampled_rules: Set[GenericRule] = set()
     samples: Set[str] = set()
     grammar_stats = GrammarStats(generic_rules)
-
 
     def one_random_sample(start: str, depth = 0) -> Tuple[str, Set[GenericRule]]:
         """
@@ -333,12 +385,13 @@ def sample_random_nobound(start: str, generic_rules: Set[GenericRule]) -> Set[st
     return sample_random_bound(start, generic_rules, INFINITY)
 
 
+def print_stats(samples: Set[str], name: str):
+    num_samples = len(samples)
+    avg_len = sum([len(sample) for sample in samples])/num_samples
+    max_len = max([len(sample) for sample in samples])
+    print(f"{name}: {num_samples} samples of mean len {avg_len}, max len {max_len}")
+
 def sample_grammar(grammar_contents: str):
-    def print_stats(samples: Set[str], name: str):
-        num_samples = len(samples)
-        avg_len = sum([len(sample) for sample in samples])/num_samples
-        max_len = max([len(sample) for sample in samples])
-        print(f"{name}: {num_samples} samples of mean len {avg_len}, max len {max_len}")
 
     generic_rules = GenericRuleCreator(grammar_contents).get_rules()
     pure_random_samples = sample_random_nobound('start', generic_rules)
@@ -348,10 +401,113 @@ def sample_grammar(grammar_contents: str):
 
     minimal_samples = sample_minimal('start', generic_rules)
     print_stats(minimal_samples, "minimal")
-    print(minimal_samples)
+    # for sample in minimal_samples:
+    #     print("=====")
+    #     print(sample)
 
+def main(folder_root, grammar_contents_name):
+    import os
+    grammar_contents = ''
+    plain_name = os.path.basename(os.path.splitext(grammar_contents_name)[0])
+    plain_name = plain_name.replace("-", "_")
+
+    results_folder = os.path.join(folder_root, plain_name)
+
+    try:
+        os.mkdir(results_folder)
+    except OSError as e:
+        print(e)
+        print(f"[!!!] Couldn't create {results_folder}. Underlying error above.")
+        exit(1)
+
+    try:
+        grammar_contents = open(grammar_contents_name).read()
+    except IOError as e:
+        print(e)
+        print(f"[!!!] Couldn't open {grammar_contents_name}. Underlying error above.")
+        exit(1)
+
+    generic_rules = GenericRuleCreator(grammar_contents).get_rules()
+
+    parse_program_contents= f"""#!/usr/bin/python3
+import sys
+from lark import Lark
+
+target_grammar = \"\"\"{grammar_contents}\"\"\"
+
+def main():
+    if len(sys.argv) != 2:
+        print("Usage: {sys.argv[0]} <input-file>")
+        exit(1)
+
+    in_file = sys.argv[1]
+    parser = Lark(target_grammar)
+    v = parser.parse(open(in_file).read().rstrip())
+    exit(0)
+
+if __name__ == '__main__':
+    main()
+
+    """
+    try:
+        parse_program_file = open(os.path.join(results_folder, f"parse_{plain_name}.py"), "w")
+        parse_program_file.write(parse_program_contents)
+        parse_program_file.close()
+    except EnvironmentError as e:
+        print(e)
+        print(f"[!!!] Couldn't write the parser to {os.path.join(results_folder, 'parse' + plain_name + '.py')}. "
+              f"Underlying error above.")
+        exit(1)
+
+    guide_examples_folder = os.path.join(results_folder, "guides")
+    try:
+        os.mkdir(guide_examples_folder)
+    except OSError as e:
+        print(e)
+        print(f"[!!!] Couldn't create {guide_examples_folder}. Underlying error above.")
+        exit(1)
+
+    minimal_samples = sample_minimal('start', generic_rules)
+    print_stats(minimal_samples, "Guides")
+    for i, minimal_sample in enumerate(minimal_samples):
+        sample_name = os.path.join(guide_examples_folder, f"guide-{i}.ex")
+        try:
+            sample_file = open(sample_name, "w")
+            sample_file.write(minimal_sample)
+            sample_file.close()
+        except EnvironmentError as e:
+            print(e)
+            print(f"[!!!] Couldn't write guide example to {sample_name}. Underlying error above.")
+            exit(1)
+
+    test_set_folder = os.path.join(results_folder, "test_set")
+    try:
+        os.mkdir(test_set_folder)
+    except OSError as e:
+        print(e)
+        print(f"[!!!] Couldn't create {test_set_folder}. Underlying error above.")
+        exit(1)
+
+    test_samples = sample_n_random('start', generic_rules, 100)
+    print_stats(test_samples, "Test set")
+
+    for i, test_sample in enumerate(minimal_samples):
+        sample_name = os.path.join(test_set_folder, f"test-{i}.ex")
+        try:
+            sample_file = open(sample_name, "w")
+            sample_file.write(test_sample)
+            sample_file.close()
+        except EnvironmentError as e:
+            print(e)
+            print(f"[!!!] Couldn't write guide example to {sample_name}. Underlying error above.")
+            exit(1)
 
 
 if __name__ == "__main__":
-    grammar_contents = open(sys.argv[1]).read()
-    examples = sample_grammar(grammar_contents)
+    if len(sys.argv) == 3:
+        folder_root = sys.argv[1]
+        grammar_contents_name = sys.argv[2]
+        main(folder_root, grammar_contents_name)
+    else:
+        grammar_contents = open(sys.argv[1]).read()
+        examples = sample_grammar(grammar_contents)
