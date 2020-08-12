@@ -12,25 +12,24 @@
 // If you find any issues please email me so I can correct it.
 
 start: file
-file: record (NEWLINE record)* EOF
-
+file: record (newline record)*
 
 record: (quoted_field | unquoted_field) (COMMA (quoted_field | unquoted_field))*
 
-quoted_field: DQUOTE ( CHAR | COMMA | DQUOTE DQUOTE | NEWLINE)* DQUOTE
+quoted_field: DQUOTE ( char | COMMA | DQUOTE DQUOTE | newline)* DQUOTE
 
-unquoted_field: CHAR*
+unquoted_field: char*
 
-CHAR: '\u0000' .. '\u0009'
-    | '\u000b' .. '\u000c'
-    | '\u000e' .. '\u0021'
-    | '\u0023' .. '\u002b'
-    | '\u002d' .. '\uffff'
+char: "\u0000" .. "\u0009"
+    | "\u000b" .. "\u000c"
+    | "\u000e" .. "\u0021"
+    | "\u0023" .. "\u002b"
+    | "\u002d" .. "\uffff"
 
-COMMA: '\u002c'
+COMMA: "\u002c"
 
-DQUOTE: '\u0022'
+DQUOTE: "\u0022"
 
-NEWLINE: '\u000d'? '\u000a'    
-    | '\u000d'
+newline: "\u000d"? "\u000a"
+    | "\u000d"
 
