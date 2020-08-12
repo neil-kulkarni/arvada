@@ -35,12 +35,16 @@ class GenericRule:
         return hash((self.start, tuple(self.expansion), self.is_terminal))
 
 class GrammarStats:
-
-    def __init__(self, generic_rules: List[GenericRule]):
+    def __init__(self, generic_rules: Set[GenericRule]):
         self.all_rules = get_rule_map(generic_rules)
+        self.derivable_nts = {nt: set() for nt in self.all_rules}
+        self.nt_depths = {nt: INFINITY for nt in self.all_rules}
         self.calculate_min_expansion_depths()
+        self.calculate_derivable_nts()
 
     def calculate_min_expansion_depth(self, nt: str):
+        if nt == 'expr':
+            pass
         rules = self.all_rules[nt]
         min_depth = INFINITY
         for rule in rules:
@@ -49,7 +53,7 @@ class GrammarStats:
             else:
                 expansion_depths = [self.nt_depths[elem] for elem in rule.expansion]
                 if all([depth != INFINITY for depth in expansion_depths]):
-                    min_depth = min(min_depth, min(expansion_depths) + 1)
+                    min_depth = min(min_depth, max(expansion_depths) + 1)
         if self.nt_depths[nt] > min_depth:
             self.nt_depths[nt] = min_depth
             return True
@@ -57,7 +61,6 @@ class GrammarStats:
             return False
 
     def calculate_min_expansion_depths(self):
-        self.nt_depths = {nt: INFINITY for nt in self.all_rules}
         updated = True
         while updated:
             updated = False
@@ -65,6 +68,32 @@ class GrammarStats:
                 nt_updated = self.calculate_min_expansion_depth(nt)
                 if nt_updated:
                     updated = True
+
+    def calculate_derivable_nts_single(self, nt):
+        derivable_nts = set()
+        for rule in self.all_rules[nt]:
+            if not rule.is_terminal:
+                for elem in rule.expansion:
+                    if elem != nt:
+                        derivable_nts.add(elem)
+                    derivable_nts.update(self.derivable_nts[elem])
+        if derivable_nts != self.derivable_nts[nt]:
+            self.derivable_nts[nt] = derivable_nts
+            return True
+        else:
+            return False
+
+    def calculate_derivable_nts(self):
+        updated = True
+        while updated:
+            updated = False
+            for nt in self.all_rules:
+                nt_updated = self.calculate_derivable_nts_single(nt)
+                if nt_updated:
+                    updated = True
+        # Fixup to prevent infinite recursions
+        for nt, derivables in self.derivable_nts.items():
+            derivables.discard(nt)
 
 
     def get_min_rule_depth(self, rule: GenericRule):
@@ -76,7 +105,8 @@ class GrammarStats:
     def get_min_nt_depth(self, nt: str):
         return self.nt_depths[nt]
 
-
+    def get_derivable_nts(self, nt:str) -> Set[str]:
+        return self.derivable_nts[nt]
 
 def get_rule_map(rules: Iterable[GenericRule]) -> Dict[str, List[GenericRule]]:
     generic_rule_map = defaultdict(list)
@@ -141,7 +171,101 @@ def sample_minimal(start: str, generic_rules: Set[GenericRule]) -> Set[str]:
     a sample set of inputs that cover every rule in `generic_rules`. Try to minimize
     the size of each individual input.
     """
-    pass
+    generic_rule_map = get_rule_map(generic_rules)
+    sampled_rules: Set[GenericRule] = set()
+    grammar_stats = GrammarStats(generic_rules)
+
+    samples: Set[str] = set()
+
+    def some_derivable_not_expanded_nt(nt: str):
+        return not all([is_fully_expanded(derivable) for derivable in grammar_stats.get_derivable_nts(nt)])
+
+    def some_derivable_not_expanded(rule: GenericRule):
+        derivables = set(rule.expansion)
+        for nt in rule.expansion:
+            derivables.update(grammar_stats.get_derivable_nts(nt))
+        return not all([is_fully_expanded(derivable) for derivable in derivables])
+
+    def is_fully_expanded(nt: str):
+        for rule in generic_rule_map[nt]:
+            if rule not in sampled_rules:
+                return False
+        return True
+
+    def all_fully_expanded():
+        return all([is_fully_expanded(nt) for nt in generic_rule_map])
+
+    def sample_smallest(start: str) -> Tuple[str, Set[GenericRule]]:
+        minimal_expansion_depth = min([grammar_stats.get_min_rule_depth(rule) for rule in generic_rule_map[start]])
+        minimal_expansions = [rule for rule in generic_rule_map[start]
+                          if grammar_stats.get_min_rule_depth(rule) == minimal_expansion_depth]
+
+        chosen_expansion = random.choice(minimal_expansions)
+        if chosen_expansion.is_terminal:
+            return chosen_expansion.expansion[0], {chosen_expansion}
+        else:
+            sampled_str = ''
+            rules_samples = {chosen_expansion}
+            for elem in chosen_expansion.expansion:
+                elem_str, elem_rules = sample_smallest(elem)
+                sampled_str += elem_str
+                rules_samples.update(elem_rules)
+            return sampled_str, rules_samples
+
+    def sample_next(start: str) -> Tuple[str, Set[GenericRule]]:
+        unexplored = [rule for rule in generic_rule_map[start] if rule not in sampled_rules]
+        if len(unexplored) > 0:
+            chosen_expansion = random.choice(unexplored)
+            if chosen_expansion.is_terminal:
+                return chosen_expansion.expansion[0], {chosen_expansion}
+            else:
+                sampled_str = ''
+                rules_samples = {chosen_expansion}
+                for elem in chosen_expansion.expansion:
+                    elem_str, elem_rules = sample_smallest(elem)
+                    sampled_str += elem_str
+                    rules_samples.update(elem_rules)
+                return sampled_str, rules_samples
+
+        has_unexplored_children = [rule for rule in generic_rule_map[start] if some_derivable_not_expanded(rule)]
+        if len(has_unexplored_children) > 0:
+            chosen_expansion = random.choice(has_unexplored_children)
+            # Prioritize elements
+            some_nt_not_fully_expanded = any([not is_fully_expanded(elem) for elem in chosen_expansion.expansion])
+            if some_nt_not_fully_expanded:
+                to_expand = lambda x: not is_fully_expanded(x)
+            else:
+                to_expand = some_derivable_not_expanded_nt
+
+            sampled_str = ''
+            rules_samples = {chosen_expansion}
+
+            # this expansion should already have been sampled, else we would have explored it earlier
+            assert(chosen_expansion in sampled_rules and not chosen_expansion.is_terminal)
+            expanded_one = False
+            for elem in chosen_expansion.expansion:
+                if not expanded_one and to_expand(elem):
+                    elem_str, elem_rules = sample_next(elem)
+                    expanded_one = True
+                else:
+                    elem_str, elem_rules = sample_smallest(elem)
+                sampled_str += elem_str
+                rules_samples.update(elem_rules)
+            return sampled_str, rules_samples
+        else:
+            return sample_smallest(start)
+
+    count = 0
+    while not all_fully_expanded():
+        sample, rules_expanded = sample_next('start')
+        count += 1
+        if len(sampled_rules.union(rules_expanded)) > len(sampled_rules):
+            samples.add(sample)
+            sampled_rules.update(rules_expanded)
+        else:
+            print(sample)
+            raise NotImplementedError("Every sample_next should add a new rule...")
+    return samples
 
 
 def sample_random_bound(start: str, generic_rules: Set[GenericRule], bound=2) -> Set[str]:
@@ -154,6 +278,7 @@ def sample_random_bound(start: str, generic_rules: Set[GenericRule], bound=2) ->
     sampled_rules: Set[GenericRule] = set()
     samples: Set[str] = set()
     grammar_stats = GrammarStats(generic_rules)
+
 
     def one_random_sample(start: str, depth = 0) -> Tuple[str, Set[GenericRule]]:
         """
@@ -218,8 +343,12 @@ def sample_grammar(grammar_contents: str):
     generic_rules = GenericRuleCreator(grammar_contents).get_rules()
     pure_random_samples = sample_random_nobound('start', generic_rules)
     print_stats(pure_random_samples, "random_nobound")
-    bounded_random_samples = sample_random_bound('start', generic_rules)
-    print_stats(bounded_random_samples, "random_bound")
+    #bounded_random_samples = sample_random_bound('start', generic_rules)
+   # print_stats(bounded_random_samples, "random_bound")
+
+    minimal_samples = sample_minimal('start', generic_rules)
+    print_stats(minimal_samples, "minimal")
+    print(minimal_samples)
 
 
 
