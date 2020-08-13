@@ -47,8 +47,7 @@ def build_start_grammar(oracle, leaves):
     grammar = build_grammar(trees)
     print('Coalescing nonterminals...'.ljust(50), end='\r')
     grammar, new_trees, coalesce_caused = coalesce(oracle, trees, grammar)
-    #grammar, new_trees, partial_coalesces = coalesce_partial(oracle, new_trees, grammar)
-    print(f"pre-min: {grammar.pretty_print()}")
+    grammar, new_trees, partial_coalesces = coalesce_partial(oracle, new_trees, grammar)
     print('Minimizing initial grammar...'.ljust(50), end='\r')
     grammar = minimize(grammar)
     return grammar
@@ -290,7 +289,7 @@ def build_trees(oracle, leaves):
         set of trees corresponding to the coalescing.
         Does not mutate LAYERS in this process.
         """
-        # Convert LAYERS into a grammar and generator
+        # Convert LAYERS into a grammar
         grammar = build_grammar(trees)
 
         grammar, new_trees, coalesce_caused = coalesce(oracle, trees, grammar, new_bubble)
@@ -300,7 +299,7 @@ def build_trees(oracle, leaves):
                 print("\n(partial)")
                 coalesce_caused = True
 
-        grammar = minimize(grammar)
+       # grammar = minimize(grammar)
         new_size = grammar.size()
         if coalesce_caused:
             return 1, new_size, new_trees
@@ -325,13 +324,14 @@ def build_trees(oracle, leaves):
             if new_score > 0:
                 print(f"Successful grouping (coalesce): {grouping}")
                 best_trees = new_trees
+                best_size = min(best_size, size)
                 updated = True
                 break
             elif size < best_size:
-                print(f"Successful grouping (size): {grouping}")
+                print(f"Successful grouping (size, {best_size} vs. {size}): {grouping}")
                 best_trees = new_trees
-                updated = True
                 best_size = size
+                updated = True
                 break
         layers, count = best_trees, count + 1
 
@@ -520,42 +520,41 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
                 for idx in range(len(body)):
                     if body[idx] == full_replacement_nt:
                         body[idx] = new_nt
+        # Now fixup rules to remove any duplicate productions that may have been added during replacement.
+        for rule in grammar.rules.values():
+            unique_bodies = []
+            for body in rule.bodies:
+                if body not in unique_bodies:
+                    unique_bodies.append(body)
+            rule.bodies = unique_bodies
 
-    def updated_tree(tree: ParseNode, partial_replacement_locs: List[Tuple[Tuple[str, List[str]], int]],
-                     full_replacement_nt: str, new_nt: str, depth=0):
+    def updated_tree(tree: ParseNode, partial_replacement_locs: Dict[Tuple[str, Tuple[str]], List[int]],
+                     full_replacement_nt: str, new_nt: str):
         """
         Returns a copy of `tree` s.t. the locations in `partial_replacement_locs` are replaced by `new_nt`, and all
         occurrences of `full_relacement_nt` are replaced by `new_nt`.
         """
-        if depth > 100:
-            raise RecursionError()
         new_tree = tree.copy()
         if new_tree.is_terminal:
             return new_tree
-        for (rule_start, body), posn in partial_replacement_locs:
-            try:
-                new_tree.children = [updated_tree(c, partial_replacement_locs, full_replacement_nt, new_nt, depth + 1)
-                                     for c in new_tree.children]
-                if new_tree.payload == rule_start:
-                    my_body = [child.payload for child in new_tree.children]
-                    if body == my_body:
-                        prev_child = new_tree.children[posn]
-                        new_tree.children[posn] = ParseNode(new_nt, False, [prev_child])
-                if new_tree.payload == full_replacement_nt:
-                    new_tree.payload = new_nt
-            except RecursionError as e:
-                if depth > 0:
-                    raise e
-                else:
-                    print(f"Err: infinite recursion for tree {tree}\n partial locs {partial_replacement_locs}\n "
-                          "full_replaced {full_replacment_nt}\n new_nt {new_nt}")
-                    exit(1)
-
+        new_tree.children = [updated_tree(c, partial_replacement_locs, full_replacement_nt, new_nt)
+                             for c in new_tree.children]
+        my_body = tuple([child.payload for child in new_tree.children])
+        if (new_tree.payload, my_body) in partial_replacement_locs:
+            posns = partial_replacement_locs[(new_tree.payload, my_body)]
+            for posn in posns:
+                prev_child = new_tree.children[posn]
+                prev_child.payload = new_nt
+        if new_tree.payload == full_replacement_nt:
+            new_tree.payload = new_nt
         return new_tree
 
-    def updated_trees(trees: List[ParseNode], rules_to_replace: List[Tuple[Tuple[str, List[str]], int]],
+    def updated_trees(trees: List[ParseNode], rules_to_replace: Dict[Tuple[str, Tuple[str]], List[int]],
                       replacer_orig: str, replacer: str):
-        return [updated_tree(tree, rules_to_replace, replacer_orig, replacer) for tree in trees]
+        rest = []
+        for tree in trees:
+            rest.append(updated_tree(tree, rules_to_replace, replacer_orig, replacer))
+        return rest
 
     #################### END HELPERS ########################
 
@@ -590,28 +589,28 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
     # If any replacements are found, update the grammar and trees accordingly.
     for nt_to_fully_replace, replacement in replacements.items():
         nts_to_partially_replace, replacement_positions = replacement
+
+        # Copy the original positions because right now they're actually the bodies in the grammar, and
+        # in the trees we'll want it to be different
+        tree_replacement_positions : Dict[Tuple[str, Tuple[str]], List[int]] = defaultdict(list)
+        for rule, posn in replacement_positions:
+            tup_rule = (rule[0], tuple(rule[1]))
+            tree_replacement_positions[tup_rule].append(posn)
         print(f"we found that {nts_to_partially_replace} could replace {nt_to_fully_replace} everywhere, "
               f"and {nt_to_fully_replace} could replace {nts_to_partially_replace} at : {replacement_positions}")
-        new_nt = allocate_tid()
+        if nt_to_fully_replace == START:
+            new_nt = START
+        else:
+            new_nt = allocate_tid()
         alt_rule = Rule(new_nt)
         update_grammar(grammar, replacement_positions, nt_to_fully_replace, new_nt)
-        alt_rule.add_body([nt_to_fully_replace])
-        for nt_to_partially_replace in partially_replaceable:
-            alt_rule.add_body([nt_to_partially_replace])
+        alt_rule_bodies = grammar.rules[nt_to_fully_replace].bodies
+        for nt_to_partially_replace in nts_to_partially_replace:
+            alt_rule_bodies.extend(grammar.rules[nt_to_partially_replace].bodies)
+        grammar.rules.pop(nt_to_fully_replace)
+        alt_rule.bodies = alt_rule_bodies
         grammar.add_rule(alt_rule)
-        if nt_to_fully_replace == START or START in nts_to_partially_replace:  # haven't thought about this yet
-            assert False
-        new_trees = updated_trees(new_trees, replacement_positions, nt_to_fully_replace, new_nt)
-
-    if coalesce_target is not None and coalesce_target[1] == 't9034':
-        print("Original trees:")
-        for tree in trees:
-            print(tree)
-            print('----')
-        print("New trees:")
-        for tree in new_trees:
-            print(tree)
-            print('----')
+        new_trees = updated_trees(new_trees, tree_replacement_positions, nt_to_fully_replace, new_nt)
 
     return grammar, new_trees, replacements
 
