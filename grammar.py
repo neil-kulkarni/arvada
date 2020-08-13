@@ -20,14 +20,20 @@ class Grammar():
 
         # Define cacheable values and their valid bits
         self.cached_str = ""
-        self.cached_str_valid = False
         self.cached_parser = None
-        self.cached_parser_valid = False
+        self.str_cache_hash = self._rule_hash()
+        self.parser_cache_hash = self._rule_hash()
+
+    def _rule_hash(self):
+        return hash(tuple([(start, rule._body_hash()) for start, rule in self.rules.items()]))
+
+    def str_cache_valid(self):
+        return self.str_cache_hash == self._rule_hash()
+
+    def parser_cache_valid(self):
+        return self.parser_cache_hash == self._rule_hash()
 
     def add_rule(self, rule):
-        self.cached_str_valid = False
-        self.cached_parser_valid = False
-
         if rule.start in self.rules:
             saved_rule = self.rules[rule.start]
             for rule_body in rule.bodies:
@@ -35,12 +41,14 @@ class Grammar():
         else:
             self.rules[rule.start] = rule
 
+        self.cache_hash = self._rule_hash()
+
     def parser(self):
-        if self.cached_parser_valid:
+        if self.parser_cache_valid():
             return self.cached_parser
 
         self.cached_parser = Lark(str(self).replace('\u03B5', ''))
-        self.cached_parser_valid = True
+        self.parser_cache_hash = self._rule_hash()
         return self.cached_parser
 
     def sample_negatives(self, n, terminals, max_size):
@@ -117,11 +125,11 @@ class Grammar():
         return "".join(expanded_body)
 
     def __str__(self):
-        if self.cached_str_valid:
+        if self.str_cache_valid():
             return self.cached_str
 
         self.cached_str = '\n'.join([str(rule) for rule in self.rules.values()])
-        self.cached_str_valid = True
+        self.str_cache_hash = self._rule_hash()
         return self.cached_str
 
     def pretty_print(self):
@@ -151,7 +159,7 @@ class Rule():
         self.start = start
         self.bodies = []
         self.cached_str = ""
-        self.cache_hash = self._body_hash()
+        self.cache_hash = 0
 
     def add_body(self, body):
         self.cache_valid = False
@@ -180,7 +188,7 @@ class Rule():
         return ' '.join([b if len(b) > 0 else '\u03B5' for b in body])
 
     def size(self):
-        return sum([len(body) for body in self.bodies])
+        return 1 + sum([len(body) for body in self.bodies])
 
     def pretty_print(self):
 
