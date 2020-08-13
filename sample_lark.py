@@ -491,7 +491,7 @@ if __name__ == '__main__':
     test_samples = sample_n_random('start', generic_rules, 100)
     print_stats(test_samples, "Test set")
 
-    for i, test_sample in enumerate(minimal_samples):
+    for i, test_sample in enumerate(test_samples):
         sample_name = os.path.join(test_set_folder, f"test-{i}.ex")
         try:
             sample_file = open(sample_name, "w")

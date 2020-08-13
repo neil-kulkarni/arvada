@@ -81,7 +81,10 @@ class Grammar():
         while len(samples) < n and attempts < 10*n:
             attempts += 1
             try:
-                samples.add(self.generate_positive_example(max_depth))
+                sample = self.generate_positive_example(max_depth)
+                if len(sample) > 300:
+                    continue
+                samples.add(sample)
             except RecursionError:
                 continue
         return samples

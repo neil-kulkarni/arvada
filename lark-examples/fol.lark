@@ -1,0 +1,42 @@
+//
+
+start: formula
+
+formula	:	((FORALL | EXISTS) variable)? disjunction 
+
+disjunction:	conjunction (OR conjunction)* 
+
+conjunction:	negation (AND negation)* 
+
+negation :	NOT? (predicate | LPAREN formula RPAREN) 
+
+predicate :	preposition predicateTuple "->" (PREDICATE preposition predicateTuple)
+	| 	preposition 
+
+predicateTuple:	LPAREN term ("," term)* RPAREN
+
+term:	function | variable 
+
+function:	constant functionTuple -> ^(FUNCTION constant functionTuple)
+	|	constant;
+
+functionTuple
+	:	LPAREN! (constant | variable) (','! (constant | variable) )* RPAREN!;
+
+LPAREN : '(' ;
+RPAREN :  ')' ;
+AND :  '&' ;
+OR :  '|' ;
+NOT :  '!' ;
+FORALL :  'Forall' ;
+EXISTS :  'Exists' ;
+
+variable: '?' (('a'..'z') | ('0'..'9')) character* ;
+
+constant: (('a'..'z') | ('0'..'9')) character* ;
+
+preposition: ('A'..'Z') character* ;
+
+character: ('0'..'9' | 'a'..'z' | 'A'..'Z' | '_') ;
+
+ws : (' ' | '\t' | '\r' | '\n')+ 

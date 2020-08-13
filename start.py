@@ -47,7 +47,8 @@ def build_start_grammar(oracle, leaves):
     grammar = build_grammar(trees)
     print('Coalescing nonterminals...'.ljust(50), end='\r')
     grammar, new_trees, coalesce_caused = coalesce(oracle, trees, grammar)
-    grammar, new_trees, partial_coalesces = coalesce_partial(oracle, new_trees, grammar)
+    #grammar, new_trees, partial_coalesces = coalesce_partial(oracle, new_trees, grammar)
+    print(f"pre-min: {grammar.pretty_print()}")
     print('Minimizing initial grammar...'.ljust(50), end='\r')
     grammar = minimize(grammar)
     return grammar
@@ -296,6 +297,7 @@ def build_trees(oracle, leaves):
         if not coalesce_caused:
             grammar, new_trees, partial_coalesces = coalesce_partial(oracle, trees, grammar, new_bubble)
             if len(partial_coalesces) > 0:
+                print("\n(partial)")
                 coalesce_caused = True
 
         grammar = minimize(grammar)
@@ -308,7 +310,7 @@ def build_trees(oracle, leaves):
     # Run the character class algorithm to create the first layer of tree
     best_trees, classes = derive_classes(oracle, leaves)
     print("Scoring...")
-    best_score, best_size, _ = score(best_trees)
+    best_score, best_size, best_trees = score(best_trees)
     updated = True
     count = 1
 
@@ -319,14 +321,14 @@ def build_trees(oracle, leaves):
         for i, grouping in enumerate(all_groupings):
             print(('Bubbling iteration (%d, %d, %d)...' % (count, i + 1, nlg)).ljust(50), end='\r')
             new_trees = apply(grouping, best_trees)
-            new_score, size, _ = score(new_trees, grouping[1])
+            new_score, size, new_trees = score(new_trees, grouping[1])
             if new_score > 0:
-                print(f"Successful grouping: {grouping}")
+                print(f"Successful grouping (coalesce): {grouping}")
                 best_trees = new_trees
                 updated = True
                 break
             elif size < best_size:
-                print(f"Successful grouping: {grouping}")
+                print(f"Successful grouping (size): {grouping}")
                 best_trees = new_trees
                 updated = True
                 best_size = size
@@ -601,6 +603,16 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
             assert False
         new_trees = updated_trees(new_trees, replacement_positions, nt_to_fully_replace, new_nt)
 
+    if coalesce_target is not None and coalesce_target[1] == 't9034':
+        print("Original trees:")
+        for tree in trees:
+            print(tree)
+            print('----')
+        print("New trees:")
+        for tree in new_trees:
+            print(tree)
+            print('----')
+
     return grammar, new_trees, replacements
 
 
@@ -713,6 +725,8 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
     coalesce_caused = False
     for pair in pairs:
         first, second = pair
+     #   first_set = uf.followers(uf.find(first))
+      #  second_set = uf.followers(uf.find(second))
         # If the nonterminals can replace each other in every context, they
         # must belong to the same character class
         if not uf.is_connected(first, second) and replaces(first, second) and replaces(second, first):

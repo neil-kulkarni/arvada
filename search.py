@@ -184,7 +184,7 @@ if __name__ == '__main__':
     elif sys.argv[1] == "internal":
         main(sys.argv[2], sys.argv[3])
     elif sys.argv[1] == "external":
-        main_external(sys.argv[2], sys.argv[3])
+        main_external(sys.argv[2], sys.argv[3], True)
     else:
         print(f'Usage: python3 {sys.argv[0]} <mode> <input_file> <log_file>')
         print('where mode is one of {external, internal}')
