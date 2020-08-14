@@ -7,6 +7,7 @@ class ExternalOracle:
     def __init__(self, command):
         self.command = command
         self.cache_set = {}
+        self.parse_calls = 0
 
     def _parse_internal(self, string):
         FNULL = open(os.devnull, 'w')
@@ -18,6 +19,7 @@ class ExternalOracle:
         subprocess.run([self.command, f_name], stdout=FNULL, stderr=FNULL, check=True)
 
     def parse(self, string):
+        self.parse_calls += 1
         if string in self.cache_set:
             if self.cache_set[string]:
                 return True
@@ -36,8 +38,10 @@ class CachingOracle:
     def __init__(self, oracle: Lark):
         self.oracle = oracle
         self.cache_set = {}
+        self.parse_calls = 0
 
     def parse(self, string):
+        self.parse_calls += 1
         if string in self.cache_set:
             if self.cache_set[string]:
                 return True

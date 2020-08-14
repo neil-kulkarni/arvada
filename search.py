@@ -94,6 +94,8 @@ def main_external(external_folder, log_file, fast = False):
         print(f'Precision: {precision_num/len(precision_set)}, Recall: {recall_num/len(recall_set)}')
         print(f'Time spent building grammar: {build_time}s', file = f)
         print(f'Time spent building + scoring grammar: {time.time() - start_time}s', file = f)
+        print(f'Parse calls: {oracle.parse_calls}')
+        print(f'Parse calls: {oracle.parse_calls}', file = f)
 
 def main(file_name, log_file):
     start_time = time.time() # To compute elapsed time
