@@ -183,6 +183,8 @@ if __name__ == '__main__':
     if len(sys.argv) != 4 or not os.path.exists(sys.argv[2]) :
         print(f'Usage: python3 {sys.argv[0]} <mode> <input_file/folder> <log_file>')
         print('where mode is one of {external, internal}')
+        if not os.path.exists(sys.argv[2]):
+            print(f"err: {sys.argv[2]} not found")
     elif sys.argv[1] == "internal":
         main(sys.argv[2], sys.argv[3])
     elif sys.argv[1] == "external":
