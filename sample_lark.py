@@ -35,6 +35,9 @@ class GenericRule:
         return hash((self.start, tuple(self.expansion), self.is_terminal))
 
 class GrammarStats:
+    """
+    Pre-calculates a bunch of statistics about a grammar.
+    """
     def __init__(self, generic_rules: Set[GenericRule]):
         self.all_rules = get_rule_map(generic_rules)
         self.derivable_nts = {nt: set() for nt in self.all_rules}
@@ -133,13 +136,17 @@ class GrammarStats:
                 if nt_updated:
                     updated = True
 
+    ### Public APIs
+
     def get_derivables_and_depths(self, nt):
+        """
+        Returns a map of nonterminals derivable from `nt`, and the number of expansions necessary
+        to get to each nonterminal (its depths)
+        """
         if isinstance(nt, str):
             return {d:v for (nt0, d), v in self.derivation_depths.items() if nt0 == nt}
         elif isinstance(nt, GenericRule):
             rule = nt
-            if rule == ['stmt', 'SPACE', 'SEMICOLON', 'SPACE', 'stmt']:
-                pass
             ret = {}
             for nt in rule.expansion:
                 if nt in self.all_rules:
@@ -153,6 +160,9 @@ class GrammarStats:
             raise NotImplementedError("ayyyyyyeeee")
 
     def get_min_rule_depth(self, rule: GenericRule):
+        """
+        Gets the minimum expansion depth (# rules til termination) for a particular rule
+        """
         if rule.is_terminal:
             return 0
         else:
@@ -161,9 +171,15 @@ class GrammarStats:
             else: return 0
 
     def get_min_nt_depth(self, nt: str):
+        """
+        Gets the minimum expansion depth (# rules til termination) for a particular nonterminal
+        """
         return self.nt_depths[nt]
 
     def get_derivable_nts(self, nt:str) -> Set[str]:
+        """
+        Gets the set of nonterminals derivable from a particular nonterminal `nt`.
+        """
         return self.derivable_nts[nt]
 
 def get_rule_map(rules: Iterable[GenericRule]) -> Dict[str, List[GenericRule]]:
@@ -261,11 +277,27 @@ def sample_minimal(start: str, generic_rules: Set[GenericRule]) -> Set[str]:
     def all_fully_expanded():
         return all([is_fully_expanded(nt) for nt in generic_rule_map])
 
+    def rule_with_min_distance_to_child(child_to_expand: str, rule_list: List[GenericRule]):
+        """
+        Choose a random rule in `rule_list` that has the minimal distance to expand to `child_to_expand`[-.
+        """
+        depth_to_child = [grammar_stats.get_derivables_and_depths(rule)[child_to_expand]
+                          for rule in rule_list
+                          if child_to_expand in grammar_stats.get_derivables_and_depths(rule)]
+        min_expansion_depth = min(depth_to_child)
+        chosen_expansion = random.choice([rule for rule in rule_list if
+                                          child_to_expand in grammar_stats.get_derivables_and_depths(rule)
+                                          and grammar_stats.get_derivables_and_depths(rule)[
+                                              child_to_expand] == min_expansion_depth])
+        return chosen_expansion
+
     def sample_smallest(start: str) -> Tuple[str, Set[GenericRule]]:
+        """
+        Samples the smallest (in terms of depth) possible expansion of `start`
+        """
         minimal_expansion_depth = min([grammar_stats.get_min_rule_depth(rule) for rule in generic_rule_map[start]])
         minimal_expansions = [rule for rule in generic_rule_map[start]
                           if grammar_stats.get_min_rule_depth(rule) == minimal_expansion_depth]
-
         chosen_expansion = random.choice(minimal_expansions)
         if chosen_expansion.is_terminal:
             return chosen_expansion.expansion[0], {chosen_expansion}
@@ -279,9 +311,18 @@ def sample_minimal(start: str, generic_rules: Set[GenericRule]) -> Set[str]:
             return sampled_str, rules_samples
 
     def sample_next(start: str, child_to_expand = None) -> Tuple[str, Set[GenericRule]]:
-        print(start)
+        """
+        Samples the next expansion of `start`, which should exercise one yet-unexercised rule
+        in the grammar. If `child_to_expand` is not null, one of the expansions of `child_to_expand`
+        should be the yet-unexercised rule.
+        """
+
         unexplored = [rule for rule in generic_rule_map[start] if rule not in sampled_rules]
         if len(unexplored) > 0:
+            """
+            First case: there is an expansion of `start` that has not yet been exercise. Choose
+            one to exercise, and then choose all the smallest expansions for any other non-terminals.
+            """
             chosen_expansion = random.choice(unexplored)
             if chosen_expansion.is_terminal:
                 return chosen_expansion.expansion[0], {chosen_expansion}
@@ -296,46 +337,46 @@ def sample_minimal(start: str, generic_rules: Set[GenericRule]) -> Set[str]:
 
         has_unexplored_children = [rule for rule in generic_rule_map[start] if some_derivable_not_expanded(rule)]
         if len(has_unexplored_children) > 0:
+            """
+            Otherwise, if we are not done, then one of our expansions 
+            """
             # get the rules we need to expand
             unexpanded_children = [unex for rule in has_unexplored_children for unex in unexpanded_derivables(rule)]
             # choose one to expand
             if child_to_expand is None:
                 child_to_expand = random.choice(unexpanded_children)
-            # choose the next expansion based on the one with lowest depth to get to it
-            thing = [grammar_stats.get_derivables_and_depths(rule)[child_to_expand]
-                                       for rule in has_unexplored_children
-                                       if child_to_expand in grammar_stats.get_derivables_and_depths(rule)]
-            if len(thing) == 0:
-                pass
-            min_expansion_depth = min(thing)
-            chosen_expansion = random.choice([rule for rule in has_unexplored_children if
-                                              child_to_expand in grammar_stats.get_derivables_and_depths(rule)
-                                              and grammar_stats.get_derivables_and_depths(rule)[child_to_expand] == min_expansion_depth])
-            #chosen_expansion = random.choice(has_unexplored_children)
-            # Prioritize elements
-            some_nt_not_fully_expanded = any([not is_fully_expanded(elem) for elem in chosen_expansion.expansion])
-            if some_nt_not_fully_expanded:
-                to_expand = lambda x: not is_fully_expanded(x)
-            else:
-                to_expand = some_derivable_not_expanded_nt
-
-            sampled_str = ''
-            rules_samples = {chosen_expansion}
-
+            # Choose the next expansion based on the one with lowest depth to get to it
+            chosen_expansion = rule_with_min_distance_to_child(child_to_expand, has_unexplored_children)
             # this expansion should already have been sampled, else we would have explored it earlier
             assert(chosen_expansion in sampled_rules and not chosen_expansion.is_terminal)
-            expanded_one = False
-            for elem in chosen_expansion.expansion:
-                if not expanded_one and to_expand(elem):
+
+            # Now choose the element to expand in that expansion
+            element_depths_to_child = [grammar_stats.get_derivables_and_depths(elem).get(child_to_expand, INFINITY)
+                                       for elem in chosen_expansion.expansion]
+            min_elem_depth_to_child = min(element_depths_to_child)
+            elem_to_expand_idx = random.choice([idx for idx, elem in enumerate(chosen_expansion.expansion)
+                                                if element_depths_to_child[idx] == min_elem_depth_to_child])
+
+            # Now perform the expansion.
+            sampled_str = ''
+            rules_samples = {chosen_expansion}
+            for idx, elem in enumerate(chosen_expansion.expansion):
+                if idx == elem_to_expand_idx:
                     elem_str, elem_rules = sample_next(elem, child_to_expand)
-                    expanded_one = True
                 else:
                     elem_str, elem_rules = sample_smallest(elem)
                 sampled_str += elem_str
                 rules_samples.update(elem_rules)
             return sampled_str, rules_samples
+
         else:
+            """
+            Otherwise we're a totally explored start symbol, so just get the smallest thing.
+            """
             return sample_smallest(start)
+
+
+    #### Main body
 
     count = 0
     while not all_fully_expanded():
