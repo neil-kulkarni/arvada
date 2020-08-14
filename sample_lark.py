@@ -41,6 +41,10 @@ class GrammarStats:
         self.nt_depths = {nt: INFINITY for nt in self.all_rules}
         self.calculate_min_expansion_depths()
         self.calculate_derivable_nts()
+        self.derivation_depths = {(nt, other): INFINITY for nt in self.derivable_nts for other in self.derivable_nts[nt]}
+        for nt in self.derivable_nts:
+            self.derivation_depths[(nt,nt)] = 0
+        self.calculate_nt_depths()
 
     def calculate_min_expansion_depth(self, nt: str):
         if nt == 'expr':
@@ -97,6 +101,56 @@ class GrammarStats:
         for nt, derivables in self.derivable_nts.items():
             derivables.discard(nt)
 
+
+    def calculate_nt_depths_single(self, nt):
+        derivable_nts = self.derivable_nts[nt]
+        depths = {nt: 0}
+        for rule in self.all_rules[nt]:
+            if not rule.is_terminal:
+                for elem in rule.expansion:
+                    if elem != nt:
+                        depths[elem] = 1
+                    elem_depths = self.get_derivables_and_depths(elem)
+                    for deriv, depth in elem_depths.items():
+                        if deriv not in depths:
+                            depths[deriv] = depth + 1
+                        else:
+                            depths[deriv] = min(depth + 1, depths[deriv])
+
+        if any([depths[deriv] < self.derivation_depths[(nt, deriv)] for deriv in depths]): #derivable_nts != self.derivable_nts[nt]:
+            for deriv in depths:
+                self.derivation_depths[(nt, deriv)] = min(depths[deriv], self.derivation_depths[(nt, deriv)])
+            return True
+        else:
+            return False
+
+    def calculate_nt_depths(self):
+        updated = True
+        while updated:
+            updated = False
+            for nt in self.all_rules:
+                nt_updated = self.calculate_nt_depths_single(nt)
+                if nt_updated:
+                    updated = True
+
+    def get_derivables_and_depths(self, nt):
+        if isinstance(nt, str):
+            return {d:v for (nt0, d), v in self.derivation_depths.items() if nt0 == nt}
+        elif isinstance(nt, GenericRule):
+            rule = nt
+            if rule == ['stmt', 'SPACE', 'SEMICOLON', 'SPACE', 'stmt']:
+                pass
+            ret = {}
+            for nt in rule.expansion:
+                if nt in self.all_rules:
+                    for d, v in self.get_derivables_and_depths(nt).items():
+                        if d in ret:
+                            ret[d] = min(ret[d], v+1)
+                        else:
+                            ret[d] = v + 1
+            return ret
+        else:
+            raise NotImplementedError("ayyyyyyeeee")
 
     def get_min_rule_depth(self, rule: GenericRule):
         if rule.is_terminal:
@@ -192,6 +246,12 @@ def sample_minimal(start: str, generic_rules: Set[GenericRule]) -> Set[str]:
             derivables.update(grammar_stats.get_derivable_nts(nt))
         return not all([is_fully_expanded(derivable) for derivable in derivables])
 
+    def unexpanded_derivables(rule:GenericRule):
+        derivables = set(rule.expansion)
+        for nt in rule.expansion:
+            derivables.update(grammar_stats.get_derivable_nts(nt))
+        return [derivable for derivable in derivables if not is_fully_expanded(derivable)]
+
     def is_fully_expanded(nt: str):
         for rule in generic_rule_map[nt]:
             if rule not in sampled_rules:
@@ -218,7 +278,8 @@ def sample_minimal(start: str, generic_rules: Set[GenericRule]) -> Set[str]:
                 rules_samples.update(elem_rules)
             return sampled_str, rules_samples
 
-    def sample_next(start: str) -> Tuple[str, Set[GenericRule]]:
+    def sample_next(start: str, child_to_expand = None) -> Tuple[str, Set[GenericRule]]:
+        print(start)
         unexplored = [rule for rule in generic_rule_map[start] if rule not in sampled_rules]
         if len(unexplored) > 0:
             chosen_expansion = random.choice(unexplored)
@@ -235,7 +296,22 @@ def sample_minimal(start: str, generic_rules: Set[GenericRule]) -> Set[str]:
 
         has_unexplored_children = [rule for rule in generic_rule_map[start] if some_derivable_not_expanded(rule)]
         if len(has_unexplored_children) > 0:
-            chosen_expansion = random.choice(has_unexplored_children)
+            # get the rules we need to expand
+            unexpanded_children = [unex for rule in has_unexplored_children for unex in unexpanded_derivables(rule)]
+            # choose one to expand
+            if child_to_expand is None:
+                child_to_expand = random.choice(unexpanded_children)
+            # choose the next expansion based on the one with lowest depth to get to it
+            thing = [grammar_stats.get_derivables_and_depths(rule)[child_to_expand]
+                                       for rule in has_unexplored_children
+                                       if child_to_expand in grammar_stats.get_derivables_and_depths(rule)]
+            if len(thing) == 0:
+                pass
+            min_expansion_depth = min(thing)
+            chosen_expansion = random.choice([rule for rule in has_unexplored_children if
+                                              child_to_expand in grammar_stats.get_derivables_and_depths(rule)
+                                              and grammar_stats.get_derivables_and_depths(rule)[child_to_expand] == min_expansion_depth])
+            #chosen_expansion = random.choice(has_unexplored_children)
             # Prioritize elements
             some_nt_not_fully_expanded = any([not is_fully_expanded(elem) for elem in chosen_expansion.expansion])
             if some_nt_not_fully_expanded:
@@ -251,7 +327,7 @@ def sample_minimal(start: str, generic_rules: Set[GenericRule]) -> Set[str]:
             expanded_one = False
             for elem in chosen_expansion.expansion:
                 if not expanded_one and to_expand(elem):
-                    elem_str, elem_rules = sample_next(elem)
+                    elem_str, elem_rules = sample_next(elem, child_to_expand)
                     expanded_one = True
                 else:
                     elem_str, elem_rules = sample_smallest(elem)
@@ -401,9 +477,10 @@ def sample_grammar(grammar_contents: str):
 
     minimal_samples = sample_minimal('start', generic_rules)
     print_stats(minimal_samples, "minimal")
-    # for sample in minimal_samples:
-    #     print("=====")
-    #     print(sample)
+
+    for sample in minimal_samples:
+        print("=====")
+        print(sample)
 
 def main(folder_root, grammar_contents_name):
     import os
