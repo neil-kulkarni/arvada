@@ -1,41 +1,56 @@
-
 start: formula
 
-formula	:	((FORALL | EXISTS) ws variable ws)?  disjunction
+formula: formula SPACE bin_connective SPACE formula
+   | NOT formula SPACE bin_connective SPACE formula
+   | NOT formula 
+   | FORALL LPAREN variable RPAREN SPACE formula
+   | EXISTS LPAREN variable RPAREN SPACE formula
+   | pred_constant LPAREN term (separator term)* RPAREN
+   | term SPACE EQUAL SPACE term
 
-disjunction:	conjunction (ws OR ws conjunction)*
+term: ind_constant
+   | variable
+   | func_constant LPAREN term (separator term)* RPAREN
 
-conjunction:	negation (ws AND ws negation)*
+bin_connective: CONJ
+   | DISJ
+   | IMPL
+   | BICOND
+//used in FORALL|EXISTS and following predicates
+variable : "?" character+
 
-negation :	NOT? (predicate | LPAREN formula RPAREN) 
+//predicate constant - np. _isProfesor(?x)   
+pred_constant : "_" character+
 
-predicate :	preposition predicatetuple
-	| 	preposition 
+//individual constant - used in single predicates
+ind_constant: "#" character+
 
-predicatetuple:	LPAREN term ("," ws term)* RPAREN
+//used to create functions, np. .presidentOf(?America) = #Trump
+func_constant: "." character+
 
-term:	function | variable
+LPAREN:"("
 
-function:	constant functiontuple
-	|	constant
+RPAREN:")"
 
-functiontuple:	LPAREN (constant | variable) ("," ws (constant | variable) )* RPAREN
+separator:", "
 
-variable: "?" (("a".."z") | ("0".."9")) character*
+EQUAL:"="
 
-constant: (("a".."z") | ("0".."9")) character*
+NOT:"!"
 
-preposition: ("A".."Z") character*
+FORALL:"Forall"
 
-character: ("0".."9" | "a".."z" | "A".."Z" | "_")
+EXISTS:"Exists"
 
-ws : " "
+character:("0".."9" | "a".."z" | "A".."Z")
 
-LPAREN : "("
-RPAREN :  ")"
-AND :  "&"
-OR :  "|"
-NOT :  "!"
-FORALL :  "Forall"
-EXISTS :  "Exists"
+CONJ:"\\/"
+
+DISJ:"^"
+
+IMPL:"->"
+
+BICOND:"<->"
+SPACE: " "
+
 

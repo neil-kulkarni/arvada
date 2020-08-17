@@ -517,6 +517,10 @@ def sample_grammar(grammar_contents: str):
     #bounded_random_samples = sample_random_bound('start', generic_rules)
    # print_stats(bounded_random_samples, "random_bound")
 
+    for sample in pure_random_samples:
+        print("------")
+        print(sample)
+
     minimal_samples = sample_minimal('start', generic_rules)
     print_stats(minimal_samples, "minimal")
 
@@ -554,6 +558,13 @@ def main(folder_root, grammar_contents_name, antlr_mode):
         print(f"[!!!] Couldn't open {grammar_contents_name}. Underlying error above.")
         exit(1)
 
+    nolr_grammar_lines = []
+    try:
+        nolr_grammar_lines = [line.rstrip() for line in open(grammar_contents_name.replace(".lark", "_nolr.lark")).readlines()]
+        print("Found a version without left recursion, using that to populate antlr parser")
+    except IOError as e:
+        print("Didn't find a version with left recursion removed")
+
     generic_rules = GenericRuleCreator(grammar_contents).get_rules()
 
     parse_program_contents= f"""#!/usr/bin/python3
@@ -583,7 +594,10 @@ if __name__ == '__main__':
         if antlr_mode:
             gram_name = "g_" + plain_name
             os.mkdir(cpp_dir)
-            antlr_contents = antlr_utils.lark_to_antlr(gram_name, grammar_contents_lines)
+            if nolr_grammar_lines:
+                antlr_contents = antlr_utils.lark_to_antlr(gram_name, nolr_grammar_lines)
+            else:
+                antlr_contents = antlr_utils.lark_to_antlr(gram_name, grammar_contents_lines)
             antlr_file_name = os.path.join(cpp_dir, f"{gram_name}.g4")
             antlr_file = open(antlr_file_name, "w")
             antlr_file.write(antlr_contents)

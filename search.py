@@ -19,7 +19,6 @@ def main_external(external_folder, log_file, fast = False):
         if filename.endswith(".ex"):
             full_filename = os.path.join(guide_folder, filename)
             guide_raw = open(full_filename).read()
-            print(f"Guide {filename}:\n{guide_raw}")
             guide = [ParseNode(tok, True, []) for tok in guide_raw]
             guide_examples.append(guide)
 
@@ -188,7 +187,7 @@ if __name__ == '__main__':
     elif sys.argv[1] == "internal":
         main(sys.argv[2], sys.argv[3])
     elif sys.argv[1] == "external":
-        main_external(sys.argv[2], sys.argv[3], False)
+        main_external(sys.argv[2], sys.argv[3], True)
     else:
         print(f'Usage: python3 {sys.argv[0]} <mode> <input_file> <log_file>')
         print('where mode is one of {external, internal}')

@@ -3,6 +3,8 @@ import re
 from lark import Lark
 import random
 
+random.seed(0)
+
 class Grammar():
     """
     Object representing a string-representation of a context-free grammar.

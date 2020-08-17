@@ -19,8 +19,8 @@ def lark_to_antlr(gram_name: str, gram_contents: List[str]) -> str:
     antlr_lines = [f"grammar {gram_name};"]
 
     start_rule = re.compile("^start\s*:.*")
-    other_rule = re.compile("^[a-zA-Z]+\s*:.*")
-    rule_cont = re.compile("^\s*\|.*")
+    other_rule = re.compile("(^[a-zA-Z_]+)\s*:(.*)")
+    rule_cont = re.compile("^\s*\|(.*)")
     blank_line = re.compile("^\s*$")
     comment_line = re.compile("^\s*//.*")
     import_line = re.compile("^\s*%.*")
@@ -29,6 +29,8 @@ def lark_to_antlr(gram_name: str, gram_contents: List[str]) -> str:
     last_rule_line = -1
     last_rule_was_start = False
     last_start_line = -1
+    last_rule_name = ""
+    rename_as_terminal = []
     for line in gram_contents:
         line = line.replace("\"", "'")
         start_m = start_rule.search(line)
@@ -43,6 +45,7 @@ def lark_to_antlr(gram_name: str, gram_contents: List[str]) -> str:
             antlr_lines.append(line)
             last_rule_was_start = True
             last_start_line = idx
+            idx += 1
         elif other_m is not None:
             if last_rule_was_start:
                 antlr_lines[last_start_line] += " EOF;"
@@ -52,27 +55,41 @@ def lark_to_antlr(gram_name: str, gram_contents: List[str]) -> str:
                 pass
             antlr_lines.append(line)
             last_rule_line = idx
+            last_rule_name = other_m.group(1)
+            if "'..'" in other_m.group(2):
+                 rename_as_terminal.append(last_rule_name)
+            idx += 1
         elif cont_m is not None:
             if last_rule_was_start:
                 last_start_line = idx
             else:
                 last_rule_line = idx
             antlr_lines.append(line)
+            if "'..'" in cont_m.group(1):
+                 rename_as_terminal.append(last_rule_name)
+            idx += 1
         elif blank_m is not None:
-            antlr_lines.append(line)
+            pass
         elif comment_m is not None:
             pass
         elif import_m is not None:
             pass
         else:
             raise NotImplementedError(f"I don't know how to process the line: {line}")
-        idx += 1
+
+
+    def replace_terminals(line):
+        replaced = line
+        for term in rename_as_terminal:
+            upper_term = term.upper()
+            line = line.replace(term, upper_term)
+        return line
 
     if last_rule_line == idx -1:
         antlr_lines[last_rule_line] += ";"
     if last_start_line == idx -1:
         antlr_lines[last_start_line] += " EOF;"
-    return '\n'.join(antlr_lines)
+    return '\n'.join([replace_terminals(line) for line in antlr_lines])
 
 
 def cmake_contents(gram_name: str) -> str:
