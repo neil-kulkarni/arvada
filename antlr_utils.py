@@ -11,7 +11,7 @@ def lark_file_to_antlr_test(filename: str):
         print(line)
 
 
-def lark_to_antlr(gram_name: str, gram_contents: List[str]) -> List[str]:
+def lark_to_antlr(gram_name: str, gram_contents: List[str]) -> str:
     """
     Converts the contents of a grammar written for Lark into ANTLR4 format.
     ASSUMES: gram_contents has been stripped of newlines.
@@ -72,7 +72,88 @@ def lark_to_antlr(gram_name: str, gram_contents: List[str]) -> List[str]:
         antlr_lines[last_rule_line] += ";"
     if last_start_line == idx -1:
         antlr_lines[last_start_line] += " EOF;"
+    return '\n'.join(antlr_lines)
 
-    return antlr_lines
 
+def cmake_contents(gram_name: str) -> str:
+    contents = """
+cmake_minimum_required (VERSION 3.17.1)
+project(!!REPLACEME!!)
+
+if(DEFINED ENV{ANTLR_RUNTIME})
+        set(ANTLR_RUNTIME  $ENV{ANTLR_RUNTIME})
+else()
+   message(FATAL_ERROR "Please set ANTLR_RUNTIME to the location of the antlr c++ runtime")
+endif()
+
+add_custom_command(OUTPUT !!REPLACEME!!Lexer.cpp !!REPLACEME!!Parser.cpp
+        COMMAND antlr4 !!REPLACEME!!.g4 -Dlanguage=Cpp -no-listener -no-visitor
+        DEPENDS !!REPLACEME!!.g4)
+
+add_executable(file_parser file_parser.cpp !!REPLACEME!!Lexer.cpp !!REPLACEME!!Parser.cpp)
+target_include_directories(file_parser PUBLIC ${ANTLR_RUNTIME}/runtime/src/)
+target_link_libraries(file_parser ${ANTLR_RUNTIME}/dist/libantlr4-runtime.a)
+"""
+
+    #add_executable(stdin_parser stdin_parser.cpp !!REPLACEME!!Lexer.cpp !!REPLACEME!!Parser.cpp)
+    #target_include_directories(stdin_parser PUBLIC ${ANTLR_RUNTIME}/runtime/src/)
+    #target_link_libraries(stdin_parser ${ANTLR_RUNTIME}/dist/libantlr4-runtime.a)
+
+    contents =contents.replace("!!REPLACEME!!", gram_name)
+    return contents
+
+def parser_contents(gram_name: str, mode :str):
+    parser_common= """
+    #include <strstream>
+#include <string>
+#include "antlr4-runtime.h"
+#include "!!!REPLACEME!!!Lexer.h"
+#include "!!!REPLACEME!!!Parser.h"
+
+class MyParserErrorListener: public antlr4::BaseErrorListener {
+  virtual void syntaxError(
+      antlr4::Recognizer *recognizer,
+      antlr4::Token *offendingSymbol,
+      size_t line,
+      size_t charPositionInLine,
+      const std::string &msg,
+      std::exception_ptr e) override {
+    std::ostrstream s;
+    s << "Line(" << line << ":" << charPositionInLine << ") Error(" << msg << ")";
+    throw std::invalid_argument(s.str());
+  }
+};
+
+int main(int argc, char *argv[]) {
+  !!!INPUT_MODE!!!
+  !!!REPLACEME!!!Lexer lexer(&input);
+  antlr4::CommonTokenStream tokens(&lexer);
+
+  MyParserErrorListener errorListener;
+
+  !!!REPLACEME!!!Parser parser(&tokens);
+  parser.removeErrorListeners();
+  parser.addErrorListener(&errorListener);
+  try {
+    antlr4::tree::ParseTree* tree = parser.start();
+    return 0;
+  } catch (std::invalid_argument &e) {
+    std::cerr << e.what() << std::endl;
+    return 10;
+  }
+}
+    """
+    file_input = """
+      std::ifstream input_file(argv[1]);
+  antlr4::ANTLRInputStream input(input_file);
+    """
+    stdin_input = """
+    antlr4::ANTLRInputStream input(argv[1]);
+    """
+
+    if mode == "stdin":
+        return parser_common.replace("!!!REPLACEME!!!", gram_name).replace("!!!INPUT_MODE!!!", stdin_input)
+    elif mode == "file":
+        return parser_common.replace("!!!REPLACEME!!!", gram_name).replace("!!!INPUT_MODE!!!", file_input)
+    else: raise NotImplementedError(f"Don't know what to do with mode {mode}")
 

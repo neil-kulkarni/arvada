@@ -12,7 +12,7 @@ def main_external(external_folder, log_file, fast = False):
     bench_name = os.path.basename(external_folder)
     guide_folder = os.path.join(external_folder, "guides")
     test_folder = os.path.join(external_folder, "test_set")
-    parser_command = os.path.join(external_folder, f"parse_{bench_name}.py")
+    parser_command = os.path.join(external_folder, f"parse_{bench_name}")
 
     guide_examples = []
     for filename in os.listdir(guide_folder):
@@ -188,7 +188,7 @@ if __name__ == '__main__':
     elif sys.argv[1] == "internal":
         main(sys.argv[2], sys.argv[3])
     elif sys.argv[1] == "external":
-        main_external(sys.argv[2], sys.argv[3], True)
+        main_external(sys.argv[2], sys.argv[3], False)
     else:
         print(f'Usage: python3 {sys.argv[0]} <mode> <input_file> <log_file>')
         print('where mode is one of {external, internal}')

@@ -6,6 +6,7 @@ from lark.grammar import *
 from lark.lexer import TerminalDef
 import re
 import sys
+import antlr_utils
 
 import random
 
@@ -523,9 +524,16 @@ def sample_grammar(grammar_contents: str):
         print("=====")
         print(sample)
 
-def main(folder_root, grammar_contents_name):
+def main(folder_root, grammar_contents_name, antlr_mode):
     import os
+
+    if "ANTLR_RUNTIME" not in os.environ:
+        print("Please set ANTLR_RUNTIME to the location of the antlr runtime")
+        exit(1)
+
+
     grammar_contents = ''
+    grammar_contents_lines = []
     plain_name = os.path.basename(os.path.splitext(grammar_contents_name)[0])
     plain_name = plain_name.replace("-", "_")
 
@@ -540,6 +548,7 @@ def main(folder_root, grammar_contents_name):
 
     try:
         grammar_contents = open(grammar_contents_name).read()
+        grammar_contents_lines = [line.rstrip() for line in open(grammar_contents_name).readlines()]
     except IOError as e:
         print(e)
         print(f"[!!!] Couldn't open {grammar_contents_name}. Underlying error above.")
@@ -567,14 +576,48 @@ if __name__ == '__main__':
     main()
 
     """
+
+    cpp_dir = os.path.join(results_folder, "cpp-build")
+
     try:
-        parse_program_file = open(os.path.join(results_folder, f"parse_{plain_name}.py"), "w")
-        parse_program_file.write(parse_program_contents)
-        parse_program_file.close()
+        if antlr_mode:
+            gram_name = "g_" + plain_name
+            os.mkdir(cpp_dir)
+            antlr_contents = antlr_utils.lark_to_antlr(gram_name, grammar_contents_lines)
+            antlr_file_name = os.path.join(cpp_dir, f"{gram_name}.g4")
+            antlr_file = open(antlr_file_name, "w")
+            antlr_file.write(antlr_contents)
+            antlr_file.close()
+
+            cmake_file_name = os.path.join(cpp_dir, f"CMakeLists.txt")
+            cmake_file = open(cmake_file_name, "w")
+            cmake_file.write(antlr_utils.cmake_contents(gram_name))
+            cmake_file.close()
+
+            parser_file_name = os.path.join(cpp_dir, f"file_parser.cpp")
+            parser_file = open(parser_file_name, "w")
+            parser_file.write(antlr_utils.parser_contents(gram_name, "file"))
+            parser_file.close()
+
+            # make and copy out of the cpp dir
+            import subprocess
+            wd = os.getcwd()
+            os.chdir(cpp_dir)
+            subprocess.run(["cmake", "."], check=True)
+            subprocess.run(["make"], check=True)
+
+            os.chdir(wd)
+            import shutil
+            shutil.copy(os.path.join(cpp_dir, "file_parser"), os.path.join(results_folder, f"parse_{plain_name}"))
+        else:
+            parse_program_file = open(os.path.join(results_folder, f"parse_{plain_name}"), "w")
+            parse_program_file.write(parse_program_contents)
+            parse_program_file.close()
     except EnvironmentError as e:
         print(e)
-        print(f"[!!!] Couldn't write the parser to {os.path.join(results_folder, 'parse' + plain_name + '.py')}. "
-              f"Underlying error above.")
+        print(f"[!!!] Couldn't write + compile the parser.")
+        if wd is not None:
+            os.chdir(wd)
         exit(1)
 
     guide_examples_folder = os.path.join(results_folder, "guides")
@@ -625,7 +668,7 @@ if __name__ == "__main__":
     if len(sys.argv) == 3:
         folder_root = sys.argv[1]
         grammar_contents_name = sys.argv[2]
-        main(folder_root, grammar_contents_name)
+        main(folder_root, grammar_contents_name, True)
     else:
         grammar_contents = open(sys.argv[1]).read()
         examples = sample_grammar(grammar_contents)
