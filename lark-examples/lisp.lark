@@ -1,14 +1,14 @@
-start: s_expression
+start: sexpression
 
-s_expression : atomic_symbol
-               | "(" s_expression empty "." empty s_expression ")"
+sexpression : atomicsymbol
+               | "(" sexpression empty "." empty sexpression ")"
                | list 
    
-list : "(" s_expression (empty s_expression)* ")"
+list : "(" sexpression (empty sexpression)* ")"
 
-atomic_symbol : letter atom_part
+atomicsymbol : letter atompart
 
-atom_part :  | letter atom_part | number atom_part
+atompart :  | letter atompart | number atompart
 
 letter : "a".."z"
 

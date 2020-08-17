@@ -1,7 +1,7 @@
 start: value
 char : "a".."z" | "A".."Z" | "0".."9"
 chars : char | char chars
-string: "\"" chars "\""
+string: QUOTE chars QUOTE
 digits: ("0".."9")+
 number: ("-")? ("1".."9" digits | digits ("." digits)?)
 value: object | array | string | number | "true" | "false" | "null"
@@ -10,3 +10,4 @@ list: value | list  ","  value
 object: "{"  "}" | "{" objlist "}"
 objtuple:  string  ":"  value
 objlist: objtuple | objlist "," objtuple
+QUOTE: "\u0022"

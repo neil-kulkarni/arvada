@@ -4,6 +4,6 @@ space: " "
 machinename: str | str "." machinename
 ws: " " | "\t" | "\n"
 machine: "machine" space machinename ws "login" space str ws "password" space str (ws "account" space str)? 
-default: "default" ws "login" space str ws "password" space str (ws "account" space str)? 
-netrc: machine | machine ws netrc | default
+def: "default" ws "login" space str ws "password" space str (ws "account" space str)?
+netrc: machine | machine ws netrc | def
 start: netrc

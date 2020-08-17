@@ -7,13 +7,13 @@ site : alphanum | site sitechar
 
 domainchar : lower 
 domain : lower | domain domainchar
-
+lower: "a".."z"
 
 login : domain "@" site "." domain
 
 tailchar : alphanum  | "-" | "@" | ":" | "%" | "_" | "+" | "~" | "#" | "&" | "="
-tailseq : e | tailseq tailchar
-tail : e | "/" tailseq | "?" tailseq
+tailseq :  | tailseq tailchar
+tail :  | "/" tailseq | "?" tailseq
 
 
 mailtoaddress :  "m" "a" "i" "l" "t" "o" sep site "." domain tail | "m" "a" "i" "l" "t" "o" sep login tail
@@ -24,3 +24,4 @@ nntpaddress :  "n" "n" "t" "p" sep site "." domain tail
 httpsaddress :  "h" "t" "t" "p" "s" sep site "." domain tail
 httpaddress :   "h" "t" "t" "p"  sep site "." domain tail
 url : httpaddress | httpsaddress | nntpaddress | ftpaddress | newsaddress | gopheraddress | mailtoaddress
+alphanum: "a".."z" | "0".."9"

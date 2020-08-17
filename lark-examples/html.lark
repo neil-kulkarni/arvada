@@ -19,9 +19,9 @@ item: BF_START html BF_END
 |
 | text
 
-ahref : "<a href=\"" text "\">" text "</a>" 
+ahref : "<a href=" QUOTE text QUOTE ">" text "</a>"
 text: (alpha | numeric | whitespace | punctuation)*
-img: "<img" whitespace "src=\"" text "\"" whitespace ("alt=\"" text "\"" whitespace)? "width=\"" text "\"" whitespace ("height=\"" text "\"")? ">"
+img: "<img" whitespace "src="  QUOTE text  QUOTE whitespace ("alt=" QUOTE text  QUOTE whitespace)? "width="  QUOTE text  QUOTE whitespace ("height="  QUOTE text  QUOTE)? ">"
 br: "<br>"
 
 list: OL_START (LI_START item LI_END)+ OL_END
@@ -57,3 +57,4 @@ whitespace: " "
 alpha: "a".."z" | "A".."Z"
 numeric: "0".."9"
 punctuation: "." | "!" | "(" | ")" | "/" | ":" | ";" |"?" 
+QUOTE: "\u0022"

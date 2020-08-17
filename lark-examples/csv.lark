@@ -14,15 +14,15 @@
 start: file
 file: record (newline record)*
 
-record: (quoted_field | unquoted_field) (COMMA (quoted_field | unquoted_field))*
+record: (quotedfield | unquotedfield) (COMMA (quotedfield | unquotedfield))*
 
-quoted_field: DQUOTE ( char | COMMA | DQUOTE DQUOTE | newline)* DQUOTE
+quotedfield: DQUOTE ( char | COMMA | DQUOTE DQUOTE | newline)* DQUOTE
 
-unquoted_field: char*
+unquotedfield: char*
 
-char: "\u0020" .. "\u0021"
-    | "\u0023" .. "\u002b"
-    | "\u002d" .. "\u007e"
+char: "\u0020".."\u0021"
+    | "\u0023".."\u002b"
+    | "\u002d".."\u007e"
 
 COMMA: "\u002c"
 

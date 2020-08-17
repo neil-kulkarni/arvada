@@ -1,9 +1,9 @@
 start: (instruction SPACE)+
 instruction: movement  number
            | "c" SPACE color (SPACE color)?
-           | "fill" SPACE code_block
-           | "repeat" SPACE number SPACE code_block
-code_block: "{" (instruction SPACE)+ "}"
+           | "fill" SPACE codeblock
+           | "repeat" SPACE number SPACE codeblock
+codeblock: "{" (instruction SPACE)+ "}"
 movement: "f"|"b"|"l"|"r"
 color: letter+
 letter: "a".."z" | "A".."Z"
