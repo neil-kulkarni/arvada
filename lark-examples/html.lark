@@ -1,9 +1,9 @@
 start: doc
-doc: "<!DOCTYPE html>" whitespace DOC_START whitespace head? whitespace body whitespace DOC_END whitespace
+doc: "<!DOCTYPE html>"  DOC_START  head?  body  DOC_END
 
 head: HEAD_START html HEAD_END
 body: BODY_START html BODY_END
-html: (item whitespace)*
+html: (item)*
 
 item: BF_START html BF_END
 | IT_START html IT_END
@@ -17,9 +17,10 @@ item: BF_START html BF_END
 | br
 | ahref
 |
+| text
 
 ahref : "<a href=\"" text "\">" text "</a>" 
-text: (ALPHA | NUMERIC | whitespace | punctuation)*
+text: (alpha | numeric | whitespace | punctuation)*
 img: "<img" whitespace "src=\"" text "\"" whitespace ("alt=\"" text "\"" whitespace)? "width=\"" text "\"" whitespace ("height=\"" text "\"")? ">"
 br: "<br>"
 
@@ -52,7 +53,7 @@ H4_START: "<h4>"
 H4_END: "</h4>"
 P_START: "<p>"
 P_END: "</p>"
-whitespace: (" " | "\t" | "\n")*
-ALPHA: "a..z" | "A".."Z"
-NUMERIC: "0".."9"
+whitespace: " "
+alpha: "a".."z" | "A".."Z"
+numeric: "0".."9"
 punctuation: "." | "!" | "(" | ")" | "/" | ":" | ";" |"?" 

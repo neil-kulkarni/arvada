@@ -1,0 +1,26 @@
+start: regex
+
+regex : single | regex single
+       | regex "\\" "(" regex "\\" ")"
+
+genchar : alphanum
+nbchar : genchar | s | t | n | "!" | "\"" | "#" | "$" | "%" | "&" | "'" | "(" | ")" | "*" | "+" | "," | "-" | "." | "/" | ":" | ";" | "<" | "=" | ">" | "?" | "@" | "[" | "]" | "^" | "_" | "`" | "{" | "}" | "~"
+npchar : genchar | s | t | n | "!" | "\"" | "#" | "$" | "%" | "&" | "'" | "*" | "+" | "," | "-" | "." | "/" | ":" | ";" | "<" | "=" | ">" | "?" | "@" | "[" | "\\" | "]" | "^" | "_" | "`" | "~"
+char : nbchar | "\\" npchar
+
+nums :  | nums numall
+tok :  tok char
+    |
+
+single : single tok
+        | single "\\" "{" nums "\\" "}" | single "\\" "{" nums "," nums "\\" "}"
+        | single "[" tok "]" | single "[" "^" tok "]" | single "[" "=" tok "=" "]" | single "[" "." tok "." "]" | single "[" ":" tok ":" "]"
+        |
+
+
+alphanum: "a".."z" | "A".."Z" | "0".."9"
+
+s: " "
+t: "\t"
+n: "\n"
+numall: "0".."9"

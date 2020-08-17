@@ -1,5 +1,5 @@
+start: expr
 expr : num | binop | "(" expr ")"
 binop : expr op expr
 op: "+" | "-" | "/" | "*"
 num : "0".."9"+
-start: expr

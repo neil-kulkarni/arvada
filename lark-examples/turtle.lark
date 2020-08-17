@@ -1,12 +1,12 @@
-start: instruction+
-instruction: MOVEMENT NUMBER            -> movement
-           | "c" COLOR [COLOR]          -> change_color
-           | "fill" code_block          -> fill
-           | "repeat" NUMBER code_block -> repeat
-code_block: "{" instruction+ "}"
-MOVEMENT: "f"|"b"|"l"|"r"
-COLOR: LETTER+
-%import common.LETTER
-%import common.INT -> NUMBER
-%import common.WS
-%ignore WS
+start: (instruction SPACE)+
+instruction: movement  number
+           | "c" SPACE color (SPACE color)?
+           | "fill" SPACE code_block
+           | "repeat" SPACE number SPACE code_block
+code_block: "{" (instruction SPACE)+ "}"
+movement: "f"|"b"|"l"|"r"
+color: letter+
+letter: "a".."z" | "A".."Z"
+number: "0".."9"
+SPACE: " "
+

@@ -1,39 +1,26 @@
-start: uri
+start: url
 
-uri: scheme ":" hierpart ("?" query)? ("#" fragment)?
-scheme: "http" | "https" | "ftp" | "mailto" | "file" | "irc"
+sep : ":" "/" "/" | ":" "/" "/" "w" "w" "w" "."
 
-hierpart: "//" authority pathabempty 
-		| pathabsolute
-		| pathrootless
-		| pathempty
+sitechar : alphanum   | alphanum "-" alphanum
+site : alphanum | site sitechar
+
+domainchar : lower 
+domain : lower | domain domainchar
 
 
-authority: (userinfo "@")? host (":" port)?
+login : domain "@" site "." domain
 
-userinfo: (unreserved | subdelims)*
+tailchar : alphanum  | "-" | "@" | ":" | "%" | "_" | "+" | "~" | "#" | "&" | "="
+tailseq : e | tailseq tailchar
+tail : e | "/" tailseq | "?" tailseq
 
-host: label | host "." label
-label: ALPHA (ldhstr? alnum)?
-ldhstr: letdighyp | letdighyp ldhstr
-letdighyp: ALPHA | DIGIT | "-"
 
-port: DIGIT*
-
-pathabempty: ("/" segment)*
-pathabsolute: "/" (segmentnz ("/" segment)*)?
-pathrootless: segmentnz ("/" segment)*
-pathempty: 
-segment: (unreserved|subdelims)*
-segmentnz: (unreserved|subdelims)+
-
-query: (unreserved|subdelims | "/" | "?")*
-
-fragment: (unreserved|subdelims | "/" | "?")*
-
-unreserved: ALPHA | DIGIT | "-" | "." | "_" | "~"
-subdelims: "!" | "$" | "&" | "'" | "(" | ")" | "*" | "+" | "," | ";" | "="
-
-ALPHA: "a".."z" 
-DIGIT: "0".."9"
-alnum: ALPHA | DIGIT
+mailtoaddress :  "m" "a" "i" "l" "t" "o" sep site "." domain tail | "m" "a" "i" "l" "t" "o" sep login tail
+gopheraddress :  "g" "o" "p" "h" "e" "r" sep site "." domain tail
+newsaddress :  "n" "e" "w" "s" sep site "." domain tail | "n" "e" "w" "s" sep login tail
+ftpaddress :  "f" "t" "p" sep site "." domain tail | "f" "t" "p" sep login tail
+nntpaddress :  "n" "n" "t" "p" sep site "." domain tail
+httpsaddress :  "h" "t" "t" "p" "s" sep site "." domain tail
+httpaddress :   "h" "t" "t" "p"  sep site "." domain tail
+url : httpaddress | httpsaddress | nntpaddress | ftpaddress | newsaddress | gopheraddress | mailtoaddress

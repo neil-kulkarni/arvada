@@ -20,11 +20,9 @@ quoted_field: DQUOTE ( char | COMMA | DQUOTE DQUOTE | newline)* DQUOTE
 
 unquoted_field: char*
 
-char: "\u0000" .. "\u0009"
-    | "\u000b" .. "\u000c"
-    | "\u000e" .. "\u0021"
+char: "\u0020" .. "\u0021"
     | "\u0023" .. "\u002b"
-    | "\u002d" .. "\uffff"
+    | "\u002d" .. "\u007e"
 
 COMMA: "\u002c"
 

@@ -1,11 +1,9 @@
-start: value 
-escapable: "\"" | "\\" | "\/" | "b" | "f" | "n" | "r" | "t" | "u" ("0".."9" | "A".."F")~4
-escapedchar: "\\" escapable
-char : "a".."z" | "A".."Z" | "0".."9"  | escapedchar | "_" | " " | "!" | "?" | "." | ":" | ";" | "(" | ")" | "/" | "@" | "#" | "=" | "+" | "-" | "&" | "*"
+start: value
+char : "a".."z" | "A".."Z" | "0".."9"
 chars : char | char chars
 string: "\"" chars "\""
 digits: ("0".."9")+
-number: ("-")? ("1".."9" digits | digits ("." digits)? (("e" | "E") ("-" | "+")? digits)?)
+number: ("-")? ("1".."9" digits | digits ("." digits)?)
 value: object | array | string | number | "true" | "false" | "null"
 array: "["  "]" | "["  list  "]"
 list: value | list  ","  value

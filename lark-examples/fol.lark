@@ -1,42 +1,41 @@
-//
 
 start: formula
 
-formula	:	((FORALL | EXISTS) variable)? disjunction 
+formula	:	((FORALL | EXISTS) ws variable ws)?  disjunction
 
-disjunction:	conjunction (OR conjunction)* 
+disjunction:	conjunction (ws OR ws conjunction)*
 
-conjunction:	negation (AND negation)* 
+conjunction:	negation (ws AND ws negation)*
 
 negation :	NOT? (predicate | LPAREN formula RPAREN) 
 
-predicate :	preposition predicateTuple "->" (PREDICATE preposition predicateTuple)
+predicate :	preposition predicatetuple
 	| 	preposition 
 
-predicateTuple:	LPAREN term ("," term)* RPAREN
+predicatetuple:	LPAREN term ("," ws term)* RPAREN
 
-term:	function | variable 
+term:	function | variable
 
-function:	constant functionTuple -> ^(FUNCTION constant functionTuple)
-	|	constant;
+function:	constant functiontuple
+	|	constant
 
-functionTuple
-	:	LPAREN! (constant | variable) (','! (constant | variable) )* RPAREN!;
+functiontuple:	LPAREN (constant | variable) ("," ws (constant | variable) )* RPAREN
 
-LPAREN : '(' ;
-RPAREN :  ')' ;
-AND :  '&' ;
-OR :  '|' ;
-NOT :  '!' ;
-FORALL :  'Forall' ;
-EXISTS :  'Exists' ;
+variable: "?" (("a".."z") | ("0".."9")) character*
 
-variable: '?' (('a'..'z') | ('0'..'9')) character* ;
+constant: (("a".."z") | ("0".."9")) character*
 
-constant: (('a'..'z') | ('0'..'9')) character* ;
+preposition: ("A".."Z") character*
 
-preposition: ('A'..'Z') character* ;
+character: ("0".."9" | "a".."z" | "A".."Z" | "_")
 
-character: ('0'..'9' | 'a'..'z' | 'A'..'Z' | '_') ;
+ws : " "
 
-ws : (' ' | '\t' | '\r' | '\n')+ 
+LPAREN : "("
+RPAREN :  ")"
+AND :  "&"
+OR :  "|"
+NOT :  "!"
+FORALL :  "Forall"
+EXISTS :  "Exists"
+
