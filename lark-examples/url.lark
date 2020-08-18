@@ -1,15 +1,8 @@
 start: url
 
-sep : ":" "/" "/" | ":" "/" "/" "w" "w" "w" "."
 
-sitechar : alphanum   | alphanum "-" alphanum
-site : alphanum | site sitechar
 
-domainchar : lower 
-domain : lower | domain domainchar
-lower: "a".."z"
-
-login : domain "@" site "." domain
+login : domain "@" SITE "." domain
 
 tailchar : alphanum  | "-" | "@" | ":" | "%" | "_" | "+" | "~" | "#" | "&" | "="
 tailseq :  | tailseq tailchar

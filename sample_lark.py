@@ -183,6 +183,21 @@ class GrammarStats:
         """
         return self.derivable_nts[nt]
 
+def fixup_nts(grammar_contents) -> str:
+    rule_re = re.compile("([a-zA-Z_]+)\s*:(.*)")
+    to_lowercase = []
+    for line in grammar_contents.split("\n"):
+        if rule_re.search(line) is not None:
+            m = rule_re.search(line)
+            rule_start_name = m.group(1)
+            if rule_start_name == rule_start_name.upper():
+                to_lowercase.append(rule_start_name)
+    to_lowercase.sort(reverse=True)
+    for to_translate in to_lowercase:
+        lower = to_translate.lower()
+        grammar_contents = grammar_contents.replace(to_translate, lower)
+    return grammar_contents
+
 def get_rule_map(rules: Iterable[GenericRule]) -> Dict[str, List[GenericRule]]:
     generic_rule_map = defaultdict(list)
     for rule in rules:
@@ -191,6 +206,8 @@ def get_rule_map(rules: Iterable[GenericRule]) -> Dict[str, List[GenericRule]]:
 
 class GenericRuleCreator:
     def __init__(self, grammar_contents):
+        grammar_contents = fixup_nts(grammar_contents)
+        print(grammar_contents)
         grammar = load_grammar(grammar_contents, "?")
         all_rules = [rdef[0] for rdef in grammar.rule_defs]
         terms, rules, ignore = grammar.compile(all_rules)
@@ -634,6 +651,7 @@ if __name__ == '__main__':
             os.chdir(wd)
         exit(1)
 
+
     guide_examples_folder = os.path.join(results_folder, "guides")
     try:
         os.mkdir(guide_examples_folder)
@@ -676,6 +694,7 @@ if __name__ == '__main__':
             print(e)
             print(f"[!!!] Couldn't write guide example to {sample_name}. Underlying error above.")
             exit(1)
+
 
 
 if __name__ == "__main__":

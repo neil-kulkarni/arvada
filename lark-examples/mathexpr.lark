@@ -1,11 +1,10 @@
 start: expr
-char: "a".."z"
-var: char |  char var |  "0".."9" var |  "_" var
-number: int | float | "-" int | "-" float
-int: ("0".."9") | ("1".."9") ("0".."9")+
-float: int "." int
-constant: "pi" | "phi" | "e"
-func : "abs"
+expr: funccall | VAR | NUMBER | CONSTANT | binop | "(" expr ")"
+funccall: FUNC "(" arglist ")"
+arglist: expr | expr "," SPACE arglist
+binop: expr SPACE op SPACE expr
+op : "+" | "-" | "*" | "/"
+FUNC : "abs"
     | "acos" 
     | "asin" 
     | "atan" 
@@ -31,9 +30,7 @@ func : "abs"
     | "sqrt" 
     | "tan" 
     | "tanh"
-funccall: func "(" arglist ")"
-space: " "
-arglist: expr | expr "," space arglist
-binop: expr space op space expr
-op : "+" | "-" | "*" | "/"
-expr: funccall | var | number | constant | binop | "(" expr ")"
+CONSTANT: "pi" | "phi" | "e"
+VAR: ("a".."z")+ (("a".."z"|"0".."9"|"_")+ ("a".."z"))?
+NUMBER: ("0" | ("-")?  "1".."9" ("0".."9")*) ("." ("0".."9")+)?
+SPACE: " "

@@ -16,6 +16,7 @@ def lark_to_antlr(gram_name: str, gram_contents: List[str]) -> str:
     Converts the contents of a grammar written for Lark into ANTLR4 format.
     ASSUMES: gram_contents has been stripped of newlines.
     """
+    print(gram_contents)
     antlr_lines = [f"grammar {gram_name};"]
 
     start_rule = re.compile("^start\s*:.*")
