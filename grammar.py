@@ -194,6 +194,8 @@ class Rule():
                     return '"\\""'
                 elif term_char == '\\':
                     return '"\\\\"'
+                elif term_char == '\n':
+                    return '"\\n"'
             return elem
 
         return ' '.join([elem_fixup(b) if len(b) > 0 else '\u03B5' for b in body])

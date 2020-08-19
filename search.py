@@ -129,7 +129,7 @@ def main(file_name, log_file):
         # Build the starting grammars and test them for compilation
         print('Building the starting grammar...'.ljust(50), end='\r')
         start_time = time.time()
-        start_grammar : Grammar = build_start_grammar(OR_PARSER, guide_nodes)
+        start_grammar: Grammar = build_start_grammar(OR_PARSER, guide_nodes)
         try:
             start_grammar.parser()
             print('\n\nInitial Grammar Created:\n%s' % str(start_grammar), file=f)

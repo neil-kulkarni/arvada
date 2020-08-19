@@ -16,9 +16,9 @@ file: record (newline record)*
 
 record: (quotedfield | unquotedfield) (COMMA (quotedfield | unquotedfield))*
 
-quotedfield: DQUOTE ( char | COMMA | DQUOTE DQUOTE | newline)* DQUOTE
+quotedfield: DQUOTE ( char | COMMA | DQUOTE DQUOTE | newline)+ DQUOTE
 
-unquotedfield: char*
+unquotedfield: char+
 
 char: "\u0020".."\u0021"
     | "\u0023".."\u002b"
@@ -28,6 +28,5 @@ COMMA: "\u002c"
 
 DQUOTE: "\u0022"
 
-newline: "\u000d"? "\u000a"
-    | "\u000d"
+newline: "\n"
 

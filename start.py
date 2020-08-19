@@ -793,6 +793,7 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
                 fix_double_indirection(child)
 
         new_trees = []
+
         for tree in trees:
             new_tree = tree.copy()
             replace_coalesced_nonterminals(new_tree)
