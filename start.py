@@ -90,7 +90,7 @@ def derive_classes(oracle, leaves):
         for example in replaced_examples:
             try:
                 oracle.parse(example)
-            except:
+            except Exception as e:
                 return False
         return True
 

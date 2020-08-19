@@ -25,8 +25,6 @@ def main_external(external_folder, log_file, fast = False):
     precision_set = []
     for filename in os.listdir(test_folder):
         if filename.endswith(".ex"):
-            if len(precision_set) ==0:
-                print("first precision example is ", filename)
             full_filename = os.path.join(test_folder, filename)
             test_raw = open(full_filename).read()
             precision_set.append(test_raw)
@@ -39,7 +37,6 @@ def main_external(external_folder, log_file, fast = False):
     try:
         oracle.parse(precision_set[0])
     except Exception as e:
-        print(e)
         print("Woops! The oracle can't parse the precision set.")
         exit(1)
 
