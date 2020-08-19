@@ -26,6 +26,13 @@ class Grammar():
         self.str_cache_hash = self._rule_hash()
         self.parser_cache_hash = self._rule_hash()
 
+    def copy(self):
+        new_grammar = Grammar(self.rules['start'][0])
+        for rule in self.rules.values():
+            new_rule = rule.copy()
+            self.add_rule(new_rule)
+        return new_grammar
+
     def _rule_hash(self):
         return hash(tuple([(start, rule._body_hash()) for start, rule in self.rules.items()]))
 
@@ -162,6 +169,12 @@ class Rule():
         self.bodies = []
         self.cached_str = ""
         self.cache_hash = 0
+
+    def copy(self):
+        new_rule = Rule(self.start)
+        for body in self.bodies:
+            new_rule.add(body[:])
+        return new_rule
 
     def add_body(self, body):
         self.cache_valid = False
