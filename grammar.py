@@ -18,6 +18,7 @@ class Grammar():
         # Add the first rule pointing a dummy start nonterminal to start
         start_rule = Rule('start')
         start_rule.add_body([start])
+        self.start_symbol = start
         self.rules = {'start':start_rule}
 
         # Define cacheable values and their valid bits
@@ -27,10 +28,10 @@ class Grammar():
         self.parser_cache_hash = self._rule_hash()
 
     def copy(self):
-        new_grammar = Grammar(self.rules['start'][0])
+        new_grammar = Grammar(self.start_symbol)
         for rule in self.rules.values():
             new_rule = rule.copy()
-            self.add_rule(new_rule)
+            new_grammar.add_rule(new_rule)
         return new_grammar
 
     def _rule_hash(self):
@@ -173,7 +174,7 @@ class Rule():
     def copy(self):
         new_rule = Rule(self.start)
         for body in self.bodies:
-            new_rule.add(body[:])
+            new_rule.add_body(body[:])
         return new_rule
 
     def add_body(self, body):

@@ -671,7 +671,7 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
             for child in tree.children:
                 replacer_strings(child, replacer_nt, derivable)
 
-    def replaces(replacer, replacee):
+    def replaces(replacer, replacee, trees):
         """
         For every string derived from REPLACEE, replace it with all possible
         strings derived from REPLACER, and check if the resulting string is still valid.
@@ -701,6 +701,70 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
                 return False
         return True
 
+    def get_updated_trees(get_class: Dict[str, str], trees):
+
+            def replace_coalesced_nonterminals(node: ParseNode):
+                """
+                Rewrites node so that coalesced nonterminals point to their
+                class nonterminal. For non-coalesced nonterminals, get_class
+                just gives the original nonterminal
+                """
+                if node.is_terminal:
+                    return
+                else:
+                    node.payload = get_class.get(node.payload, node.payload)
+                    for child in node.children:
+                        replace_coalesced_nonterminals(child)
+
+            def fix_double_indirection(node: ParseNode):
+                """
+                Fix parse trees that have an expansion of the for tx->tx (only one child)
+                since we've removed such double indirection while merging nonterminals
+                """
+                if node.is_terminal:
+                    return
+
+                while len(node.children) == 1 and node.children[0].payload == node.payload:
+                    # Won't go on forever because eventually length of children will be not 1,
+                    # or the children's payload will not be the same as the top node (e.g. if
+                    # the child is a terminal)
+                    node.children = node.children[0].children
+
+                for child in node.children:
+                    fix_double_indirection(child)
+            new_trees = []
+            for tree in trees:
+                new_tree = tree.copy()
+                replace_coalesced_nonterminals(new_tree)
+                fix_double_indirection(new_tree)
+                new_trees.append(new_tree)
+            return new_trees
+
+    def get_updated_grammar(classes: Dict[str, List[str]], get_class: Dict[str, str], grammar):
+        # Traverse through the grammar, and update each nonterminal to point to
+        # its class nonterminal
+        new_grammar = grammar.copy()
+        for nonterm in new_grammar.rules:
+            if nonterm == "start":
+                continue
+            for body in new_grammar.rules[nonterm].bodies:
+                for i in range(len(body)):
+                    # The keys of the rules determine the set of nonterminals
+                    if body[i] in get_class:
+                        body[i] = get_class[body[i]]
+        # Add the alternation rules for each class into the grammar
+        for class_nt, nts in classes.items():
+            rule = Rule(class_nt)
+            for nt in nts:
+                old_rule = new_grammar.rules.pop(nt)
+                for body in old_rule.bodies:
+                    # Remove infinite recursions
+                    if body == [class_nt]:
+                        continue
+                    rule.add_body(body)
+            new_grammar.add_rule(rule)
+        return new_grammar
+
     # Define helpful data structures
     nonterminals = set(grammar.rules.keys())
     nonterminals.remove("start")
@@ -722,97 +786,39 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
                 pairs.append((first, second))
 
     coalesce_caused = False
+    coalesced_into = {}
+    checked = set()
     for pair in pairs:
         first, second = pair
-     #   first_set = uf.followers(uf.find(first))
-      #  second_set = uf.followers(uf.find(second))
-        # If the nonterminals can replace each other in every context, they
-        # must belong to the same character class
-        if not uf.is_connected(first, second) and replaces(first, second) and replaces(second, first):
-            coalesce_caused = True
-            uf.connect(first, second)
-
-    # Define a mapping and a reverse mapping between a set of equivalent
-    # nonterminals and the newly generated nonterminal for that class
-    classes, get_class = {}, {}
-    for leader, nts in uf.classes().items():
-        if len(nts) > 1:
-            if START in nts:
+        ### update the pair for the new grammar
+        while first in coalesced_into and first != START:
+            first = coalesced_into[first]
+        while second in coalesced_into and second != START:
+            second = coalesced_into[second]
+        ### and check that it's still valid
+        if first == second:
+            continue
+        if (first, second) in checked:
+            continue
+        else:
+            checked.add((first, second))
+        ###
+        # If the nonterminals can replace each other in every context, they are replaceable
+        if replaces(first, second, trees) and replaces(second, first, trees):
+            if first == START or second == START:
                 class_nt = START
             else:
                 class_nt = allocate_tid()
-            classes[class_nt] = nts
-        for nt in nts:
-            if len(nts) == 1:
-                get_class[nt] = nt
-            else:
-                get_class[nt] = class_nt
+            classes = {class_nt: [first, second]}
+            get_class = {first: class_nt, second: class_nt}
+            coalesced_into[first] = class_nt
+            coalesced_into[second] = class_nt
+            grammar = get_updated_grammar(classes, get_class, grammar)
+            trees = get_updated_trees(get_class, trees)
+            coalesce_caused = True
 
-    # Traverse through the grammar, and update each nonterminal to point to
-    # its class nonterminal
-    for nonterm in grammar.rules:
-        if nonterm == "start":
-            continue
-        for body in grammar.rules[nonterm].bodies:
-            for i in range(len(body)):
-                # The keys of the rules determine the set of nonterminals
-                if body[i] in grammar.rules.keys():
-                    body[i] = get_class[body[i]]
 
-    new_trees = trees
-    # Update the parse trees accordingly:
-    if coalesce_caused:
-        def replace_coalesced_nonterminals(node: ParseNode):
-            """
-            Rewrites node so that coalesced nonterminals point to their
-            class nonterminal. For non-coalesced nonterminals, get_class
-            just gives the original nonterminal
-            """
-            if node.is_terminal:
-                return
-            else:
-                node.payload = get_class[node.payload]
-                for child in node.children:
-                    replace_coalesced_nonterminals(child)
-
-        def fix_double_indirection(node: ParseNode):
-            """
-            Fix parse trees that have an expansion of the for tx->tx (only one child)
-            since we've removed such double indirection while merging nonterminals
-            """
-            if node.is_terminal:
-                return
-
-            while len(node.children) == 1 and node.children[0].payload == node.payload:
-                # Won't go on forever because eventually length of children will be not 1,
-                # or the children's payload will not be the same as the top node (e.g. if
-                # the child is a terminal)
-                node.children = node.children[0].children
-
-            for child in node.children:
-                fix_double_indirection(child)
-
-        new_trees = []
-
-        for tree in trees:
-            new_tree = tree.copy()
-            replace_coalesced_nonterminals(new_tree)
-            fix_double_indirection(new_tree)
-            new_trees.append(new_tree)
-
-    # Add the alternation rules for each class into the grammar
-    for class_nt, nts in classes.items():
-        rule = Rule(class_nt)
-        for nt in nts:
-            old_rule = grammar.rules.pop(nt)
-            for body in old_rule.bodies:
-                # Remove infinite recursions
-                if body == [class_nt]:
-                    continue
-                rule.add_body(body)
-        grammar.add_rule(rule)
-
-    return grammar, new_trees, coalesce_caused
+    return grammar, trees, coalesce_caused
 
 
 def minimize(grammar):
