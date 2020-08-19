@@ -22,12 +22,12 @@ def main_external(external_folder, log_file, fast = False):
             guide = [ParseNode(tok, True, []) for tok in guide_raw]
             guide_examples.append(guide)
 
-    precision_set = []
+    real_recall_set = []
     for filename in os.listdir(test_folder):
         if filename.endswith(".ex"):
             full_filename = os.path.join(test_folder, filename)
             test_raw = open(full_filename).read()
-            precision_set.append(test_raw)
+            real_recall_set.append(test_raw)
 
     if fast:
         grammar_contents = open(os.path.join("lark-examples", f"{bench_name}.lark")).read()
@@ -35,7 +35,7 @@ def main_external(external_folder, log_file, fast = False):
     else:
         oracle = ExternalOracle(parser_command)
     try:
-        oracle.parse(precision_set[0])
+        oracle.parse(real_recall_set[0])
     except Exception as e:
         print("Woops! The oracle can't parse the precision set.")
         exit(1)
@@ -61,33 +61,33 @@ def main_external(external_folder, log_file, fast = False):
         # "interesting" set for future iterations
 
         print('Scoring grammar....'.ljust(50), end='\r')
-        recall_set = start_grammar.sample_positives(100, 5)
+        precision_set = start_grammar.sample_positives(100, 5)
         parser : Lark = start_grammar.parser()
 
-        recall_num = 0
-        print(f"Recall set (size {len(recall_set)}):", file=f)
-        for example in recall_set:
-            try:
-                print("   ", example, file=f)
-                oracle.parse(example)
-                recall_num += 1
-            except Exception as e:
-                continue
-
-        precision_num = 0
-
+        num_precision_parsed = 0
         print(f"Precision set (size {len(precision_set)}):", file=f)
         for example in precision_set:
             try:
                 print("   ", example, file=f)
-                parser.parse(example)
-                precision_num += 1
+                oracle.parse(example)
+                num_precision_parsed += 1
             except Exception as e:
                 continue
 
-        print(f'Precision: {precision_num/len(precision_set)}, Recall: {recall_num/len(recall_set)}', file=f)
+        num_recall_parsed = 0
+
+        print(f"Recall set (size {len(real_recall_set)}):", file=f)
+        for example in real_recall_set:
+            try:
+                print("   ", example, file=f)
+                parser.parse(example)
+                num_recall_parsed += 1
+            except Exception as e:
+                continue
+
+        print(f'Recall: {num_recall_parsed/len(real_recall_set)}, Precision: {num_precision_parsed/len(precision_set)}', file=f)
         print(f"Build_time: {build_time}")
-        print(f'Precision: {precision_num/len(precision_set)}, Recall: {recall_num/len(recall_set)}')
+        print(f'Recall: {num_recall_parsed/len(real_recall_set)}, Precision: {num_precision_parsed/len(precision_set)}')
         print(f'Time spent building grammar: {build_time}s', file = f)
         print(f'Time spent building + scoring grammar: {time.time() - start_time}s', file = f)
         print(f'Parse calls: {oracle.parse_calls}')
