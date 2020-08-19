@@ -187,7 +187,16 @@ class Rule():
         return self.cached_str
 
     def _body_str(self, body):
-        return ' '.join([b if len(b) > 0 else '\u03B5' for b in body])
+        def elem_fixup(elem: str):
+            if len(elem) == 3 and elem.startswith('"') and elem.endswith('"'):
+                term_char = elem[1]
+                if term_char == '"':
+                    return '"\\""'
+                elif term_char == '\\':
+                    return '"\\\\"'
+            return elem
+
+        return ' '.join([elem_fixup(b) if len(b) > 0 else '\u03B5' for b in body])
 
     def size(self):
         return 1 + sum([len(body) for body in self.bodies])
