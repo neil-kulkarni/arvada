@@ -79,8 +79,10 @@ class Grammar():
         n_chars = random.randint(1, max_size)
         for _ in range(n_chars):
             rindex = random.randint(0, len(terminals) - 1)
-            negative_example += terminals[rindex]
-        negative_example = negative_example.replace('"', '')
+            term = terminals[rindex]
+            assert(term[0]== '"' and term[-1] == '"')
+            term = term[1:-1]
+            negative_example += term
 
         # Check if the negative example is in the grammar. Try again if so.
         try:
@@ -130,7 +132,7 @@ class Grammar():
         nonterminals_to_expand = body_nonterminals(self, body_to_expand)
         expanded_body = [self.generate_positive_example(max_depth, elem, cur_depth + 1)
                                 if elem in nonterminals_to_expand
-                                else elem.replace('"', '')   # really just wanna non-clean up the terminals
+                                else elem[1:-1]   # really just wanna non-clean up the terminals
                                 for elem in body_to_expand]
         return "".join(expanded_body)
 
