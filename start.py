@@ -126,15 +126,15 @@ def derive_classes(oracle, leaves):
         for terminal in cc:
             get_class[terminal] = class_nt
 
-    trees = [ParseNode(allocate_tid(), False, [ParseNode(get_class[leaf.payload], False, [leaf]) for leaf in leaf_lst]
+    trees = [ParseNode(START, False, [ParseNode(get_class[leaf.payload], False, [leaf]) for leaf in leaf_lst]
                        )
              for leaf_lst in leaves]
 
     # Update each of the terminals in leaves to instead be a new nonterminal
     # ParseNode pointing to the original terminal. Return the resulting parse
     # trees as well as a mapping of nonterminal to its character class.
-    return [ParseNode(START, False, [tree])
-            for tree in trees], classes
+    return trees, classes #[ParseNode(START, False, [tree])
+            #for tree in trees], classes
 
 
 def group(trees):
@@ -451,7 +451,7 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
                 derivable.update(get_all_derivable_strings(child, replacer_nt))
             return derivable
 
-    def partially_coalescable(replaceable_everywhere: str, replaceable_in_some_rules: str):
+    def partially_coalescable(replaceable_everywhere: str, replaceable_in_some_rules: str, trees) -> Dict[Tuple[str, Tuple[str]], List[int]]:
         """
         `replaceable_everywhere` and `replaceable_in_some_rules` are both nonterminals
 
@@ -490,7 +490,7 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
 
         # Now check whether there are any rules where `replaeable_in_some_rules` is replaceable by
         # `replaceable_everywhere`
-        replacing_positions: List[Tuple[Tuple[str, List[str]], int]] = []
+        replacing_positions: Dict[Tuple[str, List[str]], List[int]] = defaultdict(list)
         for replacement_loc in partial_replacement_locs:
             rule, posn = replacement_loc
             try:
@@ -499,22 +499,25 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
                         candidate = replace_in_rule(tree, replaceable_everywhere, rule, posn)
                         oracle.parse(candidate)
 
-                replacing_positions.append(replacement_loc)
+                replacing_positions[tuple(rule)].append(posn)
             except Exception as e:
                 continue
 
         return replacing_positions
 
-    def update_grammar(grammar, partial_replacement_locs: List[Tuple[Tuple[str, List[str]], int]],
-                       full_replacement_nt: str, new_nt: str):
+    def get_updated_grammar(old_grammar, partial_replacement_locs: Dict[Tuple[str, Tuple[str]], List[int]],
+                       full_replacement_nt: str, nt_to_partially_replace: str, new_nt: str):
         """
-        Mutates `grammar` so that the locations in `partial_replacement_locs` are replaced by `new_nt`, and all
+        Creates a copy of `old_grammar` so that the locations in `partial_replacement_locs` are replaced by `new_nt`, and all
         occurrences of `full_relacement_nt` are replaced by `new_nt`
         """
-        for (rule_start, body), posn in partial_replacement_locs:
+        grammar = old_grammar.copy()
+        alt_rule = Rule(new_nt)
+        for (rule_start, body), posns in partial_replacement_locs.items():
             rule_to_update = grammar.rules[rule_start]
-            body_posn = rule_to_update.bodies.index(body)
-            rule_to_update.bodies[body_posn][posn] = new_nt
+            body_posn = rule_to_update.bodies.index(list(body))
+            for posn in posns:
+                rule_to_update.bodies[body_posn][posn] = new_nt
         for rule in grammar.rules.values():
             for body in rule.bodies:
                 for idx in range(len(body)):
@@ -527,18 +530,23 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
                 if body not in unique_bodies:
                     unique_bodies.append(body)
             rule.bodies = unique_bodies
+        alt_rule_bodies = grammar.rules[full_replacement_nt].bodies
+        alt_rule_bodies.extend(grammar.rules[nt_to_partially_replace].bodies)
+        grammar.rules.pop(full_replacement_nt)
+        alt_rule.bodies = alt_rule_bodies
+        grammar.add_rule(alt_rule)
+        return grammar
 
-    def updated_tree(tree: ParseNode, partial_replacement_locs: Dict[Tuple[str, Tuple[str]], List[int]],
+    def update_tree(new_tree: ParseNode, partial_replacement_locs: Dict[Tuple[str, Tuple[str]], List[int]],
                      full_replacement_nt: str, new_nt: str):
         """
-        Returns a copy of `tree` s.t. the locations in `partial_replacement_locs` are replaced by `new_nt`, and all
+        Updates `new_tree` s.t. the locations in `partial_replacement_locs` are replaced by `new_nt`, and all
         occurrences of `full_relacement_nt` are replaced by `new_nt`.
         """
-        new_tree = tree.copy()
         if new_tree.is_terminal:
             return new_tree
-        new_tree.children = [updated_tree(c, partial_replacement_locs, full_replacement_nt, new_nt)
-                             for c in new_tree.children]
+        for c in new_tree.children:
+            update_tree(c, partial_replacement_locs, full_replacement_nt, new_nt)
         my_body = tuple([child.payload for child in new_tree.children])
         if (new_tree.payload, my_body) in partial_replacement_locs:
             posns = partial_replacement_locs[(new_tree.payload, my_body)]
@@ -547,13 +555,14 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
                 prev_child.payload = new_nt
         if new_tree.payload == full_replacement_nt:
             new_tree.payload = new_nt
-        return new_tree
 
-    def updated_trees(trees: List[ParseNode], rules_to_replace: Dict[Tuple[str, Tuple[str]], List[int]],
+    def get_updated_trees(trees: List[ParseNode], rules_to_replace: Dict[Tuple[str, Tuple[str]], List[int]],
                       replacer_orig: str, replacer: str):
         rest = []
         for tree in trees:
-            rest.append(updated_tree(tree, rules_to_replace, replacer_orig, replacer))
+            new_tree = tree.copy()
+            update_tree(new_tree, rules_to_replace, replacer_orig, replacer)
+            rest.append(new_tree)
         return rest
 
     #################### END HELPERS ########################
@@ -573,46 +582,33 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
 
     # The main work of the function.
     replacements = {}
+    fully_replaced = {}
     for nt_to_fully_replace in fully_replaceable:
         for nt_to_partially_replace in partially_replaceable:
+            while nt_to_fully_replace in fully_replaced and nt_to_fully_replace != START:
+                nt_to_fully_replace = fully_replaced[nt_to_fully_replace]
+            while nt_to_partially_replace in fully_replaced and nt_to_partially_replace != START:
+                nt_to_partially_replace = fully_replaced[nt_to_partially_replace]
             if nt_to_fully_replace == nt_to_partially_replace:
                 continue
-            replacement_positions = partially_coalescable(nt_to_fully_replace, nt_to_partially_replace)
+            replacement_positions = partially_coalescable(nt_to_fully_replace, nt_to_partially_replace, trees)
             if len(replacement_positions) > 0:
-                if nt_to_fully_replace in replacements:
-                    replacements[nt_to_fully_replace][0].append(nt_to_partially_replace)
-                    replacements[nt_to_fully_replace][1].extend(replacement_positions)
+                print(f"we found that {nt_to_partially_replace} could replace {nt_to_fully_replace} everywhere, "
+                      f"and {nt_to_fully_replace} could replace {nt_to_partially_replace} at : {replacement_positions}")
+                tree_replacement_positions: Dict[Tuple[str, Tuple[str]], List[int]] = defaultdict(list)
+                for rule, posn in replacement_positions:
+                    tup_rule = (rule[0], tuple(rule[1]))
+                    tree_replacement_positions[tup_rule].append(posn)
+                if nt_to_fully_replace == START:
+                    new_nt = START
                 else:
-                    replacements[nt_to_fully_replace] = ([nt_to_partially_replace], replacement_positions)
+                    new_nt = allocate_tid()
+                grammar = get_updated_grammar(grammar, replacement_positions, nt_to_fully_replace,
+                                              nt_to_partially_replace, new_nt)
+                trees = get_updated_trees(trees, tree_replacement_positions, nt_to_fully_replace, new_nt)
+                fully_replaced[nt_to_fully_replace] = new_nt
 
-    new_trees = trees
-    # If any replacements are found, update the grammar and trees accordingly.
-    for nt_to_fully_replace, replacement in replacements.items():
-        nts_to_partially_replace, replacement_positions = replacement
-
-        # Copy the original positions because right now they're actually the bodies in the grammar, and
-        # in the trees we'll want it to be different
-        tree_replacement_positions : Dict[Tuple[str, Tuple[str]], List[int]] = defaultdict(list)
-        for rule, posn in replacement_positions:
-            tup_rule = (rule[0], tuple(rule[1]))
-            tree_replacement_positions[tup_rule].append(posn)
-        print(f"we found that {nts_to_partially_replace} could replace {nt_to_fully_replace} everywhere, "
-              f"and {nt_to_fully_replace} could replace {nts_to_partially_replace} at : {replacement_positions}")
-        if nt_to_fully_replace == START:
-            new_nt = START
-        else:
-            new_nt = allocate_tid()
-        alt_rule = Rule(new_nt)
-        update_grammar(grammar, replacement_positions, nt_to_fully_replace, new_nt)
-        alt_rule_bodies = grammar.rules[nt_to_fully_replace].bodies
-        for nt_to_partially_replace in nts_to_partially_replace:
-            alt_rule_bodies.extend(grammar.rules[nt_to_partially_replace].bodies)
-        grammar.rules.pop(nt_to_fully_replace)
-        alt_rule.bodies = alt_rule_bodies
-        grammar.add_rule(alt_rule)
-        new_trees = updated_trees(new_trees, tree_replacement_positions, nt_to_fully_replace, new_nt)
-
-    return grammar, new_trees, replacements
+    return grammar, trees, replacements
 
 
 def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
