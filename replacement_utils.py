@@ -53,8 +53,8 @@ def get_all_replacement_strings(tree: ParseNode, nt_to_replace: str):
 def get_all_rule_replacement_strs(tree: ParseNode, replacee_rule: Tuple[str, List[str]], replacee_posn: int):
     """
     Get all the possible strings derived from `tree` where all possible combinations
-    (including the combination of len 0) of instances of `nt_to_replace` are replaced
-    by REPLACE_CONST.
+    (including the combination of len 0) of instances of the nonterminal at position
+    `replacee_posn` in `replacee_rule` are replaced by REPLACE_CONST.
     >>> left_l3 = [ParseNode('t2', False, [ParseNode('"4"', True, [])]), ParseNode('t2', False, [ParseNode('"4"', True, [])])]
     >>> right_l3 = [ParseNode('t2', False, [ParseNode('"4"', True, [])])]
     >>> left_l2 = [ParseNode('t2', False, left_l3)]
@@ -113,6 +113,35 @@ def get_strings_with_replacement(tree: ParseNode, nt_to_replace: str, replacemen
     ['2*2', '2*4', '22*2', '22*4', '24*2', '24*4', '3*3', '3*4', '33*3', '33*4', '34*3', '34*4', '42*2', '42*4', '43*3', '43*4', '44*2', '44*3']
     """
     placeholder_strings = get_all_replacement_strings(tree, nt_to_replace)
+    placeholder_strings = [s for s in placeholder_strings if REPLACE_CONST in s]
+
+    ret_strings = []
+    for replacement_str in replacement_strs:
+        ret_strings.extend([ps.replace(REPLACE_CONST, replacement_str) for ps in placeholder_strings])
+
+    return ret_strings
+
+
+def get_strings_with_replacement_in_rule(tree: ParseNode, replacee_rule: Tuple[str, List[str]], replacee_posn: int, replacement_strs: Set[str]):
+    """
+    Get all the possible strings derived from `tree` where all possible combinations
+    (not including the empty combo) of instances of the nonterminal at position
+    `replacee_posn` in `replacee_rule` are replaced with one of the replacement strings
+    in `replacement_strs`. Does not combine differentstrings from `replacement_strs`
+    in the same instance.
+    >>> left_l3 = [ParseNode('t2', False, [ParseNode('"4"', True, [])]), ParseNode('t2', False, [ParseNode('"4"', True, [])])]
+    >>> right_l3 = [ParseNode('t2', False, [ParseNode('"4"', True, [])])]
+    >>> left_l2 = [ParseNode('t2', False, left_l3)]
+    >>> right_l2 = [ParseNode('t2', False, right_l3)]
+    >>> big_tree = ParseNode('t0', False, \
+                     [ParseNode('t0', False, left_l2), \
+                      ParseNode('t4', False, [ParseNode('"*"', True, [])]), \
+                      ParseNode('t0', False, right_l2)] \
+                     )
+    >>> sorted(get_strings_with_replacement_in_rule(big_tree, ('t0', ['t2']), 0, {"3", "2"}))
+    ['2*2', '2*4', '3*3', '3*4', '44*2', '44*3']
+    """
+    placeholder_strings = get_all_rule_replacement_strs(tree, replacee_rule, replacee_posn)
     placeholder_strings = [s for s in placeholder_strings if REPLACE_CONST in s]
 
     ret_strings = []
