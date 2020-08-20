@@ -1,13 +1,52 @@
+import functools
+import itertools
+import random
 from typing import Tuple, List, Set
+
+import numpy as np
 
 from parse_tree import ParseNode
 REPLACE_CONST = '[[:REPLACEME]]'
+MAX_SAMPLES = 1000
 
 def fixup_terminal(payload):
     if len(payload) >= 3 and payload.startswith('"') and payload.endswith('"'):
         payload = payload[1:-1]
     return payload
 
+
+
+def sample_from_product(strings_per_child, num_samples):
+    """
+    Uniformly sample n strings from the product of strings_per_child.
+    An approcimate test is below.
+    >>> a = ['a', 'b', 'c']
+    >>> b = ['d', 'e', 'f', 'g']
+    >>> c = ['h', 'i']
+    >>> all_string_occs = {''.join(p): 0 for p in itertools.product(a,b,c)}
+    >>> for i in range(10000):
+    ...      samples = sample_from_product([a, b, c], 12)
+    ...      for sample in samples:
+    ...          all_string_occs[sample] += 1
+    >>> print([ 0.48 < occ/10000 < 0.52 for occ in all_string_occs.values()])
+    [True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True]
+    """
+    # fancy math to get efficient sampling.
+    # Consider lens_per_child = [3, 4, 2]
+    # to map idx to a sample, do (idx % (len(a)*len(b)*len(c)) // (len(b)*len(c)), (idx % (len(b)*len(c))) // len(c), idx % len(c))
+    ret_strings = []
+    lens_per_child = [len(spc) for spc in strings_per_child]
+    prod_size = np.product(lens_per_child)
+    indices = random.sample(range(prod_size), num_samples)
+    to_divide = [1 for i in range(len(strings_per_child))]
+    for i in reversed(range(len(to_divide) - 1)):
+        to_divide[i] = to_divide[i + 1] * lens_per_child[i + 1]
+    to_modulo = [prod_size] + to_divide[:-1]
+    for idx in indices:
+        index_per_child = [(idx % to_modulo[i]) // to_divide[i] for i in range(len(strings_per_child))]
+        children_choice = [strings_per_child[i][child_index] for i, child_index in enumerate(index_per_child)]
+        ret_strings.append(''.join(children_choice))
+    return ret_strings
 
 def get_all_replacement_strings(tree: ParseNode, nt_to_replace: str):
     """
@@ -43,10 +82,12 @@ def get_all_replacement_strings(tree: ParseNode, nt_to_replace: str):
         replacement_strings.append(REPLACE_CONST)
 
     strings_per_child = [get_all_replacement_strings(c, nt_to_replace) for c in tree.children]
-    string_prefixes = ['']
-    for strings_for_child in strings_per_child:
-        string_prefixes =[prefix + string_for_child for prefix in string_prefixes for string_for_child in strings_for_child]
-    replacement_strings.extend(string_prefixes)
+    lens_per_child = [len(spc) for spc in strings_per_child]
+    prod_size = np.product(lens_per_child)
+    if prod_size > MAX_SAMPLES:
+        replacement_strings.extend(sample_from_product(strings_per_child, MAX_SAMPLES))
+    else:
+        replacement_strings.extend([''.join(p) for p in itertools.product(*strings_per_child)])
 
     return list(set(replacement_strings))
 
@@ -118,6 +159,10 @@ def get_strings_with_replacement(tree: ParseNode, nt_to_replace: str, replacemen
     ret_strings = []
     for replacement_str in replacement_strs:
         ret_strings.extend([ps.replace(REPLACE_CONST, replacement_str) for ps in placeholder_strings])
+
+    if len(ret_strings) > 100:
+        random.shuffle(ret_strings)
+        ret_strings = ret_strings[:100]
 
     return ret_strings
 
