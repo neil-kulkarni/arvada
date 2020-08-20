@@ -1,6 +1,7 @@
-from typing import Tuple, List
+from typing import Tuple, List, Set
 
 from parse_tree import ParseNode
+REPLACE_CONST = '[[:REPLACEME]]'
 
 def fixup_terminal(payload):
     if len(payload) >= 3 and payload.startswith('"') and payload.endswith('"'):
@@ -12,7 +13,7 @@ def get_all_replacement_strings(tree: ParseNode, nt_to_replace: str):
     """
     Get all the possible strings derived from `tree` where all possible combinations
     (including the combination of len 0) of instances of `nt_to_replace` are replaced
-    by '[[:REPLACEME]]'.
+    by REPLACE_CONST.
     >>> left_l3 = [ParseNode('t2', False, [ParseNode('"4"', True, [])]), ParseNode('t2', False, [ParseNode('"4"', True, [])])]
     >>> right_l3 = [ParseNode('t2', False, [ParseNode('"4"', True, [])])]
     >>> left_l2 = [ParseNode('t2', False, left_l3)]
@@ -39,7 +40,7 @@ def get_all_replacement_strings(tree: ParseNode, nt_to_replace: str):
         return [fixup_terminal(tree.payload)]
 
     if tree.payload == nt_to_replace:
-        replacement_strings.append('[[:REPLACEME]]')
+        replacement_strings.append(REPLACE_CONST)
 
     strings_per_child = [get_all_replacement_strings(c, nt_to_replace) for c in tree.children]
     string_prefixes = ['']
@@ -53,7 +54,7 @@ def get_all_rule_replacement_strs(tree: ParseNode, replacee_rule: Tuple[str, Lis
     """
     Get all the possible strings derived from `tree` where all possible combinations
     (including the combination of len 0) of instances of `nt_to_replace` are replaced
-    by '[[:REPLACEME]]'.
+    by REPLACE_CONST.
     >>> left_l3 = [ParseNode('t2', False, [ParseNode('"4"', True, [])]), ParseNode('t2', False, [ParseNode('"4"', True, [])])]
     >>> right_l3 = [ParseNode('t2', False, [ParseNode('"4"', True, [])])]
     >>> left_l2 = [ParseNode('t2', False, left_l3)]
@@ -85,13 +86,40 @@ def get_all_rule_replacement_strs(tree: ParseNode, replacee_rule: Tuple[str, Lis
     if tree.payload == start:
         tree_body = [fixup_terminal(c.payload) for c in tree.children]
         if tree_body == body:
-            strings_per_child[replacee_posn].append('[[:REPLACEME]]')
+            strings_per_child[replacee_posn].append(REPLACE_CONST)
 
     string_prefixes = ['']
     for strings_for_child in strings_per_child:
         string_prefixes =[prefix + string_for_child for prefix in string_prefixes for string_for_child in strings_for_child]
 
     return list(set(string_prefixes))
+
+def get_strings_with_replacement(tree: ParseNode, nt_to_replace: str, replacement_strs: Set[str]):
+    """
+    Get all the possible strings derived from `tree` where all possible combinations
+    (not including the empty combo) of instances of `nt_to_replace` are replaced
+    with one of the replacement strings in `replacement_strs`. Does not combine different
+    strings from `replacement_strs` in the same instance.
+    >>> left_l3 = [ParseNode('t2', False, [ParseNode('"4"', True, [])]), ParseNode('t2', False, [ParseNode('"4"', True, [])])]
+    >>> right_l3 = [ParseNode('t2', False, [ParseNode('"4"', True, [])])]
+    >>> left_l2 = [ParseNode('t2', False, left_l3)]
+    >>> right_l2 = [ParseNode('t2', False, right_l3)]
+    >>> big_tree = ParseNode('t0', False, \
+                     [ParseNode('t0', False, left_l2), \
+                      ParseNode('t4', False, [ParseNode('"*"', True, [])]), \
+                      ParseNode('t0', False, right_l2)] \
+                     )
+    >>> sorted(get_strings_with_replacement(big_tree, 't2', {"3", "2"}))
+    ['2*2', '2*4', '22*2', '22*4', '24*2', '24*4', '3*3', '3*4', '33*3', '33*4', '34*3', '34*4', '42*2', '42*4', '43*3', '43*4', '44*2', '44*3']
+    """
+    placeholder_strings = get_all_replacement_strings(tree, nt_to_replace)
+    placeholder_strings = [s for s in placeholder_strings if REPLACE_CONST in s]
+
+    ret_strings = []
+    for replacement_str in replacement_strs:
+        ret_strings.extend([ps.replace(REPLACE_CONST, replacement_str) for ps in placeholder_strings])
+
+    return ret_strings
 
 if __name__ == "__main__":
     import doctest
