@@ -7,7 +7,7 @@ import numpy as np
 
 from parse_tree import ParseNode
 REPLACE_CONST = '[[:REPLACEME]]'
-MAX_SAMPLES = 1000
+MAX_SAMPLES = 100
 
 def fixup_terminal(payload):
     if len(payload) >= 3 and payload.startswith('"') and payload.endswith('"'):
@@ -129,11 +129,14 @@ def get_all_rule_replacement_strs(tree: ParseNode, replacee_rule: Tuple[str, Lis
         if tree_body == body:
             strings_per_child[replacee_posn].append(REPLACE_CONST)
 
-    string_prefixes = ['']
-    for strings_for_child in strings_per_child:
-        string_prefixes =[prefix + string_for_child for prefix in string_prefixes for string_for_child in strings_for_child]
+    lens_per_child = [len(spc) for spc in strings_per_child]
+    prod_size = np.product(lens_per_child)
+    if prod_size > MAX_SAMPLES:
+        ret_list = sample_from_product(strings_per_child, MAX_SAMPLES)
+    else:
+        ret_list = [''.join(p) for p in itertools.product(*strings_per_child)]
 
-    return list(set(string_prefixes))
+    return list(set(ret_list))
 
 def get_strings_with_replacement(tree: ParseNode, nt_to_replace: str, replacement_strs: Set[str]):
     """
@@ -160,9 +163,9 @@ def get_strings_with_replacement(tree: ParseNode, nt_to_replace: str, replacemen
     for replacement_str in replacement_strs:
         ret_strings.extend([ps.replace(REPLACE_CONST, replacement_str) for ps in placeholder_strings])
 
-    if len(ret_strings) > 100:
+    if len(ret_strings) > MAX_SAMPLES:
         random.shuffle(ret_strings)
-        ret_strings = ret_strings[:100]
+        ret_strings = ret_strings[:MAX_SAMPLES]
 
     return ret_strings
 
@@ -192,6 +195,10 @@ def get_strings_with_replacement_in_rule(tree: ParseNode, replacee_rule: Tuple[s
     ret_strings = []
     for replacement_str in replacement_strs:
         ret_strings.extend([ps.replace(REPLACE_CONST, replacement_str) for ps in placeholder_strings])
+
+    if len(ret_strings) > MAX_SAMPLES:
+        random.shuffle(ret_strings)
+        ret_strings = ret_strings[:MAX_SAMPLES]
 
     return ret_strings
 
