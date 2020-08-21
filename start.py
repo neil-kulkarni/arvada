@@ -2,6 +2,7 @@ import re
 from collections import defaultdict
 from typing import List, Tuple, Set, Dict, Optional
 
+from oracle import ParseException
 from parse_tree import ParseNode
 from grammar import *
 from graph import Graph
@@ -29,7 +30,11 @@ class Bubble:
     def add_context(self, context_lhs, context_rhs):
         #TODO
         pass
+    def __str__(self):
+        return f"Bubble({self.new_nt}->{self.bubbled_elems}, occs={self.occ_count})"
 
+    def __repr__(self):
+        return self.__str__()
     # def get_new_nt(self):
     #     return self.new_nt
     #
@@ -321,7 +326,7 @@ def build_trees(oracle, leaves):
     """
 
     def score(trees: List[ParseNode], new_bubble: Optional[Bubble] = None) \
-            -> Tuple[int, List[ParseNode]]:
+            -> Tuple[int, float, List[ParseNode]]:
         """[
         TREES is a list of Parse Trees.
 
@@ -335,7 +340,7 @@ def build_trees(oracle, leaves):
         grammar, new_trees, coalesce_caused = coalesce(oracle, trees, grammar, new_bubble)
         if not coalesce_caused:
             grammar, new_trees, partial_coalesces = coalesce_partial(oracle, trees, grammar, new_bubble)
-            if len(partial_coalesces) > 0:
+            if partial_coalesces:
                 print("\n(partial)")
                 coalesce_caused = True
 
@@ -368,12 +373,16 @@ def build_trees(oracle, leaves):
                 best_size = min(best_size, size)
                 updated = True
                 break
-            elif size < best_size:
-                print(f"Successful grouping (size, {best_size} vs. {size}): {grouping.new_nt} -> {grouping.bubbled_elems}")
-                best_trees = new_trees
-                best_size = size
-                updated = True
-                break
+        # if not updated:
+        #     for i, grouping in enumerate(all_groupings):
+        #         new_trees = apply(grouping, best_trees)
+        #         for j, grouping_2 in
+            # elif size < best_size:
+            #     print(f"Successful grouping (size, {best_size} vs. {size}): {grouping.new_nt} -> {grouping.bubbled_elems}")
+            #     best_trees = new_trees
+            #     best_size = size
+            #     updated = True
+            #     break
         layers, count = best_trees, count + 1
 
     return best_trees, {}
@@ -509,12 +518,12 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
 
         # Now check whether there are any rules where `replaeable_in_some_rules` is replaceable by
         # `replaceable_everywhere`
-        replacing_positions: Dict[Tuple[str, List[str]], List[int]] = defaultdict(list)
+        replacing_positions: Dict[Tuple[str, Tuple[str]], List[int]] = defaultdict(list)
         for replacement_loc in partial_replacement_locs:
             rule, posn = replacement_loc
             candidate_strs = []
             for tree in trees:
-                candidate_strs = get_strings_with_replacement_in_rule(tree, rule, posn, everywhere_derivable_strings)
+                candidate_strs.extend(get_strings_with_replacement_in_rule(tree, rule, posn, everywhere_derivable_strings))
             if len(candidate_strs) > MAX_SAMPLES_PER_COALESCE:
                 candidate_strs = random.sample(everywhere_by_some_candidates,
                                                MAX_SAMPLES_PER_COALESCE)
@@ -524,8 +533,8 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
             try:
                 for candidate in candidate_strs:
                     oracle.parse(candidate)
-                replacing_positions[tuple(rule)].append(posn)
-            except Exception as e:
+                replacing_positions[(rule[0], tuple(rule[1]))].append(posn)
+            except ParseException as e:
                 continue
 
         return replacing_positions
@@ -570,9 +579,9 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
         """
         if new_tree.is_terminal:
             return new_tree
+        my_body = tuple([child.payload for child in new_tree.children])
         for c in new_tree.children:
             update_tree(c, partial_replacement_locs, full_replacement_nt, new_nt)
-        my_body = tuple([child.payload for child in new_tree.children])
         if (new_tree.payload, my_body) in partial_replacement_locs:
             posns = partial_replacement_locs[(new_tree.payload, my_body)]
             for posn in posns:
@@ -606,7 +615,7 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
                              and grammar.rules[nonterm].bodies[0][0] not in nonterminals]
 
     # The main work of the function.
-    replacements = {}
+    replacement_happened = False
     fully_replaced = {}
     for nt_to_fully_replace in fully_replaceable:
         for nt_to_partially_replace in partially_replaceable:
@@ -620,20 +629,18 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
             if len(replacement_positions) > 0:
                 print(f"we found that {nt_to_partially_replace} could replace {nt_to_fully_replace} everywhere, "
                       f"and {nt_to_fully_replace} could replace {nt_to_partially_replace} at : {replacement_positions}")
-                tree_replacement_positions: Dict[Tuple[str, Tuple[str]], List[int]] = defaultdict(list)
-                for rule, posn in replacement_positions:
-                    tup_rule = (rule[0], tuple(rule[1]))
-                    tree_replacement_positions[tup_rule].append(posn)
+
                 if nt_to_fully_replace == START:
                     new_nt = START
                 else:
                     new_nt = allocate_tid()
                 grammar = get_updated_grammar(grammar, replacement_positions, nt_to_fully_replace,
                                               nt_to_partially_replace, new_nt)
-                trees = get_updated_trees(trees, tree_replacement_positions, nt_to_fully_replace, new_nt)
+                trees = get_updated_trees(trees, replacement_positions, nt_to_fully_replace, new_nt)
                 fully_replaced[nt_to_fully_replace] = new_nt
+                replacement_happened = True
 
-    return grammar, trees, replacements
+    return grammar, trees, replacement_happened
 
 
 def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,

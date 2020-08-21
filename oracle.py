@@ -3,6 +3,9 @@ import tempfile
 import subprocess
 import os
 
+class ParseException(Exception):
+    pass
+
 class ExternalOracle:
     def __init__(self, command):
         self.command = command
@@ -24,7 +27,7 @@ class ExternalOracle:
             if self.cache_set[string]:
                 return True
             else:
-                raise Exception(f"doesn't parse: {string}")
+                raise ParseException(f"doesn't parse: {string}")
         else:
             try:
                 self._parse_internal(string)
@@ -32,7 +35,7 @@ class ExternalOracle:
                 return True
             except subprocess.CalledProcessError as e:
                 self.cache_set[string] = False
-                raise Exception(f"doesn't parse: {string}")
+                raise ParseException(f"doesn't parse: {string}")
 
 class CachingOracle:
     def __init__(self, oracle: Lark):
@@ -46,11 +49,11 @@ class CachingOracle:
             if self.cache_set[string]:
                 return True
             else:
-                raise Exception("doesn't parse")
+                raise ParseException("doesn't parse")
         else:
             try:
                 self.oracle.parse(string)
                 self.cache_set[string] = True
             except Exception as e:
                 self.cache_set[string] = False
-                raise e
+                raise ParseException("doesn't parse")
