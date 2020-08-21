@@ -7,16 +7,20 @@ import numpy as np
 
 from parse_tree import ParseNode
 REPLACE_CONST = '[[:REPLACEME]]'
-MAX_SAMPLES = 100
+MAX_SAMPLES = 10
 
 def fixup_terminal(payload):
     if len(payload) >= 3 and payload.startswith('"') and payload.endswith('"'):
         payload = payload[1:-1]
     return payload
 
+def muh_product(lst):
+    prod = 1
+    for e in lst:
+        prod *= e
+    return prod
 
-
-def sample_from_product(strings_per_child, num_samples):
+def sample_from_product(strings_per_child, num_samples, lens_per_child, prod_size):
     """
     Uniformly sample n strings from the product of strings_per_child.
     An approcimate test is below.
@@ -35,8 +39,6 @@ def sample_from_product(strings_per_child, num_samples):
     # Consider lens_per_child = [3, 4, 2]
     # to map idx to a sample, do (idx % (len(a)*len(b)*len(c)) // (len(b)*len(c)), (idx % (len(b)*len(c))) // len(c), idx % len(c))
     ret_strings = []
-    lens_per_child = [len(spc) for spc in strings_per_child]
-    prod_size = np.product(lens_per_child)
     indices = random.sample(range(prod_size), num_samples)
     to_divide = [1 for i in range(len(strings_per_child))]
     for i in reversed(range(len(to_divide) - 1)):
@@ -83,9 +85,9 @@ def get_all_replacement_strings(tree: ParseNode, nt_to_replace: str):
 
     strings_per_child = [get_all_replacement_strings(c, nt_to_replace) for c in tree.children]
     lens_per_child = [len(spc) for spc in strings_per_child]
-    prod_size = np.product(lens_per_child)
+    prod_size = muh_product(lens_per_child)
     if prod_size > MAX_SAMPLES:
-        replacement_strings.extend(sample_from_product(strings_per_child, MAX_SAMPLES))
+        replacement_strings.extend(sample_from_product(strings_per_child, MAX_SAMPLES, lens_per_child, prod_size))
     else:
         replacement_strings.extend([''.join(p) for p in itertools.product(*strings_per_child)])
 
@@ -130,9 +132,9 @@ def get_all_rule_replacement_strs(tree: ParseNode, replacee_rule: Tuple[str, Lis
             strings_per_child[replacee_posn].append(REPLACE_CONST)
 
     lens_per_child = [len(spc) for spc in strings_per_child]
-    prod_size = np.product(lens_per_child)
+    prod_size = muh_product(lens_per_child)
     if prod_size > MAX_SAMPLES:
-        ret_list = sample_from_product(strings_per_child, MAX_SAMPLES)
+        ret_list = sample_from_product(strings_per_child, MAX_SAMPLES, lens_per_child, prod_size)
     else:
         ret_list = [''.join(p) for p in itertools.product(*strings_per_child)]
 
