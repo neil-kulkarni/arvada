@@ -341,7 +341,7 @@ def build_trees(oracle, leaves):
         grammar = build_grammar(trees)
 
         grammar, new_trees, coalesce_caused = coalesce(oracle, trees, grammar, new_bubble)
-        if not coalesce_caused:
+        if not coalesce_caused and not isinstance(new_bubble, list):
             grammar, new_trees, partial_coalesces = coalesce_partial(oracle, trees, grammar, new_bubble)
             if partial_coalesces:
                 print("\n(partial)")
@@ -376,16 +376,32 @@ def build_trees(oracle, leaves):
                 best_size = min(best_size, size)
                 updated = True
                 break
-        # if not updated:
-        #     for i, grouping in enumerate(all_groupings):
-        #         new_trees = apply(grouping, best_trees)
-        #         for j, grouping_2 in
-            # elif size < best_size:
-            #     print(f"Successful grouping (size, {best_size} vs. {size}): {grouping.new_nt} -> {grouping.bubbled_elems}")
-            #     best_trees = new_trees
-            #     best_size = size
-            #     updated = True
-            #     break
+        if not updated:
+            print()
+            for i, grouping in enumerate(all_groupings):
+                new_trees = apply(grouping, best_trees)
+                all_groupings_2 = group(new_trees)
+                nlg2 = len(all_groupings_2)
+                for j, grouping_2 in enumerate(all_groupings_2):
+                    print(f'Double bubble iteration ({i}/{nlg}, {j}/{nlg2}, )'.ljust(50), end='\r')
+                    new_trees_2 = apply(grouping_2, new_trees)
+                    new_score, size, new_trees_2 = score(new_trees_2, [grouping, grouping_2])
+                    if new_score > 0:
+                        print(
+                            f"Successful grouping (coalesce): {grouping.new_nt} -> {grouping.bubbled_elems},  {grouping_2.new_nt} -> {grouping_2.bubbled_elems}")
+                        best_trees = new_trees_2
+                        best_size = min(best_size, size)
+                        updated = True
+                        break
+                if updated:
+                    break
+
+        # elif size < best_size:
+        #     print(f"Successful grouping (size, {best_size} vs. {size}): {grouping.new_nt} -> {grouping.bubbled_elems}")
+        #     best_trees = new_trees
+        #     best_size = size
+        #     updated = True
+        #     break
         layers, count = best_trees, count + 1
 
     return best_trees, {}
@@ -449,7 +465,6 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
     be in the situation where (nt1, nt2) can partially coalesce and (nt2, nt1) can partially coalesce:
 
     """
-
 
     def get_all_derivable_strings(tree: ParseNode, replacer_nt: str) -> Set[str]:
         """
@@ -712,6 +727,12 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
         for tree in trees:
             replaced_strings.update(get_strings_with_replacement(tree, replacee, replacer_derivable_strings))
 
+        if len(replaced_strings) == 0:
+            print(replacer, replacee)
+            for tree in trees:
+                print(tree)
+        assert (replaced_strings)
+
         replaced_strings = list(replaced_strings)
         if len(replaced_strings) > MAX_SAMPLES_PER_COALESCE:
             replaced_strings = random.sample(replaced_strings, MAX_SAMPLES_PER_COALESCE)
@@ -801,12 +822,15 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
 
     # Get all unique pairs of nonterminals
     pairs = []
-    if coalesce_target is not None:
+    if isinstance(coalesce_target, Bubble):
         first = coalesce_target.new_nt
         for second in nonterminals:
             if first == second:
                 continue
             pairs.append((first, second))
+    elif isinstance(coalesce_target, list):
+        pair = (coalesce_target[0].new_nt, coalesce_target[1].new_nt)
+        pairs.append(pair)
     else:
         for i in range(len(nonterminals)):
             for j in range(i + 1, len(nonterminals)):
