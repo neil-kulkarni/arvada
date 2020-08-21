@@ -12,10 +12,11 @@ import numpy as np
 from replacement_utils import get_strings_with_replacement, get_strings_with_replacement_in_rule
 
 MAX_SAMPLES_PER_COALESCE = 50
-MAX_GROUP_LEN=7
+MAX_GROUP_LEN = 7
+
 
 class Bubble:
-    def __init__(self, new_nt: str, bubbled_elems : List[str]):
+    def __init__(self, new_nt: str, bubbled_elems: List[str]):
         self.new_nt = new_nt
         self.bubbled_elems = bubbled_elems
         self.direct_parents = []
@@ -28,8 +29,9 @@ class Bubble:
         self.occ_count += 1
 
     def add_context(self, context_lhs, context_rhs):
-        #TODO
+        # TODO
         pass
+
     def __str__(self):
         return f"Bubble({self.new_nt}->{self.bubbled_elems}, occs={self.occ_count})"
 
@@ -165,8 +167,9 @@ def derive_classes(oracle, leaves):
     # Update each of the terminals in leaves to instead be a new nonterminal
     # ParseNode pointing to the original terminal. Return the resulting parse
     # trees as well as a mapping of nonterminal to its character class.
-    return trees, classes #[ParseNode(START, False, [tree])
-            #for tree in trees], classes
+    return trees, classes  # [ParseNode(START, False, [tree])
+    # for tree in trees], classes
+
 
 def build_naive_parse_trees(leaves: List[List[ParseNode]]):
     """
@@ -344,7 +347,7 @@ def build_trees(oracle, leaves):
                 print("\n(partial)")
                 coalesce_caused = True
 
-       # grammar = minimize(grammar)
+        # grammar = minimize(grammar)
         new_size = grammar.size()
         if coalesce_caused:
             return 1, new_size, new_trees
@@ -352,7 +355,7 @@ def build_trees(oracle, leaves):
             return 0, new_size, trees
 
     # Run the character class algorithm to create the first layer of tree
-    #best_trees, classes = derive_classes(oracle, leaves)
+    # best_trees, classes = derive_classes(oracle, leaves)
     best_trees = build_naive_parse_trees(leaves)
     print("Scoring...")
     best_score, best_size, best_trees = score(best_trees)
@@ -471,7 +474,8 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
                 derivable.update(get_all_derivable_strings(child, replacer_nt))
             return derivable
 
-    def partially_coalescable(replaceable_everywhere: str, replaceable_in_some_rules: str, trees) -> Dict[Tuple[str, Tuple[str]], List[int]]:
+    def partially_coalescable(replaceable_everywhere: str, replaceable_in_some_rules: str, trees) -> Dict[
+        Tuple[str, Tuple[str]], List[int]]:
         """
         `replaceable_everywhere` and `replaceable_in_some_rules` are both nonterminals
 
@@ -501,7 +505,8 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
         # Check whether `replaceable_everywhere` is replaceable by `replaceable_in_some_rules` everywhere.
         everywhere_by_some_candidates = []
         for tree in trees:
-            everywhere_by_some_candidates.extend(get_strings_with_replacement(tree, replaceable_everywhere, in_some_derivable_strings))
+            everywhere_by_some_candidates.extend(
+                get_strings_with_replacement(tree, replaceable_everywhere, in_some_derivable_strings))
 
         if len(everywhere_by_some_candidates) > MAX_SAMPLES_PER_COALESCE:
             everywhere_by_some_candidates = random.sample(everywhere_by_some_candidates, MAX_SAMPLES_PER_COALESCE)
@@ -523,10 +528,10 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
             rule, posn = replacement_loc
             candidate_strs = []
             for tree in trees:
-                candidate_strs.extend(get_strings_with_replacement_in_rule(tree, rule, posn, everywhere_derivable_strings))
+                candidate_strs.extend(
+                    get_strings_with_replacement_in_rule(tree, rule, posn, everywhere_derivable_strings))
             if len(candidate_strs) > MAX_SAMPLES_PER_COALESCE:
-                candidate_strs = random.sample(everywhere_by_some_candidates,
-                                               MAX_SAMPLES_PER_COALESCE)
+                candidate_strs = random.sample(candidate_strs, MAX_SAMPLES_PER_COALESCE)
             else:
                 random.shuffle(candidate_strs)
 
@@ -540,7 +545,7 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
         return replacing_positions
 
     def get_updated_grammar(old_grammar, partial_replacement_locs: Dict[Tuple[str, Tuple[str]], List[int]],
-                       full_replacement_nt: str, nt_to_partially_replace: str, new_nt: str):
+                            full_replacement_nt: str, nt_to_partially_replace: str, new_nt: str):
         """
         Creates a copy of `old_grammar` so that the locations in `partial_replacement_locs` are replaced by `new_nt`, and all
         occurrences of `full_relacement_nt` are replaced by `new_nt`
@@ -572,7 +577,7 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
         return grammar
 
     def update_tree(new_tree: ParseNode, partial_replacement_locs: Dict[Tuple[str, Tuple[str]], List[int]],
-                     full_replacement_nt: str, new_nt: str):
+                    full_replacement_nt: str, new_nt: str):
         """
         Updates `new_tree` s.t. the locations in `partial_replacement_locs` are replaced by `new_nt`, and all
         occurrences of `full_relacement_nt` are replaced by `new_nt`.
@@ -591,7 +596,7 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
             new_tree.payload = new_nt
 
     def get_updated_trees(trees: List[ParseNode], rules_to_replace: Dict[Tuple[str, Tuple[str]], List[int]],
-                      replacer_orig: str, replacer: str):
+                          replacer_orig: str, replacer: str):
         rest = []
         for tree in trees:
             new_tree = tree.copy()
@@ -708,7 +713,12 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
             replaced_strings.update(get_strings_with_replacement(tree, replacee, replacer_derivable_strings))
 
         replaced_strings = list(replaced_strings)
-        random.shuffle(replaced_strings)
+        if len(replaced_strings) > MAX_SAMPLES_PER_COALESCE:
+            replaced_strings = random.sample(replaced_strings, MAX_SAMPLES_PER_COALESCE)
+        else:
+            random.shuffle(replaced_strings)
+
+
 
         # Return True if all the replaced_strings are valid
         for s in replaced_strings:
@@ -720,42 +730,43 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
 
     def get_updated_trees(get_class: Dict[str, str], trees):
 
-            def replace_coalesced_nonterminals(node: ParseNode):
-                """
+        def replace_coalesced_nonterminals(node: ParseNode):
+            """
                 Rewrites node so that coalesced nonterminals point to their
                 class nonterminal. For non-coalesced nonterminals, get_class
                 just gives the original nonterminal
                 """
-                if node.is_terminal:
-                    return
-                else:
-                    node.payload = get_class.get(node.payload, node.payload)
-                    for child in node.children:
-                        replace_coalesced_nonterminals(child)
+            if node.is_terminal:
+                return
+            else:
+                node.payload = get_class.get(node.payload, node.payload)
+                for child in node.children:
+                    replace_coalesced_nonterminals(child)
 
-            def fix_double_indirection(node: ParseNode):
-                """
+        def fix_double_indirection(node: ParseNode):
+            """
                 Fix parse trees that have an expansion of the for tx->tx (only one child)
                 since we've removed such double indirection while merging nonterminals
                 """
-                if node.is_terminal:
-                    return
+            if node.is_terminal:
+                return
 
-                while len(node.children) == 1 and node.children[0].payload == node.payload:
-                    # Won't go on forever because eventually length of children will be not 1,
-                    # or the children's payload will not be the same as the top node (e.g. if
-                    # the child is a terminal)
-                    node.children = node.children[0].children
+            while len(node.children) == 1 and node.children[0].payload == node.payload:
+                # Won't go on forever because eventually length of children will be not 1,
+                # or the children's payload will not be the same as the top node (e.g. if
+                # the child is a terminal)
+                node.children = node.children[0].children
 
-                for child in node.children:
-                    fix_double_indirection(child)
-            new_trees = []
-            for tree in trees:
-                new_tree = tree.copy()
-                replace_coalesced_nonterminals(new_tree)
-                fix_double_indirection(new_tree)
-                new_trees.append(new_tree)
-            return new_trees
+            for child in node.children:
+                fix_double_indirection(child)
+
+        new_trees = []
+        for tree in trees:
+            new_tree = tree.copy()
+            replace_coalesced_nonterminals(new_tree)
+            fix_double_indirection(new_tree)
+            new_trees.append(new_tree)
+        return new_trees
 
     def get_updated_grammar(classes: Dict[str, List[str]], get_class: Dict[str, str], grammar):
         # Traverse through the grammar, and update each nonterminal to point to
@@ -833,7 +844,6 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
             grammar = get_updated_grammar(classes, get_class, grammar)
             trees = get_updated_trees(get_class, trees)
             coalesce_caused = True
-
 
     return grammar, trees, coalesce_caused
 
