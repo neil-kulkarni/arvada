@@ -10,7 +10,31 @@ from union import UnionFind
 import numpy as np
 from replacement_utils import get_strings_with_replacement, get_strings_with_replacement_in_rule
 
-MAX_SAMPLES_PER_COALESCE = 500
+MAX_SAMPLES_PER_COALESCE = 50
+MAX_GROUP_LEN=7
+
+class Bubble:
+    def __init__(self, new_nt: str, bubbled_elems : List[str]):
+        self.new_nt = new_nt
+        self.bubbled_elems = bubbled_elems
+        self.direct_parents = []
+        self.occ_count = 1
+
+    def add_direct_parent(self, parent):
+        self.direct_parents.append(parent)
+
+    def add_occurrence(self):
+        self.occ_count += 1
+
+    def add_context(self, context_lhs, context_rhs):
+        #TODO
+        pass
+
+    # def get_new_nt(self):
+    #     return self.new_nt
+    #
+    # def get_bubble_elems(self):
+    #     return self.bubbled_elems
 
 
 def allocate_tid():
@@ -152,7 +176,7 @@ def build_naive_parse_trees(leaves: List[List[ParseNode]]):
     return trees
 
 
-def group(trees):
+def group(trees) -> List[Bubble]:
     """
     TREES is a set of ParseTrees.
 
@@ -171,22 +195,23 @@ def group(trees):
     # I.e. t2 t3 t4 in t1 -> t2 t3 t4, but not in t1 -> t2 t2 t3 t4
     full_bubbles = defaultdict(int)
 
-    def add_groups_for_tree(tree: ParseNode, groups: Dict[str, Tuple[List[ParseNode], str, int]]):
+    def add_groups_for_tree(tree: ParseNode, groups: Dict[str, Bubble]):
         """
         Add all groups possible groupings derived from the parse tree `tree` to `groups`.
         """
         children_lst = tree.children
         for i in range(len(children_lst)):
-            for j in range(i + 2, len(children_lst) + 1):
+            for j in range(i + 2, min(len(children_lst) + 1, i + MAX_GROUP_LEN)):
                 tree_sublist = children_lst[i:j]
                 tree_substr = ''.join([t.payload for t in tree_sublist])
                 if i == 0 and j == len(children_lst):
+                    # TODO: add direct parent to bubble
                     full_bubbles[tree_substr] += 1
                 if not tree_substr in groups:
-                    groups[tree_substr] = (tree_sublist, allocate_tid(), 1)
+                    groups[tree_substr] = Bubble(allocate_tid(), tree_sublist)
                 else:
-                    tree_sublist, tid, count = groups[tree_substr]
-                    groups[tree_substr] = (tree_sublist, tid, count + 1)
+                    bubble: Bubble = groups[tree_substr]
+                    bubble.add_occurrence()
 
         # Recurse down in the other layers
         for child in tree.children:
@@ -200,17 +225,17 @@ def group(trees):
 
     # Remove sequences if they're the full list of children of a rule and don't appear anywhere else
     for bubble in full_bubbles:
-        if groups[bubble][2] == full_bubbles[bubble]:
+        if groups[bubble].occ_count == full_bubbles[bubble]:
             groups.pop(bubble)
 
     # Return the set of repeated groupings as an iterable
-    groups = list(groups.items())
+    groups = list(groups.values())
     # random.shuffle(groups)
-    groups = sorted(groups, key=lambda group: (group[1][2], len(group[1][0])), reverse=True)
+    groups = sorted(groups, key=lambda bubble: (bubble.occ_count, len(bubble.bubbled_elems)), reverse=True)
     return groups
 
 
-def apply(grouping: Tuple[str, Tuple[List[ParseNode], str]], trees: List[ParseNode]):
+def apply(grouping: Bubble, trees: List[ParseNode]):
     """
     GROUPING is a two-element tuple data structure that represents a contiguous
     sequence of nonterminals that appears someplace in LAYERS. The first element
@@ -253,7 +278,7 @@ def apply(grouping: Tuple[str, Tuple[List[ParseNode], str]], trees: List[ParseNo
 
         Returns the new layer. If no updates can be made, do nothing.
         """
-        group_str, (group_lst, id, _) = grouping
+        group_lst, id = grouping.bubbled_elems, grouping.new_nt
         new_tree, ng = tree.copy(), len(group_lst)
 
         # Do replacments in all the children first
@@ -295,7 +320,7 @@ def build_trees(oracle, leaves):
         2. If a replacement was possible, repeat (1)
     """
 
-    def score(trees: List[ParseNode], new_bubble: Optional[Tuple[List[ParseNode], str, int]] = None) \
+    def score(trees: List[ParseNode], new_bubble: Optional[Bubble] = None) \
             -> Tuple[int, List[ParseNode]]:
         """[
         TREES is a list of Parse Trees.
@@ -336,15 +361,15 @@ def build_trees(oracle, leaves):
         for i, grouping in enumerate(all_groupings):
             print(('Bubbling iteration (%d, %d, %d)...' % (count, i + 1, nlg)).ljust(50), end='\r')
             new_trees = apply(grouping, best_trees)
-            new_score, size, new_trees = score(new_trees, grouping[1])
+            new_score, size, new_trees = score(new_trees, grouping)
             if new_score > 0:
-                print(f"Successful grouping (coalesce): {grouping}")
+                print(f"Successful grouping (coalesce): {grouping.new_nt} -> {grouping.bubbled_elems}")
                 best_trees = new_trees
                 best_size = min(best_size, size)
                 updated = True
                 break
             elif size < best_size:
-                print(f"Successful grouping (size, {best_size} vs. {size}): {grouping}")
+                print(f"Successful grouping (size, {best_size} vs. {size}): {grouping.new_nt} -> {grouping.bubbled_elems}")
                 best_trees = new_trees
                 best_size = size
                 updated = True
@@ -403,7 +428,7 @@ def build_grammar(trees):
 
 
 def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
-                     coalesce_target: Tuple[List[ParseNode], str, int] = None):
+                     coalesce_target: Bubble = None):
     """
     Performs partial coalesces on the grammar. That is, for pairs of nonterminals (nt1, nt2), checks whether:
        if nt1 can be replaced by nt2 everywhere, are there any occurrences of nt2 where nt1 can replace nt2.
@@ -572,7 +597,7 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
     nonterminals = list(nonterminals)
 
     if coalesce_target is not None:
-        fully_replaceable = [coalesce_target[1]]
+        fully_replaceable = [coalesce_target.new_nt]
     else:
         fully_replaceable = nonterminals
 
@@ -612,7 +637,7 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
 
 
 def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
-             coalesce_target: Tuple[List[ParseNode], str, int] = None):
+             coalesce_target: Bubble = None):
     """
     ORACLE is a Lark parser for the grammar we seek to find. We ask the oracle
     yes or no replacement questions in this method.
@@ -759,7 +784,7 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
     # Get all unique pairs of nonterminals
     pairs = []
     if coalesce_target is not None:
-        first = coalesce_target[1]
+        first = coalesce_target.new_nt
         for second in nonterminals:
             if first == second:
                 continue
