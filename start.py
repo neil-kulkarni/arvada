@@ -1,12 +1,10 @@
-import time
 from collections import defaultdict
 from typing import List, Tuple, Set, Dict, Optional, Union
 
 from bubble import Bubble
 from oracle import ParseException
-from parse_tree import ParseNode, ParseTreeList
+from parse_tree import ParseNode, ParseTreeList, build_grammar, START
 from grammar import *
-from input import clean_terminal
 from union import UnionFind
 from replacement_utils import get_strings_with_replacement, get_strings_with_replacement_in_rule, \
     lvl_n_derivable
@@ -35,8 +33,7 @@ def allocate_tid():
 
 
 # Globally unique nonterminal number
-next_tid = 0
-START = allocate_tid()  # The start nonterminal is t0
+next_tid = 1
 
 
 def build_start_grammar(oracle, leaves):
@@ -455,54 +452,6 @@ def build_trees(oracle, leaves):
     return best_trees, {}
 
 
-def build_grammar(trees):
-    """
-    CONFIG is the required configuration options for GrammarGenerator classes.
-
-    TREES is a list of fully constructed parse trees. This method builds a
-    GrammarNode that is the disjunction of the parse trees, and returns it.
-    """
-
-    def build_rules(grammar_node, parse_node, rule_map):
-        """
-        Adds the rules defined in PARSE_NODE and all of its subtrees to the
-        GRAMMAR_NODE via recursion. RULE_MAP is used to keep track of duplicate
-        rules, so they are not added multiple times to the grammar.
-        """
-        # Terminals and nodes with no children do not define rules
-        if parse_node.is_terminal or len(parse_node.children) == 0:
-            return
-
-        # The current ParseNode defines a rule. Add this rule to the grammar.
-        #        t0
-        #       / | \
-        #     t1  a  b
-        #    / |
-        #    ...
-        # E.g. the ParseNode t0 defines the rule t0 -> t1 a b
-        rule_body = [clean_terminal(child.payload) if child.is_terminal
-                     else child.payload
-                     for child in parse_node.children]
-        rule = Rule(parse_node.payload)
-        rule.add_body(rule_body)
-        rule_str = ''.join([elem for elem in rule_body])
-        if rule.start not in rule_map: rule_map[rule.start] = set()
-        if rule_str not in rule_map[rule.start]:
-            grammar_node.add_rule(rule)
-            rule_map[rule.start].add(rule_str)
-
-        # Recurse on the children of this ParseNode so the rule they define
-        # are also added to the grammar.
-        for child in parse_node.children:
-            build_rules(grammar_node, child, rule_map)
-
-    # Construct the initial grammar node without children, then fill them.
-    grammar, rule_map = Grammar(START), {}
-    for tree in trees:
-        build_rules(grammar, tree, rule_map)
-    return grammar
-
-
 def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
                      coalesce_target: Bubble = None):
     """
@@ -537,7 +486,7 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
                 derivable.update(get_all_derivable_strings(child, replacer_nt))
             return derivable
 
-    def partially_coalescable(replaceable_everywhere: str, replaceable_in_some_rules: str, trees) -> Dict[
+    def partially_coalescable(replaceable_everywhere: str, replaceable_in_some_rules: str, trees: ParseTreeList) -> Dict[
         Tuple[str, Tuple[str]], List[int]]:
         """
         `replaceable_everywhere` and `replaceable_in_some_rules` are both nonterminals
@@ -546,7 +495,7 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
         occurrence of `replaceable_everywhere`, returns the rules (expansions) in which
         `replaceable_in_some_rules` can be replaced by `replaceable_everywhere`
         """
-
+        language_expanded = False
         # Get all the expansions where `replaceable_in_some_rules` appears
         partial_replacement_locs: List[Tuple[Tuple[str, List[str]], int]] = []
         for rule_start, rule in grammar.rules.items():
@@ -576,11 +525,13 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
         else:
             random.shuffle(everywhere_by_some_candidates)
 
-        try:
-            for replaced_str in everywhere_by_some_candidates:
-                oracle.parse(replaced_str)
-        except Exception as e:
-            return []
+        if not trees.represented_by_derived_grammar(everywhere_by_some_candidates):
+            language_expanded = True
+            try:
+                for replaced_str in everywhere_by_some_candidates:
+                    oracle.parse(replaced_str)
+            except Exception as e:
+                return []
 
         if (len(everywhere_derivable_strings) == 0): return {}
 
@@ -598,13 +549,20 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
             else:
                 random.shuffle(candidate_strs)
 
+            if trees.represented_by_derived_grammar(candidate_strs):
+                replacing_positions[(rule[0], tuple(rule[1]))].append(posn)
+                continue
+
             try:
                 for candidate in candidate_strs:
                     oracle.parse(candidate)
                 replacing_positions[(rule[0], tuple(rule[1]))].append(posn)
+                language_expanded = True
             except ParseException as e:
                 continue
 
+        if not language_expanded:
+            return []
         return replacing_positions
 
     def get_updated_grammar(old_grammar, partial_replacement_locs: Dict[Tuple[str, Tuple[str]], List[int]],
@@ -664,7 +622,7 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
         if new_tree.payload == full_replacement_nt:
             new_tree.payload = new_nt
 
-    def get_updated_trees(trees: List[ParseNode], rules_to_replace: Dict[Tuple[str, Tuple[str]], List[int]],
+    def get_updated_trees(trees: ParseTreeList, rules_to_replace: Dict[Tuple[str, Tuple[str]], List[int]],
                           replacer_orig: str, replacer: str):
         rest = []
         for tree in trees:
@@ -691,6 +649,7 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
     # The main work of the function.
     replacement_happened = False
     fully_replaced = {}
+    trees = ParseTreeList(trees, grammar)
     for nt_to_fully_replace in fully_replaceable:
         for nt_to_partially_replace in partially_replaceable:
             while nt_to_fully_replace in fully_replaced and nt_to_fully_replace != START:
@@ -699,6 +658,8 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
                 nt_to_partially_replace = fully_replaced[nt_to_partially_replace]
             if nt_to_fully_replace == nt_to_partially_replace:
                 continue
+            if nt_to_partially_replace == 't9' and nt_to_fully_replace == 't0':
+                pass
             replacement_positions = partially_coalescable(nt_to_fully_replace, nt_to_partially_replace, trees)
             if len(replacement_positions) > 0:
                 print(f"we found that {nt_to_partially_replace} could replace {nt_to_fully_replace} everywhere, "
@@ -710,10 +671,12 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
                     new_nt = allocate_tid()
                 grammar = get_updated_grammar(grammar, replacement_positions, nt_to_fully_replace,
                                               nt_to_partially_replace, new_nt)
-                trees = get_updated_trees(trees, replacement_positions, nt_to_fully_replace, new_nt)
+                inner_trees = get_updated_trees(trees, replacement_positions, nt_to_fully_replace, new_nt)
+                trees = ParseTreeList(inner_trees, grammar)
                 fully_replaced[nt_to_fully_replace] = new_nt
                 replacement_happened = True
 
+    trees = trees.inner_list
     return grammar, trees, replacement_happened
 
 
@@ -900,7 +863,7 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
     coalesce_caused = False
     coalesced_into = {}
     checked = set()
-    tree_list = ParseTreeList(trees)
+    tree_list = ParseTreeList(trees, grammar)
     for pair in pairs:
         first, second = pair
         ### update the pair for the new grammar
@@ -928,7 +891,7 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
             coalesced_into[second] = class_nt
             grammar = get_updated_grammar(classes, get_class, grammar)
             new_inner_trees = get_updated_trees(get_class, tree_list.inner_list)
-            tree_list = ParseTreeList(new_inner_trees)
+            tree_list = ParseTreeList(new_inner_trees, grammar)
             coalesce_caused = True
 
     trees = tree_list.inner_list
