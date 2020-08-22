@@ -3,13 +3,13 @@ from collections import defaultdict
 from typing import List, Tuple, Set, Dict, Optional
 
 from oracle import ParseException
-from parse_tree import ParseNode
+from parse_tree import ParseNode, ParseTreeList
 from grammar import *
 from graph import Graph
 from input import clean_terminal
 from union import UnionFind
-import numpy as np
-from replacement_utils import get_strings_with_replacement, get_strings_with_replacement_in_rule
+from replacement_utils import get_strings_with_replacement, get_strings_with_replacement_in_rule, \
+    lvl_n_derivable
 
 MAX_SAMPLES_PER_COALESCE = 50
 MAX_GROUP_LEN = 7
