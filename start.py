@@ -167,8 +167,7 @@ def derive_classes(oracle, leaves):
     # Update each of the terminals in leaves to instead be a new nonterminal
     # ParseNode pointing to the original terminal. Return the resulting parse
     # trees as well as a mapping of nonterminal to its character class.
-    return trees, classes  # [ParseNode(START, False, [tree])
-    # for tree in trees], classes
+    return trees, classes
 
 
 def build_naive_parse_trees(leaves: List[List[ParseNode]]):
@@ -684,42 +683,77 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
     (found equivalent).
     """
 
-    def replacer_strings(tree, replacer_nt, derivable):
+    # def replacer_strings(tree, replacer_nt, derivable):
+    #     """
+    #     Adds to the set DERIVABLE all those strings derivable from the
+    #     REPLACER_NT in TREE.
+    #     """
+    #
+    #     def node_string(tree):
+    #         """
+    #         Returns the string derived from the leaves of this tree.
+    #         """
+    #         if tree.is_terminal:
+    #             return tree.payload
+    #         return ''.join([node_string(c) for c in tree.children])
+    #
+    #     if tree.is_terminal:
+    #         return derivable
+    #     elif tree.payload == replacer_nt:
+    #         derivable.add(node_string(tree))
+    #     else:
+    #         for child in tree.children:
+    #            replacer_strings(child, replacer_nt, derivable)
+
+    # def replaces(replacer, replacee, trees):
+    #     """
+    #     For every string derived from REPLACEE, replace it with all possible
+    #     strings derived from REPLACER, and check if the resulting string is still valid.
+    #
+    #     Return True if this is the always the case.
+    #
+    #     Relies on the fact that TREES is unchanged from the time when it was
+    #     inputted into coalesce.
+    #     """
+    #     # Get the set of strings derivable from replacer
+    #     replacer_derivable_strings = set()
+    #     for tree in trees:
+    #         replacer_strings(tree, replacer, replacer_derivable_strings)
+    #
+    #     # Get the set of positive examples with strings derivable from replacer
+    #     # replaced with strings derivable from replacee
+    #     replaced_strings = set()
+    #     for tree in trees:
+    #         replaced_strings.update(get_strings_with_replacement(tree, replacee, replacer_derivable_strings))
+    #
+    #     if len(replaced_strings) == 0:
+    #         print(replacer, replacee)
+    #         for tree in trees:
+    #             print(tree)
+    #     assert (replaced_strings)
+    #
+    #     replaced_strings = list(replaced_strings)
+    #     if len(replaced_strings) > MAX_SAMPLES_PER_COALESCE:
+    #         replaced_strings = random.sample(replaced_strings, MAX_SAMPLES_PER_COALESCE)
+    #     else:
+    #         random.shuffle(replaced_strings)
+    #
+    #
+    #
+    #     # Return True if all the replaced_strings are valid
+    #     for s in replaced_strings:
+    #         try:
+    #             oracle.parse(s)
+    #         except:
+    #             return False
+    #     return True
+
+
+    def replacement_valid(replacer_derivable_strings, replacee, trees : ParseTreeList) -> Tuple[bool, Set[str]]:
         """
-        Adds to the set DERIVABLE all those strings derivable from the
-        REPLACER_NT in TREE.
+        Returns true if every string derivable from `replacee` in `trees` can be replaced
+        by every string in `replacer_derivable_strings`
         """
-
-        def node_string(tree):
-            """
-            Returns the string derived from the leaves of this tree.
-            """
-            if tree.is_terminal:
-                return tree.payload
-            return ''.join([node_string(c) for c in tree.children])
-
-        if tree.is_terminal:
-            return derivable
-        elif tree.payload == replacer_nt:
-            derivable.add(node_string(tree))
-        else:
-            for child in tree.children:
-                replacer_strings(child, replacer_nt, derivable)
-
-    def replaces(replacer, replacee, trees):
-        """
-        For every string derived from REPLACEE, replace it with all possible
-        strings derived from REPLACER, and check if the resulting string is still valid.
-
-        Return True if this is the always the case.
-
-        Relies on the fact that TREES is unchanged from the time when it was
-        inputted into coalesce.
-        """
-        # Get the set of strings derivable from replacer
-        replacer_derivable_strings = set()
-        for tree in trees:
-            replacer_strings(tree, replacer, replacer_derivable_strings)
 
         # Get the set of positive examples with strings derivable from replacer
         # replaced with strings derivable from replacee
@@ -728,7 +762,7 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
             replaced_strings.update(get_strings_with_replacement(tree, replacee, replacer_derivable_strings))
 
         if len(replaced_strings) == 0:
-            print(replacer, replacee)
+            print(replacer_derivable_strings, replacee)
             for tree in trees:
                 print(tree)
         assert (replaced_strings)
@@ -739,15 +773,49 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
         else:
             random.shuffle(replaced_strings)
 
-
-
         # Return True if all the replaced_strings are valid
         for s in replaced_strings:
             try:
                 oracle.parse(s)
             except:
-                return False
+                return False, set()
+        return True, set(replaced_strings)
+
+    def replacement_valid_and_expanding(nt1, nt2, trees: ParseTreeList):
+        """
+        Returns true if nt1 and nt2 can be merged in the grammar while expanding the set of inputs accepted
+        by the grammar, and not admitting any invalid inputs.
+        """
+        nt1_derivable_strings = set()
+        nt2_derivable_strings = set()
+
+        if isinstance(coalesce_target, list):
+            nt1_derivable_strings.update(lvl_n_derivable(trees, nt1, 1))
+            nt2_derivable_strings.update(lvl_n_derivable(trees, nt2, 1))
+        else:
+            nt1_derivable_strings.update(lvl_n_derivable(trees, nt1, 0))
+            nt2_derivable_strings.update(lvl_n_derivable(trees, nt2, 0))
+
+
+        # First check if the replacement is expanding
+        if nt1_derivable_strings == nt2_derivable_strings:
+            return False
+
+        nt1_valid, nt1_check_strings = replacement_valid(nt1_derivable_strings, nt2, trees)
+        if not nt1_valid:
+            return False
+        nt2_valid, nt2_check_strings = replacement_valid(nt2_derivable_strings, nt1, trees)
+        if not nt2_valid:
+            return False
+
+        base_strings = trees.represented_strings()
+
+        if nt1_check_strings.issubset(base_strings) and nt2_check_strings.issubset(base_strings):
+            print("\n[INFO] Succesfully failed at the issubset check in coalesce!")
+            return False
+
         return True
+
 
     def get_updated_trees(get_class: Dict[str, str], trees):
 
@@ -840,6 +908,7 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
     coalesce_caused = False
     coalesced_into = {}
     checked = set()
+    tree_list = ParseTreeList(trees)
     for pair in pairs:
         first, second = pair
         ### update the pair for the new grammar
@@ -856,7 +925,7 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
             checked.add((first, second))
         ###
         # If the nonterminals can replace each other in every context, they are replaceable
-        if replaces(first, second, trees) and replaces(second, first, trees):
+        if replacement_valid_and_expanding(first, second, tree_list):
             if first == START or second == START:
                 class_nt = START
             else:
@@ -866,9 +935,11 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
             coalesced_into[first] = class_nt
             coalesced_into[second] = class_nt
             grammar = get_updated_grammar(classes, get_class, grammar)
-            trees = get_updated_trees(get_class, trees)
+            new_inner_trees = get_updated_trees(get_class, tree_list.inner_list)
+            tree_list = ParseTreeList(new_inner_trees)
             coalesce_caused = True
 
+    trees = tree_list.inner_list
     return grammar, trees, coalesce_caused
 
 

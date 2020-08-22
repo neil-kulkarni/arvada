@@ -5,6 +5,7 @@ from typing import Tuple, List, Set
 
 import numpy as np
 
+from grammar import Grammar
 from parse_tree import ParseNode
 REPLACE_CONST = '[[:REPLACEME]]'
 MAX_SAMPLES = 10
@@ -20,6 +21,54 @@ def muh_product(lst):
         prod *= e
     return prod
 
+@functools.lru_cache()
+def lvl_n_derivable(trees, target_nt, n, max_samples=1000):
+    """
+    Get the strings that are level n derivable from `trees`
+    >>> tree_1 = ParseNode('t0', False, [ParseNode('t3', False, [ParseNode('3', True, [])])])
+    >>> tree_2 = ParseNode('t0', False, [ParseNode('t1', False, [ParseNode('(', True, [])]), tree_1, ParseNode('t2', False, [ParseNode(')', True, [])])])
+    >>> tree_3 = ParseNode('t0', False, [tree_1, ParseNode('t4', False, [ParseNode('*', True, [])]), tree_1])
+    >>> trees = [tree_1, tree_2, tree_3]
+    >>> lvl_n_derivable(trees, 't0', 0)
+    ['3', '(3)', '3*3']
+    >>> lvl_n_derivable(trees, 't0', 1)
+    ['3', '(3)', '((3))', '(3*3)', '3*3', '3*(3)', '3*3*3', '(3)*3', '(3)*(3)', '(3)*3*3', '3*3*(3)', '3*3*3*3']
+    >>> len(lvl_n_derivable(trees, 't0', 2, 10))
+    10
+    >>> lvl_n_derivable([tree_1, tree_2], 't0', 2)
+    ['3', '(3)', '((3))', '(((3)))']
+    """
+    ret_strs = set()
+    for tree in trees:
+        def get_str(pn: ParseNode):
+            if pn.is_terminal:
+                return fixup_terminal(pn.payload)
+            else:
+                return ''.join([get_str(c) for c in pn.children])
+        def process_tree(tree: ParseNode):
+             if tree.payload == target_nt:
+                if n == 0 or tree.is_terminal:
+                    ret_strs.add(get_str(tree))
+                else:
+                    child_strs = [lvl_n_derivable(trees, c.payload, n-1, max_samples) for c in tree.children]
+                    ret_strs.update(sample_from_product_ext(child_strs, max_samples))
+             else:
+                 for c in tree.children:
+                    process_tree(c)
+        process_tree(tree)
+    if len(ret_strs) > max_samples:
+        return random.sample(list(ret_strs), max_samples)
+    return list(ret_strs)
+
+def sample_from_product_ext(strings_per_child, num_samples):
+    lens_per_child = [len(spc) for spc in strings_per_child]
+    prod_size = muh_product(lens_per_child)
+    if prod_size < num_samples:
+        return [''.join(p) for p in itertools.product(*strings_per_child)]
+    else:
+        return sample_from_product(strings_per_child, num_samples, lens_per_child, prod_size)
+
+
 def sample_from_product(strings_per_child, num_samples, lens_per_child, prod_size):
     """
     Uniformly sample n strings from the product of strings_per_child.
@@ -29,7 +78,7 @@ def sample_from_product(strings_per_child, num_samples, lens_per_child, prod_siz
     >>> c = ['h', 'i']
     >>> all_string_occs = {''.join(p): 0 for p in itertools.product(a,b,c)}
     >>> for i in range(10000):
-    ...      samples = sample_from_product([a, b, c], 12)
+    ...      samples = sample_from_product([a, b, c ], 12, [3,4,2], 24)
     ...      for sample in samples:
     ...          all_string_occs[sample] += 1
     >>> print([ 0.48 < occ/10000 < 0.52 for occ in all_string_occs.values()])
@@ -146,6 +195,7 @@ def get_strings_with_replacement(tree: ParseNode, nt_to_replace: str, replacemen
     (not including the empty combo) of instances of `nt_to_replace` are replaced
     with one of the replacement strings in `replacement_strs`. Does not combine different
     strings from `replacement_strs` in the same instance.
+    >>> global MAX_SAMPLES; MAX_SAMPLES = 100
     >>> left_l3 = [ParseNode('t2', False, [ParseNode('"4"', True, [])]), ParseNode('t2', False, [ParseNode('"4"', True, [])])]
     >>> right_l3 = [ParseNode('t2', False, [ParseNode('"4"', True, [])])]
     >>> left_l2 = [ParseNode('t2', False, left_l3)]

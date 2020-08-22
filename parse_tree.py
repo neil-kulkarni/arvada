@@ -2,6 +2,49 @@ import random
 from collections import defaultdict
 from typing import List
 
+class ParseTreeList:
+    def __init__(self, start_list=None):
+        self.inner_list = [] if start_list is None else start_list
+        self.derivables_from_nt = defaultdict(set)
+        self.__compute_derivables()
+        self.derivable_cache_hash = hash(tuple(self.inner_list))
+
+    def __getitem__(self, item):
+        return self.inner_list[item]
+
+    def __setitem__(self, key, value):
+        self.inner_list[key] = value
+
+    def __iter__(self):
+        return self.inner_list.__iter__()
+
+    def append(self, value):
+        self.inner_list.append(value)
+
+    def represented_strings(self):
+        return self.derivable_in_trees('t0')
+
+    def derivable_in_trees(self, nt):
+        if self.derivable_cache_hash != hash(tuple(self.inner_list)):
+            self.__compute_derivables()
+            self.derivable_cache_hash = hash(tuple(self.inner_list))
+        return self.derivables_from_nt.get(nt, 0)
+
+    def __compute_derivables(self):
+        def __per_tree_helper(tree: ParseNode):
+            if tree.is_terminal:
+                return tree.payload
+            else:
+                derivable_here = "".join([__per_tree_helper(c) for c in tree.children])
+                self.derivables_from_nt[tree.payload].add(derivable_here)
+                return derivable_here
+
+        for tree in self.inner_list:
+            __per_tree_helper(tree)
+
+
+
+
 class ParseTree():
 
     MAX_TREE_DEPTH = 100
