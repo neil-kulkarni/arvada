@@ -3,7 +3,7 @@ import re
 from lark import Lark
 import random
 
-random.seed(0)
+#random.seed(0)
 
 class Grammar():
     """
