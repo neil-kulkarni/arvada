@@ -1,10 +1,19 @@
 import random
 from collections import defaultdict
-from typing import List
+from typing import List, Iterable
+
+from grammar import Rule, Grammar
+from input import clean_terminal
+START = 't0'
+
 
 class ParseTreeList:
-    def __init__(self, start_list=None):
+    def __init__(self, start_list=None, grammar=None):
         self.inner_list = [] if start_list is None else start_list
+        if self.inner_list and grammar is None:
+            self.grammar = build_grammar(self.inner_list)
+        elif start_list and grammar is not None:
+            self.grammar = grammar
         self.derivables_from_nt = defaultdict(set)
         self.__compute_derivables()
         self.derivable_cache_hash = hash(tuple(self.inner_list))
@@ -42,7 +51,27 @@ class ParseTreeList:
         for tree in self.inner_list:
             __per_tree_helper(tree)
 
+    def represented_by_derived_grammar(self, candidates: Iterable[str]):
+        """
+        !!!ASSUMES: grammar and tree_list are in sync. Help me.!!!
+           Don't use this if you don't know what that means.
 
+        Returns true if all the candidates are already representable by our grammar
+        """
+        candidates = set(candidates)
+        represented_strings = self.represented_strings();
+        if candidates.issubset(represented_strings):
+            return True
+        else:
+            grammar_parser = self.grammar.parser()
+            for candidate in candidates:
+                if candidate not in represented_strings:
+                    try:
+                        grammar_parser.parse(candidate)
+                    except Exception as e:
+                        return False
+
+        return True
 
     def in_my_grammar(self, candidate):
         """
@@ -64,7 +93,6 @@ class ParseTreeList:
 
 
 class ParseTree():
-
     MAX_TREE_DEPTH = 100
 
     def __init__(self, gen):
@@ -150,10 +178,12 @@ class ParseTree():
 
             # Filter rules_with_start to contain only the rules that have the
             # smallest number of nonterminals
-            rules_with_start = [rules_with_start[i] for i in range(len(rules_with_start)) if number_nonterminals[i] == min_nonterminals]
+            rules_with_start = [rules_with_start[i] for i in range(len(rules_with_start)) if
+                                number_nonterminals[i] == min_nonterminals]
 
         rind = random.randint(0, len(rules_with_start) - 1)
         return rules_with_start[rind]
+
 
 class ParseNode():
     def __init__(self, payload, is_terminal, children):
@@ -182,16 +212,17 @@ class ParseNode():
         does not reference the same object.
         """
         if self.is_terminal:
-            assert(len(self.children) == 0)
+            assert (len(self.children) == 0)
             return ParseNode(self.payload, True, [])
         else:
-            copy_children : List[ParseNode] = [child.copy() for child in self.children]
+            copy_children: List[ParseNode] = [child.copy() for child in self.children]
             return ParseNode(self.payload, False, copy_children)
 
     def __eq__(self, other):
         if not isinstance(other, ParseNode):
             return False
-        if self.payload != other.payload or self.is_terminal != other.is_terminal or len(self.children) != len(other.children):
+        if self.payload != other.payload or self.is_terminal != other.is_terminal or len(self.children) != len(
+                other.children):
             return False
         for idx in range(len(self.children)):
             if not self.children[idx] == other.children[idx]:
@@ -205,7 +236,7 @@ class ParseNode():
         return hash((self.payload, self.is_terminal, tuple(self.children)))
 
     def __str__(self):
-        def place_in_middle(s : str, strlen : int):
+        def place_in_middle(s: str, strlen: int):
             # Creates a string of length STRLEN in which s is placed in the middle
             # Assumes len(S) < STRLEN
             left_pad = (strlen - len(s)) // 2
@@ -217,16 +248,17 @@ class ParseNode():
 
         child_strs = [str(c) for c in self.children]
         child_str_widths = [len(c_str.split('\n')[0]) for c_str in child_strs]
-        pointing_strs_left = [place_in_middle('/', w) for w in child_str_widths[:(len(self.children))//2]]
-        pointing_strs_mid = [place_in_middle('|', w) for w in child_str_widths[(len(self.children))//2:(len(self.children) + 1)//2]]
-        pointing_strs_right = [place_in_middle('\\', w) for w in child_str_widths[(len(self.children)+ 1)//2:]]
+        pointing_strs_left = [place_in_middle('/', w) for w in child_str_widths[:(len(self.children)) // 2]]
+        pointing_strs_mid = [place_in_middle('|', w) for w in
+                             child_str_widths[(len(self.children)) // 2:(len(self.children) + 1) // 2]]
+        pointing_strs_right = [place_in_middle('\\', w) for w in child_str_widths[(len(self.children) + 1) // 2:]]
         pointing_str = ''.join(pointing_strs_left + pointing_strs_mid + pointing_strs_right)
         top = place_in_middle(self.pretty_payload().strip(), len(pointing_str))
         max_depth = max([len(child_str.split('\n')) for child_str in child_strs])
         pasted_children_layers = defaultdict(str)
         for child_str in child_strs:
             splits = child_str.split('\n')
-            splits = splits + ([' ' * len(splits[0])] *(max_depth - len(splits)))
+            splits = splits + ([' ' * len(splits[0])] * (max_depth - len(splits)))
             for layer, line in enumerate(splits):
                 pasted_children_layers[layer] += line
         pasted_children = '\n'.join([pasted_children_layers[i] for i in range(len(pasted_children_layers))])
@@ -237,3 +269,51 @@ class ParseNode():
             return self.children[0].payload
         else:
             return self.payload
+
+
+def build_grammar(trees):
+    """
+    CONFIG is the required configuration options for GrammarGenerator classes.
+
+    TREES is a list of fully constructed parse trees. This method builds a
+    GrammarNode that is the disjunction of the parse trees, and returns it.
+    """
+
+    def build_rules(grammar_node, parse_node, rule_map):
+        """
+        Adds the rules defined in PARSE_NODE and all of its subtrees to the
+        GRAMMAR_NODE via recursion. RULE_MAP is used to keep track of duplicate
+        rules, so they are not added multiple times to the grammar.
+        """
+        # Terminals and nodes with no children do not define rules
+        if parse_node.is_terminal or len(parse_node.children) == 0:
+            return
+
+        # The current ParseNode defines a rule. Add this rule to the grammar.
+        #        t0
+        #       / | \
+        #     t1  a  b
+        #    / |
+        #    ...
+        # E.g. the ParseNode t0 defines the rule t0 -> t1 a b
+        rule_body = [clean_terminal(child.payload) if child.is_terminal
+                     else child.payload
+                     for child in parse_node.children]
+        rule = Rule(parse_node.payload)
+        rule.add_body(rule_body)
+        rule_str = ''.join([elem for elem in rule_body])
+        if rule.start not in rule_map: rule_map[rule.start] = set()
+        if rule_str not in rule_map[rule.start]:
+            grammar_node.add_rule(rule)
+            rule_map[rule.start].add(rule_str)
+
+        # Recurse on the children of this ParseNode so the rule they define
+        # are also added to the grammar.
+        for child in parse_node.children:
+            build_rules(grammar_node, child, rule_map)
+
+    # Construct the initial grammar node without children, then fill them.
+    grammar, rule_map = Grammar(START), {}
+    for tree in trees:
+        build_rules(grammar, tree, rule_map)
+    return grammar
