@@ -1,23 +1,27 @@
-import re
+import time
 from collections import defaultdict
-from typing import List, Tuple, Set, Dict, Optional
+from typing import List, Tuple, Set, Dict, Optional, Union
 
 from bubble import Bubble
 from oracle import ParseException
 from parse_tree import ParseNode, ParseTreeList
 from grammar import *
-from graph import Graph
 from input import clean_terminal
 from union import UnionFind
 from replacement_utils import get_strings_with_replacement, get_strings_with_replacement_in_rule, \
     lvl_n_derivable
 
 MAX_SAMPLES_PER_COALESCE = 50
-MAX_GROUP_LEN = 7
+MAX_GROUP_LEN = 10
 
-
-
-
+def check_recall(oracle, grammar: Grammar):
+    positives = grammar.sample_positives(10, 10)
+    for pos in positives:
+        try:
+            oracle.parse(pos)
+        except:
+            return False
+    return True
 
 
 def allocate_tid():
@@ -159,7 +163,7 @@ def build_naive_parse_trees(leaves: List[List[ParseNode]]):
     return trees
 
 
-def group(trees) -> List[Bubble]:
+def group(trees, max_group_size) -> List[Bubble]:
     """
     TREES is a set of ParseTrees.
 
@@ -178,44 +182,113 @@ def group(trees) -> List[Bubble]:
     # I.e. t2 t3 t4 in t1 -> t2 t3 t4, but not in t1 -> t2 t2 t3 t4
     full_bubbles = defaultdict(int)
 
-    def add_groups_for_tree(tree: ParseNode, groups: Dict[str, Bubble]):
+    def add_groups_for_tree(tree: ParseNode, bubbles: Dict[str, Bubble], left_context="START", right_context ="END"):
         """
         Add all groups possible groupings derived from the parse tree `tree` to `groups`.
         """
         children_lst = tree.children
+
         for i in range(len(children_lst)):
-            for j in range(i + 2, min(len(children_lst) + 1, i + MAX_GROUP_LEN)):
+            for j in range(i + 1, min(len(children_lst) + 1, i + max_group_size + 1)):
                 tree_sublist = children_lst[i:j]
                 tree_substr = ''.join([t.payload for t in tree_sublist])
                 if i == 0 and j == len(children_lst):
                     # TODO: add direct parent to bubble
                     full_bubbles[tree_substr] += 1
-                if not tree_substr in groups:
-                    groups[tree_substr] = Bubble(allocate_tid(), tree_sublist)
+
+                lhs_context = [ParseNode(left_context, True, [])] + children_lst[:i]
+                rhs_context = children_lst[j:] + [ParseNode(right_context, True, [])]
+
+                if not tree_substr in bubbles:
+                    bubble = Bubble(allocate_tid(), tree_sublist)
+                    bubble.add_context(lhs_context, rhs_context)
+                    bubbles[tree_substr] = bubble
                 else:
-                    bubble: Bubble = groups[tree_substr]
+                    bubble: Bubble = bubbles[tree_substr]
                     bubble.add_occurrence()
+                    bubble.add_context(lhs_context, rhs_context)
 
         # Recurse down in the other layers
-        for child in tree.children:
+        for i, child in enumerate(tree.children):
+            lhs = left_context if i == 0 else 'DUMMY'
+            rhs = right_context if i == len(tree.children) else 'DUMMY'
             if not child.is_terminal:
-                add_groups_for_tree(child, groups)
+                add_groups_for_tree(child, bubbles, lhs, rhs)
 
     # Compute a set of all possible groupings
-    groups = {}
+    bubbles = {}
     for tree in trees:
-        add_groups_for_tree(tree, groups)
+        add_groups_for_tree(tree, bubbles)
 
     # Remove sequences if they're the full list of children of a rule and don't appear anywhere else
-    for bubble in full_bubbles:
-        if groups[bubble].occ_count == full_bubbles[bubble]:
-            groups.pop(bubble)
+    for bubble_str in full_bubbles:
+        if bubbles[bubble_str].occ_count == full_bubbles[bubble_str]:
+            bubbles.pop(bubble_str)
+
+    bubbles = score_and_sort_bubbles(bubbles)
 
     # Return the set of repeated groupings as an iterable
-    groups = list(groups.values())
-    # random.shuffle(groups)
-    groups = sorted(groups, key=lambda bubble: (bubble.occ_count, len(bubble.bubbled_elems)), reverse=True)
-    return groups
+    return bubbles
+
+
+def score_and_sort_bubbles(bubbles: Dict[str, Bubble]) -> List[Union[Bubble, Tuple[Bubble, Bubble]]]:
+    """
+    Given a set of bubbles, returns a sorted list of (tuples of) bubbles, sorted by a score on how
+    likely the bubble(s) is to increase the size of the grammar.
+    Single bubble --> likely coalesces with existing nonterminal
+    Double bubble --> likely coalesces with each other
+    """
+    bubble_lst = list(sorted(list(bubbles.values()), key=lambda x: len(x.bubbled_elems), reverse=True))
+    bubble_pairs = []
+    for i in range(len(bubble_lst)):
+        for j in range(i + 1, len(bubble_lst)):
+            first_bubble: Bubble = bubble_lst[i]
+            second_bubble: Bubble = bubble_lst[j]
+            # Pairs of existing terminals we don't care about
+            if len(first_bubble.bubbled_elems) == len(second_bubble.bubbled_elems) == 1:
+                continue
+            # Skip overlapping/conflicting pairs
+            first_prevents_second, second_prevents_first = first_bubble.application_breaks_other(second_bubble)
+            if first_prevents_second and second_prevents_first:
+                continue
+
+            # Score both for similarity of context and occurrence of the bubbles
+            similarity = first_bubble.context_similarity(second_bubble)
+            if len(first_bubble.bubbled_elems) == 1:
+                commonness = sum([v for v in second_bubble.contexts.values()]) / 2
+            elif len(second_bubble.bubbled_elems) == 1:
+                commonness = sum([v for v in first_bubble.contexts.values()])
+            else:
+                commonness = sum([v for v in first_bubble.contexts.values()]) / 2 + sum(
+                    [v for v in second_bubble.contexts.values()]) / 2
+
+            # If they're partially overlapping, we may need a particular application order.
+            if first_prevents_second:
+                # need to invert the order of these, so we try all bubbles...
+                bubble_pairs.append(((similarity, commonness), (second_bubble, first_bubble)))
+            else:
+                # either they don't conflict, or we can still do second after we apply first
+                bubble_pairs.append(((similarity, commonness), (first_bubble, second_bubble)))
+
+    bubbles = {}
+    # Sort primarily by similarity, secondarily by commonness
+    for score, pair in list(sorted(bubble_pairs, key=lambda x: x[0], reverse=True)):
+        # Turn bubbles that are paired w/ a nonterm into single bubbles
+        if len(pair[0].bubbled_elems) == 1:
+            # This if statement probably never happens...
+            if pair[1] not in bubbles:
+                bubbles[pair[1]] = score
+        elif len(pair[1].bubbled_elems) == 1:
+            if pair[0] not in bubbles:
+                bubbles[pair[0]] = score
+        else:
+            bubbles[pair] = score
+
+    bubbles = list(bubbles.keys())
+    if len(bubbles) > 100:
+        bubbles = bubbles[:100]
+    random.shuffle(bubbles)
+    return bubbles
 
 
 def apply(grouping: Bubble, trees: List[ParseNode]):
@@ -316,7 +389,12 @@ def build_trees(oracle, leaves):
         grammar = build_grammar(trees)
 
         grammar, new_trees, coalesce_caused = coalesce(oracle, trees, grammar, new_bubble)
-        if not coalesce_caused and not isinstance(new_bubble, list):
+        if coalesce_caused and isinstance(new_bubble, tuple):
+            print(new_bubble)
+            # if (new_bubble[0].new_nt, new_bubble[1].new_nt) not in {('t961', 't4698'), ('t4978', 't8506')}:
+            #     if not check_recall(oracle, grammar):
+            #         print(f"Introduced imprescision at {new_bubble}")
+        if not coalesce_caused and not isinstance(new_bubble, tuple):
             grammar, new_trees, partial_coalesces = coalesce_partial(oracle, trees, grammar, new_bubble)
             if partial_coalesces:
                 print("\n(partial)")
@@ -334,49 +412,37 @@ def build_trees(oracle, leaves):
     best_trees = build_naive_parse_trees(leaves)
     print("Scoring...")
     best_score, best_size, best_trees = score(best_trees)
-    updated = True
     count = 1
 
     # Main algorithm loop
-    while updated:
-        all_groupings = group(best_trees)
-        updated, nlg = False, len(all_groupings)
-        for i, grouping in enumerate(all_groupings):
-            print(('Bubbling iteration (%d, %d, %d)...' % (count, i + 1, nlg)).ljust(50), end='\r')
-            new_trees = apply(grouping, best_trees)
-            new_score, size, new_trees = score(new_trees, grouping)
-            if new_score > 0:
-                print(f"Successful grouping (coalesce): {grouping.new_nt} -> {grouping.bubbled_elems}")
-                best_trees = new_trees
-                best_size = min(best_size, size)
-                updated = True
-                break
-        if not updated:
-            print()
+    for group_size in range(3, MAX_GROUP_LEN):
+        updated = True
+        while updated:
+            all_groupings = group(best_trees, group_size)
+            updated, nlg = False, len(all_groupings)
             for i, grouping in enumerate(all_groupings):
-                new_trees = apply(grouping, best_trees)
-                all_groupings_2 = group(new_trees)
-                nlg2 = len(all_groupings_2)
-                for j, grouping_2 in enumerate(all_groupings_2):
-                    print(f'Double bubble iteration ({i}/{nlg}, {j}/{nlg2}, )'.ljust(50), end='\r')
-                    new_trees_2 = apply(grouping_2, new_trees)
-                    new_score, size, new_trees_2 = score(new_trees_2, [grouping, grouping_2])
-                    if new_score > 0:
-                        print(
-                            f"Successful grouping (coalesce): {grouping.new_nt} -> {grouping.bubbled_elems},  {grouping_2.new_nt} -> {grouping_2.bubbled_elems}")
-                        best_trees = new_trees_2
-                        best_size = min(best_size, size)
-                        updated = True
-                        break
-                if updated:
+                if i == 1000:
+                    break
+                print(('Bubbling iteration (%d, %d, %d)...' % (count, i + 1, nlg)).ljust(50), end='\r')
+                ### Perform the bubble
+                if isinstance(grouping, Bubble):
+                    new_trees = apply(grouping, best_trees)
+                    new_score, size, new_trees = score(new_trees, grouping)
+                    grouping_str = f"Successful grouping (single): {grouping.bubbled_elems}"
+                else:
+                    bubble_one = grouping[0]
+                    bubble_two = grouping[1]
+                    new_trees = apply(bubble_one, best_trees)
+                    new_trees = apply(bubble_two, new_trees)
+                    new_score, size, new_trees = score(new_trees, grouping)
+                    grouping_str = f"Successful grouping (double): {bubble_one.bubbled_elems}, {bubble_two.bubbled_elems}"
+                ### Score
+                if new_score > 0:
+                    print(grouping_str)
+                    best_trees = new_trees
+                    updated = True
                     break
 
-        # elif size < best_size:
-        #     print(f"Successful grouping (size, {best_size} vs. {size}): {grouping.new_nt} -> {grouping.bubbled_elems}")
-        #     best_trees = new_trees
-        #     best_size = size
-        #     updated = True
-        #     break
         layers, count = best_trees, count + 1
 
     return best_trees, {}
@@ -738,10 +804,12 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
             replaced_strings.update(get_strings_with_replacement(tree, replacee, replacer_derivable_strings))
 
         if len(replaced_strings) == 0:
-            print(replacer_derivable_strings, replacee)
-            for tree in trees:
-                print(tree)
-        assert (replaced_strings)
+            # TODO: See the failing doctest in bubble.py
+            import pickle
+            pickle.dump(coalesce_target, open('overlap-bug.pkl', "wb"))
+            print(f"Oopsie with {coalesce_target}.\nPretty sure this is an overlap bug that I know of.... so let's just skip it")
+            return False, set()
+        #assert (replaced_strings)
 
         replaced_strings = list(replaced_strings)
         if len(replaced_strings) > MAX_SAMPLES_PER_COALESCE:
@@ -765,7 +833,7 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
         nt1_derivable_strings = set()
         nt2_derivable_strings = set()
 
-        if isinstance(coalesce_target, list):
+        if isinstance(coalesce_target, tuple):
             nt1_derivable_strings.update(lvl_n_derivable(trees, nt1, 1))
             nt2_derivable_strings.update(lvl_n_derivable(trees, nt2, 1))
         else:
@@ -787,7 +855,6 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
         base_strings = trees.represented_strings()
 
         if nt1_check_strings.issubset(base_strings) and nt2_check_strings.issubset(base_strings):
-            print("\n[INFO] Succesfully failed at the issubset check in coalesce!")
             return False
 
         return True
@@ -872,7 +939,7 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
             if first == second:
                 continue
             pairs.append((first, second))
-    elif isinstance(coalesce_target, list):
+    elif isinstance(coalesce_target, tuple):
         pair = (coalesce_target[0].new_nt, coalesce_target[1].new_nt)
         pairs.append(pair)
     else:
