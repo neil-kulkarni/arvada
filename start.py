@@ -2,6 +2,7 @@ import re
 from collections import defaultdict
 from typing import List, Tuple, Set, Dict, Optional
 
+from bubble import Bubble
 from oracle import ParseException
 from parse_tree import ParseNode, ParseTreeList
 from grammar import *
@@ -15,33 +16,8 @@ MAX_SAMPLES_PER_COALESCE = 50
 MAX_GROUP_LEN = 7
 
 
-class Bubble:
-    def __init__(self, new_nt: str, bubbled_elems: List[str]):
-        self.new_nt = new_nt
-        self.bubbled_elems = bubbled_elems
-        self.direct_parents = []
-        self.occ_count = 1
 
-    def add_direct_parent(self, parent):
-        self.direct_parents.append(parent)
 
-    def add_occurrence(self):
-        self.occ_count += 1
-
-    def add_context(self, context_lhs, context_rhs):
-        # TODO
-        pass
-
-    def __str__(self):
-        return f"Bubble({self.new_nt}->{self.bubbled_elems}, occs={self.occ_count})"
-
-    def __repr__(self):
-        return self.__str__()
-    # def get_new_nt(self):
-    #     return self.new_nt
-    #
-    # def get_bubble_elems(self):
-    #     return self.bubbled_elems
 
 
 def allocate_tid():

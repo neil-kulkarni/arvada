@@ -10,6 +10,60 @@ from parse_tree import ParseNode
 REPLACE_CONST = '[[:REPLACEME]]'
 MAX_SAMPLES = 10
 
+def get_overlaps(larger: List[str], smaller: List[str]):
+    """
+    >>> get_overlaps(["a", "b", "c", "d"], ["c", "d", "e"])
+    [[(2, 0), (3, 1)]]
+    >>> get_overlaps(["a", "b", "c", "d"], ["e", "d", "e"])
+    []
+    >>> get_overlaps(["a", "b", "c", "d"], ["c", "a", "b"])
+    [[(0, 1), (1, 2)]]
+    >>> get_overlaps(["a", "b", "c", "a"], ["c", "a", "b"])
+    [[(2, 0), (3, 1)], [(0, 1), (1, 2)]]
+    >>> get_overlaps(["a", "b", "c", "c"], ["c", "a", "b"])
+    [[(3, 0)], [(0, 1), (1, 2)]]
+    >>> get_overlaps(["a", "b", "c", "c"], ["c", "d"])
+    [[(3, 0)]]
+    >>> get_overlaps(["a", "b", "c"], ["d", "a"])
+    [[(0, 1)]]
+    """
+    # Assumes that smaller is not contained in larger
+    smaller_idx_1 = 0
+    match_1_idxs = []
+    for i in range(len(larger)):
+        if larger[i] == smaller[smaller_idx_1]:
+            match_1_idxs.append((i, smaller_idx_1))
+            smaller_idx_1 += 1
+        else:
+            match_1_idxs = []
+            smaller_idx_1 = 0
+            if larger[i] == smaller[smaller_idx_1]:
+                match_1_idxs.append((i, smaller_idx_1))
+                smaller_idx_1 += 1
+
+    smaller_idx_2 = len(smaller) - 1
+    match_2_idxs = []
+    for i in reversed(range(len(larger))):
+        if larger[i] == smaller[smaller_idx_2]:
+            match_2_idxs.insert(0, (i, smaller_idx_2))
+            smaller_idx_2 -= 1
+        else:
+            smaller_idx_2 = len(smaller) - 1
+            match_2_idxs = []
+            if larger[i] == smaller[smaller_idx_2]:
+                match_2_idxs.insert(0, (i, smaller_idx_2))
+                smaller_idx_2 -= 1
+
+
+    ret = []
+    if match_1_idxs:
+        ret.append(match_1_idxs)
+    if match_2_idxs:
+        ret.append(match_2_idxs)
+
+    return ret
+
+
 def fixup_terminal(payload):
     if len(payload) >= 3 and payload.startswith('"') and payload.endswith('"'):
         payload = payload[1:-1]
@@ -21,7 +75,7 @@ def muh_product(lst):
         prod *= e
     return prod
 
-@functools.lru_cache()
+#@functools.lru_cache()
 def lvl_n_derivable(trees, target_nt, n, max_samples=1000):
     """
     Get the strings that are level n derivable from `trees`
