@@ -582,7 +582,7 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
         except Exception as e:
             return []
 
-        assert (len(everywhere_derivable_strings) > 0)
+        if (len(everywhere_derivable_strings) == 0): return {}
 
         # Now check whether there are any rules where `replaeable_in_some_rules` is replaceable by
         # `replaceable_everywhere`
