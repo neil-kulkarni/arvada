@@ -561,7 +561,7 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
             except ParseException as e:
                 continue
 
-        if not language_expanded:
+        if coalesce_target is not None and not language_expanded:
             return []
         return replacing_positions
 
@@ -754,7 +754,7 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
 
 
         # First check if the replacement is expanding
-        if nt1_derivable_strings == nt2_derivable_strings:
+        if coalesce_target is not None and nt1_derivable_strings == nt2_derivable_strings:
             return False
 
         nt1_valid, nt1_check_strings = replacement_valid(nt1_derivable_strings, nt2, trees)
@@ -764,10 +764,10 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
         if not nt2_valid:
             return False
 
-        base_strings = trees.represented_strings()
-
-        if nt1_check_strings.issubset(base_strings) and nt2_check_strings.issubset(base_strings):
-            return False
+        if coalesce_target is not None:
+            if trees.represented_by_derived_grammar(nt1_check_strings) and \
+                trees.represented_by_derived_grammar(nt2_check_strings):
+                return False
 
         return True
 
