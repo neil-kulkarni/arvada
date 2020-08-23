@@ -376,8 +376,8 @@ def build_trees(oracle, leaves):
         2. If a replacement was possible, repeat (1)
     """
 
-    def score(trees: List[ParseNode], new_bubble: Optional[Bubble] = None) \
-            -> Tuple[int, float, List[ParseNode]]:
+    def score(trees: List[ParseNode], new_bubble: Optional[Bubble]) \
+            -> Tuple[int, List[ParseNode]]:
         """[
         TREES is a list of Parse Trees.
 
@@ -403,19 +403,23 @@ def build_trees(oracle, leaves):
         # grammar = minimize(grammar)
         new_size = grammar.size()
         if coalesce_caused:
-            return 1, new_size, new_trees
+            return 1, new_trees
         else:
-            return 0, new_size, trees
+            return 0, trees
 
     # Run the character class algorithm to create the first layer of tree
     # best_trees, classes = derive_classes(oracle, leaves)
     best_trees = build_naive_parse_trees(leaves)
-    print("Scoring...")
-    best_score, best_size, best_trees = score(best_trees)
-    count = 1
+    grammar = build_grammar(best_trees)
+    print("Beginning coalescing...")
+    grammar, best_trees, _ = coalesce(oracle, best_trees, grammar)
+    grammar, best_trees, _ = coalesce_partial(oracle, best_trees, grammar)
+
+    max_example_size = max([len(leaf_lst) for leaf_lst in leaves])
 
     # Main algorithm loop
     for group_size in range(3, MAX_GROUP_LEN):
+        count = 1
         updated = True
         while updated:
             all_groupings = group(best_trees, group_size)
@@ -423,27 +427,30 @@ def build_trees(oracle, leaves):
             for i, grouping in enumerate(all_groupings):
                 if i == 1000:
                     break
-                print(('Bubbling iteration (%d, %d, %d)...' % (count, i + 1, nlg)).ljust(50), end='\r')
+                print(('[Group len %d] Bubbling iteration %d (%d/%d)...' % (group_size, count, i + 1, nlg)).ljust(50), end='\r')
                 ### Perform the bubble
                 if isinstance(grouping, Bubble):
                     new_trees = apply(grouping, best_trees)
-                    new_score, size, new_trees = score(new_trees, grouping)
+                    new_score, new_trees = score(new_trees, grouping)
                     grouping_str = f"Successful grouping (single): {grouping.bubbled_elems}"
                 else:
                     bubble_one = grouping[0]
                     bubble_two = grouping[1]
                     new_trees = apply(bubble_one, best_trees)
                     new_trees = apply(bubble_two, new_trees)
-                    new_score, size, new_trees = score(new_trees, grouping)
+                    new_score, new_trees = score(new_trees, grouping)
                     grouping_str = f"Successful grouping (double): {bubble_one.bubbled_elems}, {bubble_two.bubbled_elems}"
                 ### Score
                 if new_score > 0:
+                    print()
                     print(grouping_str)
                     best_trees = new_trees
                     updated = True
                     break
 
-        layers, count = best_trees, count + 1
+            count = count + 1
+        if group_size > max_example_size:
+            break
 
     return best_trees, {}
 
@@ -725,70 +732,6 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
     (found equivalent).
     """
 
-    # def replacer_strings(tree, replacer_nt, derivable):
-    #     """
-    #     Adds to the set DERIVABLE all those strings derivable from the
-    #     REPLACER_NT in TREE.
-    #     """
-    #
-    #     def node_string(tree):
-    #         """
-    #         Returns the string derived from the leaves of this tree.
-    #         """
-    #         if tree.is_terminal:
-    #             return tree.payload
-    #         return ''.join([node_string(c) for c in tree.children])
-    #
-    #     if tree.is_terminal:
-    #         return derivable
-    #     elif tree.payload == replacer_nt:
-    #         derivable.add(node_string(tree))
-    #     else:
-    #         for child in tree.children:
-    #            replacer_strings(child, replacer_nt, derivable)
-
-    # def replaces(replacer, replacee, trees):
-    #     """
-    #     For every string derived from REPLACEE, replace it with all possible
-    #     strings derived from REPLACER, and check if the resulting string is still valid.
-    #
-    #     Return True if this is the always the case.
-    #
-    #     Relies on the fact that TREES is unchanged from the time when it was
-    #     inputted into coalesce.
-    #     """
-    #     # Get the set of strings derivable from replacer
-    #     replacer_derivable_strings = set()
-    #     for tree in trees:
-    #         replacer_strings(tree, replacer, replacer_derivable_strings)
-    #
-    #     # Get the set of positive examples with strings derivable from replacer
-    #     # replaced with strings derivable from replacee
-    #     replaced_strings = set()
-    #     for tree in trees:
-    #         replaced_strings.update(get_strings_with_replacement(tree, replacee, replacer_derivable_strings))
-    #
-    #     if len(replaced_strings) == 0:
-    #         print(replacer, replacee)
-    #         for tree in trees:
-    #             print(tree)
-    #     assert (replaced_strings)
-    #
-    #     replaced_strings = list(replaced_strings)
-    #     if len(replaced_strings) > MAX_SAMPLES_PER_COALESCE:
-    #         replaced_strings = random.sample(replaced_strings, MAX_SAMPLES_PER_COALESCE)
-    #     else:
-    #         random.shuffle(replaced_strings)
-    #
-    #
-    #
-    #     # Return True if all the replaced_strings are valid
-    #     for s in replaced_strings:
-    #         try:
-    #             oracle.parse(s)
-    #         except:
-    #             return False
-    #     return True
 
 
     def replacement_valid(replacer_derivable_strings, replacee, trees : ParseTreeList) -> Tuple[bool, Set[str]]:
