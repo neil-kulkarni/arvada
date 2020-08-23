@@ -7,10 +7,13 @@ from lark import Lark
 from oracle import CachingOracle, ExternalOracle
 
 
-def main_external(external_folder, log_file, fast = False):
+def main_external(external_folder, log_file, fast = False, random_guides=False):
     import os
     bench_name = os.path.basename(external_folder)
-    guide_folder = os.path.join(external_folder, "guides")
+    if random_guides:
+        guide_folder = os.path.join(external_folder, "random-guides")
+    else:
+        guide_folder = os.path.join(external_folder, "guides")
     test_folder = os.path.join(external_folder, "test_set")
     parser_command = os.path.join(external_folder, f"parse_{bench_name}")
 
@@ -100,13 +103,15 @@ def main_external(external_folder, log_file, fast = False):
 if __name__ == '__main__':
     if len(sys.argv) != 4 or not os.path.exists(sys.argv[2]) :
         print(f'Usage: python3 {sys.argv[0]} <mode> <input_file/folder> <log_file>')
-        print('where mode is one of {external, internal}')
+        print('where mode is one of {external, external-r}')
         if not os.path.exists(sys.argv[2]):
             print(f"err: {sys.argv[2]} not found")
     elif sys.argv[1] == "internal":
         print("NO LONGER SUPPORTED")
     elif sys.argv[1] == "external":
         main_external(sys.argv[2], sys.argv[3], True)
+    elif sys.argv[1] == "external-r":
+        main_external(sys.argv[2], sys.argv[3], True, random_guides=True)
     else:
         print(f'Usage: python3 {sys.argv[0]} <mode> <input_file> <log_file>')
         print('where mode is one of {external, internal}')

@@ -673,6 +673,29 @@ if __name__ == '__main__':
             print(f"[!!!] Couldn't write guide example to {sample_name}. Underlying error above.")
             exit(1)
 
+
+    random_guide_examples_folder = os.path.join(results_folder, "random-guides")
+    try:
+        os.mkdir(random_guide_examples_folder)
+    except OSError as e:
+        print(e)
+        print(f"[!!!] Couldn't create {random_guide_examples_folder}. Underlying error above.")
+        exit(1)
+
+    random_samples = sample_random_bound('start', generic_rules, 10)
+    print_stats(random_samples, "Randoms")
+    for i, random_samples in enumerate(random_samples):
+        sample_name = os.path.join(random_guide_examples_folder, f"guide-{i}.ex")
+        try:
+            sample_file = open(sample_name, "w")
+            sample_file.write(random_samples)
+            sample_file.close()
+        except EnvironmentError as e:
+            print(e)
+            print(f"[!!!] Couldn't write guide example to {sample_name}. Underlying error above.")
+            exit(1)
+
+
     test_set_folder = os.path.join(results_folder, "test_set")
     try:
         os.mkdir(test_set_folder)
