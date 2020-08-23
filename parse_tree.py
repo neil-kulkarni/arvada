@@ -44,6 +44,24 @@ class ParseTreeList:
 
 
 
+    def in_my_grammar(self, candidate):
+        """
+        !!!ASSUMES: grammar and tree_list are in sync. Help me.!!!
+           Don't use this if you don't know what that means.
+
+        Returns true if candidate is already representable by our grammar
+        """
+        if candidate in self.represented_strings():
+            return True
+        else:
+            return False
+            grammar_parser = self.grammar.parser()
+            try:
+                grammar_parser.parse(candidate)
+                return True
+            except Exception as e:
+                return False
+
 
 class ParseTree():
 
