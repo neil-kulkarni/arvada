@@ -12,6 +12,9 @@ from replacement_utils import get_strings_with_replacement, get_strings_with_rep
 MAX_SAMPLES_PER_COALESCE = 50
 MAX_GROUP_LEN = 10
 
+MUST_EXPAND_IN_COALESCE = False
+MUST_EXPAND_IN_PARTIAL= False
+
 def check_recall(oracle, grammar: Grammar):
     positives = grammar.sample_positives(10, 10)
     for pos in positives:
@@ -447,6 +450,7 @@ def build_trees(oracle, leaves):
 
             count = count + 1
         if group_size > max_example_size:
+            print("hello?")
             break
 
     return best_trees, {}
@@ -495,7 +499,7 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
         occurrence of `replaceable_everywhere`, returns the rules (expansions) in which
         `replaceable_in_some_rules` can be replaced by `replaceable_everywhere`
         """
-        language_expanded = False
+        language_expanded = not MUST_EXPAND_IN_PARTIAL
         # Get all the expansions where `replaceable_in_some_rules` appears
         partial_replacement_locs: List[Tuple[Tuple[str, List[str]], int]] = []
         for rule_start, rule in grammar.rules.items():
@@ -525,8 +529,10 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
         else:
             random.shuffle(everywhere_by_some_candidates)
 
-        if not trees.represented_by_derived_grammar(everywhere_by_some_candidates):
-            language_expanded = True
+        if MUST_EXPAND_IN_PARTIAL and coalesce_target is not None and trees.represented_by_derived_grammar(everywhere_by_some_candidates):
+            language_expanded = False
+        else:
+            language_expanded = MUST_EXPAND_IN_PARTIAL
             try:
                 for replaced_str in everywhere_by_some_candidates:
                     oracle.parse(replaced_str)
@@ -549,7 +555,7 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
             else:
                 random.shuffle(candidate_strs)
 
-            if trees.represented_by_derived_grammar(candidate_strs):
+            if MUST_EXPAND_IN_PARTIAL and coalesce_target is not None and trees.represented_by_derived_grammar(candidate_strs):
                 replacing_positions[(rule[0], tuple(rule[1]))].append(posn)
                 continue
 
@@ -561,7 +567,7 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
             except ParseException as e:
                 continue
 
-        if coalesce_target is not None and not language_expanded:
+        if MUST_EXPAND_IN_PARTIAL and coalesce_target is not None and not language_expanded:
             return []
         return replacing_positions
 
@@ -754,7 +760,8 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
 
 
         # First check if the replacement is expanding
-        if coalesce_target is not None and nt1_derivable_strings == nt2_derivable_strings:
+        if MUST_EXPAND_IN_COALESCE and coalesce_target is not None and nt1_derivable_strings == nt2_derivable_strings:
+            print("rejecting the coalesce:", coalesce_target)
             return False
 
         nt1_valid, nt1_check_strings = replacement_valid(nt1_derivable_strings, nt2, trees)
@@ -764,7 +771,7 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
         if not nt2_valid:
             return False
 
-        if coalesce_target is not None:
+        if MUST_EXPAND_IN_COALESCE and coalesce_target is not None:
             if trees.represented_by_derived_grammar(nt1_check_strings) and \
                 trees.represented_by_derived_grammar(nt2_check_strings):
                 return False
