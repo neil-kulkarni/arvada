@@ -613,6 +613,8 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
         Creates a copy of `old_grammar` so that the locations in `partial_replacement_locs` are replaced by `new_nt`, and all
         occurrences of `full_relacement_nt` are replaced by `new_nt`
         """
+        # Keep track of whether nt to partially replace still occurs on some rhss
+        partially_replace_on_rhs = False
         grammar = old_grammar.copy()
         alt_rule = Rule(new_nt)
         for (rule_start, body), posns in partial_replacement_locs.items():
@@ -625,6 +627,8 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
                 for idx in range(len(body)):
                     if body[idx] == full_replacement_nt:
                         body[idx] = new_nt
+                    elif body[idx] == nt_to_partially_replace:
+                        partially_replace_on_rhs = True
         # Now fixup rules to remove any duplicate productions that may have been added during replacement.
         for rule in grammar.rules.values():
             unique_bodies = []
@@ -637,6 +641,8 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
         grammar.rules.pop(full_replacement_nt)
         alt_rule.bodies = alt_rule_bodies
         grammar.add_rule(alt_rule)
+        if not partially_replace_on_rhs:
+            grammar.rules.pop(nt_to_partially_replace)
         return grammar
 
     def update_tree(new_tree: ParseNode, partial_replacement_locs: Dict[Tuple[str, Tuple[str]], List[int]],
