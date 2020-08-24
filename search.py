@@ -109,9 +109,9 @@ if __name__ == '__main__':
     elif sys.argv[1] == "internal":
         print("NO LONGER SUPPORTED")
     elif sys.argv[1] == "external":
-        main_external(sys.argv[2], sys.argv[3], True)
+        main_external(sys.argv[2], sys.argv[3], False)
     elif sys.argv[1] == "external-r":
-        main_external(sys.argv[2], sys.argv[3], True, random_guides=True)
+        main_external(sys.argv[2], sys.argv[3], False, random_guides=True)
     else:
         print(f'Usage: python3 {sys.argv[0]} <mode> <input_file> <log_file>')
         print('where mode is one of {external, internal}')

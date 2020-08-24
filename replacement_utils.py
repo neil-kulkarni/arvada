@@ -2,6 +2,7 @@ import functools
 import itertools
 import random
 from typing import Tuple, List, Set
+import sys
 
 import numpy as np
 
@@ -141,6 +142,7 @@ def sample_from_product(strings_per_child, num_samples, lens_per_child, prod_siz
     # fancy math to get efficient sampling.
     # Consider lens_per_child = [3, 4, 2]
     # to map idx to a sample, do (idx % (len(a)*len(b)*len(c)) // (len(b)*len(c)), (idx % (len(b)*len(c))) // len(c), idx % len(c))
+    if prod_size > sys.maxsize: prod_size = sys.maxsize//2
     ret_strings = []
     indices = random.sample(range(prod_size), num_samples)
     to_divide = [1 for i in range(len(strings_per_child))]

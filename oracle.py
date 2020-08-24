@@ -18,8 +18,16 @@ class ExternalOracle:
         f.write(bytes(string, 'utf-8'))
         f_name = f.name
         f.flush()
-        # With check = True, throws a CalledProcessError if the exit code is non-zero
-        subprocess.run([self.command, f_name], stdout=FNULL, stderr=FNULL, check=True)
+        try:
+            # With check = True, throws a CalledProcessError if the exit code is non-zero
+            subprocess.run([self.command, f_name], stdout=FNULL, stderr=FNULL, check=True)
+            f.close()
+            FNULL.close()
+            return True
+        except subprocess.CalledProcessError as e:
+            f.close()
+            FNULL.close()
+            return False
 
     def parse(self, string):
         self.parse_calls += 1
@@ -29,12 +37,11 @@ class ExternalOracle:
             else:
                 raise ParseException(f"doesn't parse: {string}")
         else:
-            try:
-                self._parse_internal(string)
-                self.cache_set[string] = True
+            res = self._parse_internal(string)
+            self.cache_set[string] = res
+            if res:
                 return True
-            except subprocess.CalledProcessError as e:
-                self.cache_set[string] = False
+            else:
                 raise ParseException(f"doesn't parse: {string}")
 
 class CachingOracle:
