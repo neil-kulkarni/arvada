@@ -389,11 +389,6 @@ def build_trees(oracle, leaves):
         grammar = build_grammar(trees)
 
         grammar, new_trees, coalesce_caused = coalesce(oracle, trees, grammar, new_bubble)
-        if coalesce_caused and isinstance(new_bubble, tuple):
-            print(new_bubble)
-            # if (new_bubble[0].new_nt, new_bubble[1].new_nt) not in {('t961', 't4698'), ('t4978', 't8506')}:
-            #     if not check_recall(oracle, grammar):
-            #         print(f"Introduced imprescision at {new_bubble}")
         if not coalesce_caused and not isinstance(new_bubble, tuple):
             grammar, new_trees, partial_coalesces = coalesce_partial(oracle, trees, grammar, new_bubble)
             if partial_coalesces:
@@ -669,8 +664,8 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
                 pass
             replacement_positions = partially_coalescable(nt_to_fully_replace, nt_to_partially_replace, trees)
             if len(replacement_positions) > 0:
-                print(f"we found that {nt_to_partially_replace} could replace {nt_to_fully_replace} everywhere, "
-                      f"and {nt_to_fully_replace} could replace {nt_to_partially_replace} at : {replacement_positions}")
+                #print(f"we found that {nt_to_partially_replace} could replace {nt_to_fully_replace} everywhere, "
+                 #     f"and {nt_to_fully_replace} could replace {nt_to_partially_replace} at : {replacement_positions}")
 
                 if nt_to_fully_replace == START:
                     new_nt = START
