@@ -13,6 +13,21 @@ from replacement_utils import get_strings_with_replacement, get_strings_with_rep
 Bulk of the Arvada algorithm.
 """
 
+###################### Settings for ICSE'21 Submission ########################
+# MAX_SAMPLES_PER_COALESCE = 50   << number of strings to sample from the     #
+#                                   grammar induced by a marge. Increase to   #
+#                                   increase chance of catching unsound       #
+#                                   merges, at the cost of runtime.           #
+# MAX_GROUP_LEN = 10              << max number of elements in a bubble.      #
+#                                   Reducing will decrease runtime of algo,   #
+#                                   at cost of missing some bubblings         #
+#                                                                             #
+# MUST_EXPAND_IN_COALESCE = False << additional setting, requiring a merge to #
+#                                   not only be valid, but also expand the    #
+#                                   language accepted by the learned grammar  #
+# MUST_EXPAND_IN_PARTIAL= False   << same thing but for partial merges        #
+###############################################################################
+
 MAX_SAMPLES_PER_COALESCE = 50
 MAX_GROUP_LEN = 10
 
