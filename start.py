@@ -67,88 +67,6 @@ def build_start_grammar(oracle, leaves):
     return grammar
 
 
-def derive_classes(oracle, leaves):
-    """
-    Given a list of positive examples in LEAVES, uses a replacement algorithm
-    to determine which tokens belong to the same character classes. Each character
-    class is given a new nonterminal, which will be the disjunction of each of
-    the characters in the class in every grammar. Characters that do not belong
-    to any classes are still given a unique nonterminal. Returns the new tree
-    that is created by bubbling up each of the terminals to their
-    corresponding class. Also returns a map of nonterminal to the character
-    class that it defines.
-
-    ORACLE is a Lark parser for the grammar we seek to find. We ask the oracle
-    yes or no replacement questions in this method.
-
-    CONFIG is the required configuration options for GrammarGenerator classes.
-
-    LEAVES is a list of positive examples, each expressed as a list of tokens
-    (ParseNode objects).
-    """
-
-    def replaces(replacer, replacee):
-        """
-        For every string in which REPLACEE appears, replace it with REPLACER,
-        and check if the resulting string is still valid.
-
-        Return True if this is the always the case.
-
-        Relies on the fact that LEAVES is unchanged from the time when it was
-        inputted into derive_classes.
-        """
-        replaced_leaves = [
-            [ParseNode(replacer if leaf.payload == replacee else leaf.payload, leaf.is_terminal, leaf.children) for leaf
-             in tree] for tree in leaves]
-        replaced_examples = [''.join([pn.payload for pn in tree]) for tree in replaced_leaves]
-        for example in replaced_examples:
-            try:
-                oracle.parse(example)
-            except Exception as e:
-                return False
-        return True
-
-    # Define helpful data structures
-    # terminals = list(config['TERMINALS'])
-    # terminals.remove('') # Remove epsilon terminal
-    # terminals = [t.replace('"', '') for t in terminals]
-    terminals = list(set([leaf.payload for leaf_lst in leaves for leaf in leaf_lst]))
-    print(terminals)
-    uf = UnionFind(terminals)
-
-    # Check to make sure initial guide examples compile
-    if not replaces('', ''):
-        print('ERROR: Guide examples do not compile!')
-        exit(1)
-
-    for i in range(len(terminals)):
-        for j in range(i + 1, len(terminals)):
-            # Iterate through each unique pair of terminals
-            print(('Terminal replacement (%d, %d, %d)...' % (i + 1, j + 1, len(terminals))).ljust(50), end='\r')
-            first, second = terminals[i], terminals[j]
-            # If the terminals can replace each other in every context, they
-            # must belong to the same character class
-            if not uf.is_connected(first, second) and replaces(first, second) and replaces(second, first):
-                uf.connect(first, second)
-
-    # Define a mapping and a reverse mapping between a character class and
-    # the newly generated nonterminal for that class
-    get_class, classes = {}, {}
-    for cc in uf.classes().values():
-        class_nt = allocate_tid()
-        classes[class_nt] = cc
-        for terminal in cc:
-            get_class[terminal] = class_nt
-
-    trees = [ParseNode(START, False, [ParseNode(get_class[leaf.payload], False, [leaf]) for leaf in leaf_lst]
-                       )
-             for leaf_lst in leaves]
-
-    # Update each of the terminals in leaves to instead be a new nonterminal
-    # ParseNode pointing to the original terminal. Return the resulting parse
-    # trees as well as a mapping of nonterminal to its character class.
-    return trees, classes
-
 
 def build_naive_parse_trees(leaves: List[List[ParseNode]]):
     """
@@ -425,8 +343,6 @@ def build_trees(oracle, leaves):
             all_groupings = group(best_trees, group_size)
             updated, nlg = False, len(all_groupings)
             for i, grouping in enumerate(all_groupings):
-                if i == 1000:
-                    break
                 print(('[Group len %d] Bubbling iteration %d (%d/%d)...' % (group_size, count, i + 1, nlg)).ljust(50), end='\r')
                 ### Perform the bubble
                 if isinstance(grouping, Bubble):
