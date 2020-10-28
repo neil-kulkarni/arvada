@@ -1,6 +1,11 @@
 from typing import List
 import re
 
+"""
+This file provides utilities to translate a Lark-format grammar into an ANTLR4-format
+grammar, as well as emit the C++ code (and cmakefile) for an ANTLR parser
+"""
+
 def lark_file_to_antlr_test(filename: str):
     import os
     gram_name = "g_" + os.path.splitext(os.path.basename(filename))[0]

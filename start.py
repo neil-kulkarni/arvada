@@ -9,6 +9,10 @@ from union import UnionFind
 from replacement_utils import get_strings_with_replacement, get_strings_with_replacement_in_rule, \
     lvl_n_derivable
 
+"""
+Bulk of the Arvada algorithm.
+"""
+
 MAX_SAMPLES_PER_COALESCE = 50
 MAX_GROUP_LEN = 10
 
@@ -16,6 +20,9 @@ MUST_EXPAND_IN_COALESCE = False
 MUST_EXPAND_IN_PARTIAL= False
 
 def check_recall(oracle, grammar: Grammar):
+    """
+    Helper function to check whether grammar is consistent with oracle.
+    """
     positives = grammar.sample_positives(10, 10)
     for pos in positives:
         try:
@@ -27,7 +34,7 @@ def check_recall(oracle, grammar: Grammar):
 
 def allocate_tid():
     """
-    Returns a new, unqiue nonterminal name.
+    Returns a new, unique nonterminal name.
     """
     global next_tid
     nt_name = 't%d' % (next_tid)
@@ -41,19 +48,12 @@ next_tid = 1
 
 def build_start_grammar(oracle, leaves):
     """
-    ORACLE is a Lark parser for the grammar we seek to find. We ask the oracle
-    yes or no replacement questions in this method.
+    ORACLE is a CachingOracle or ExternalOracle with a .parse method, which
+    returns True if the example given is in the ORACLE's language
 
-    CONFIG is the required configuration options for GrammarGenerator classes.
+    LEAVES is a list of positive examples, each  a list of characters.
 
-    DATA is a map containing both the positive and negative examples used to
-    train the stochastic search.
-
-    LEAVES is a list of positive examples, each expressed as a list of tokens
-    (ParseNode objects).
-
-    Returns a set of starting grammar generators whose corresponding grammars
-    each match at least one input example.
+    Returns a grammar that maximally expands LEAVES w.r.t. ORACLE.
     """
     print('Building the starting trees...'.ljust(50), end='\r')
     trees, classes = build_trees(oracle, leaves)
@@ -83,17 +83,11 @@ def build_naive_parse_trees(leaves: List[List[ParseNode]]):
 
 def group(trees, max_group_size) -> List[Bubble]:
     """
-    TREES is a set of ParseTrees.
+    TREES is a set of ParseNodes.
 
-    Returns the set of all possible groupings of nonterminals in TREES,
-    where each grouping is a data structure holding information about a
-    grouing of contiguous nonterminals in TREES.
-
-    A grouping is a two-element tuple data structure that represents a contiguous
-    sequence of nonterminals that appears someplace in TREES. The first element
-    is a string representation of this sequence. The second element is itself
-    a two-element tuple that contains a list representation of the sequence, as
-    well as the fresh nonterminal assigned to the grouping.
+    Returns the set of all possible bubble of nonterminals in TREES,
+    where each bubble is a data structure holding information about a
+    grouping of contiguous nonterminals in TREES.
     """
 
     # Helper tracking if a subsequence is only seen as the "full" child of another nonterminal,
@@ -138,7 +132,11 @@ def group(trees, max_group_size) -> List[Bubble]:
     for tree in trees:
         add_groups_for_tree(tree, bubbles)
 
-    # Remove sequences if they're the full list of children of a rule and don't appear anywhere else
+    # Remove sequences if they're the full list of children of a rule and don't appear anywhere else.
+    # Prevents us from adding ridiculous layers of indirection.
+    # TODO: I think this does prevent us from learning grammars that require indirection,
+    # but everything I've tried still gets us in a situation where we eternally bubble
+    # up the same sequence,
     for bubble_str in full_bubbles:
         if bubbles[bubble_str].occ_count == full_bubbles[bubble_str]:
             bubbles.pop(bubble_str)
@@ -211,16 +209,13 @@ def score_and_sort_bubbles(bubbles: Dict[str, Bubble]) -> List[Union[Bubble, Tup
 
 def apply(grouping: Bubble, trees: List[ParseNode]):
     """
-    GROUPING is a two-element tuple data structure that represents a contiguous
-    sequence of nonterminals that appears someplace in LAYERS. The first element
-    is a string representation of this sequence. The second element is itself
-    a two-element tuple that contains a list representation of the sequence, as
-    well as the fresh nonterminal assigned to the grouping.
+    `grouping` is a Bubble, i.e. a representation of a  contiguous
+    sequence of nonterminals that appears someplace in `trees`.
 
-    TREES is a set of parse trees
+    `trees` is a list of parse trees
 
-    Returns a new list of trees consisting of applying the bubbling up the grouping
-    in GROUPING for each tree in TREES
+    Returns a new list of trees consisting of  bubbling up the grouping
+    in `grouping` for each tree in `trees`
     """
 
     def matches(group_lst, layer):
@@ -284,8 +279,8 @@ def build_trees(oracle, leaves):
     up that passes replacement tests at each point in the algorithm, until no
     further bubble ups can be made.
 
-    Returns a list of finished ParseNode references. Also returns the character
-    classes for use in future stages of the algorithm.
+    Returns a list of finished parse trees (as ParseNode) one for each list of
+    leaf nodes in `leaves`.
 
     Algorithm:
         1. Over all top-level substrings:
@@ -296,12 +291,14 @@ def build_trees(oracle, leaves):
 
     def score(trees: List[ParseNode], new_bubble: Optional[Bubble]) \
             -> Tuple[int, List[ParseNode]]:
-        """[
-        TREES is a list of Parse Trees.
+        """
+        Tries to merge nonterminals in `trees`, and returns (1, the new trees with labels)
+        merged if a merge occurs. Score is 0 otherwise.
 
-        Converts TREES into a grammar and returns its positive score, and the new
-        set of trees corresponding to the coalescing.
-        Does not mutate LAYERS in this process.
+        If `new_bubble` is not None, only checks mergings that involve
+        the new bubble (against each existing nonterminal if it's a 1-bubble
+        and between the two introduced nonterminals if it's a 2-bubble)
+
         """
         # Convert LAYERS into a grammar
         grammar = build_grammar(trees)
@@ -325,8 +322,7 @@ def build_trees(oracle, leaves):
         else:
             return 0, trees
 
-    # Run the character class algorithm to create the first layer of tree
-    # best_trees, classes = derive_classes(oracle, leaves)
+
     best_trees = build_naive_parse_trees(leaves)
     grammar = build_grammar(best_trees)
     print("Beginning coalescing...")
@@ -335,7 +331,7 @@ def build_trees(oracle, leaves):
 
     max_example_size = max([len(leaf_lst) for leaf_lst in leaves])
 
-    # Main algorithm loop
+    # Main algorithm loop. Iteratively increase the length of groups allowed from 3 to MAX_GROUP_LEN
     for group_size in range(3, MAX_GROUP_LEN):
         count = 1
         updated = True
@@ -365,6 +361,7 @@ def build_trees(oracle, leaves):
                     break
 
             count = count + 1
+
         if group_size > max_example_size:
             print("hello?")
             break
@@ -372,20 +369,34 @@ def build_trees(oracle, leaves):
     return best_trees, {}
 
 
-def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
+def coalesce_partial(oracle, trees: List[ParseNode], grammar: Grammar,
                      coalesce_target: Bubble = None):
     """
+    ASSUMES: `grammar` is the grammar induced by `trees`
+
     Performs partial coalesces on the grammar. That is, for pairs of nonterminals (nt1, nt2), checks whether:
        if nt1 can be replaced by nt2 everywhere, are there any occurrences of nt2 where nt1 can replace nt2.
+    An "occurrence" of nt2 is a location in a rule in grammar. So even if there are two separate trees
+    where nt2 occurs in the subtree:
+        nt0
+       /  \
+     nt3  nt2
+
+     nt2 beside nt3 as a child of nt0 is considered only "one occurrence"
+
+    For efficiency:
+     While nt1 can range over all nonterminals in the grammar, nt2 ranges only over "character" nonterminals,
+     that is those whose rules only expand to a single character. Character classes are allowc
 
     ASSUMES: coalesce(oracle, trees, grammar, coalesce_target) has been called previously. In this case, we will never
-    be in the situation where (nt1, nt2) can partially coalesce and (nt2, nt1) can partially coalesce:
+    be in the situation where (nt1, nt2) can partially coalesce and (nt2, nt1) can partially coalesce.
 
     """
 
     def get_all_derivable_strings(tree: ParseNode, replacer_nt: str) -> Set[str]:
         """
         Returns all those strings derivable from REPLACER_NT in TREE.
+        TODO: shouldn't this be replaced by stuff in replacement_utils? Should be identical.
         """
 
         def derived_string(tree: ParseNode):
@@ -560,11 +571,15 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
     nonterminals.remove("start")
     nonterminals = list(nonterminals)
 
+    # Ranging over the nonterminals that need to be fully replaced by the
+    # other in the list (other must replace this one at every location)
     if coalesce_target is not None:
         fully_replaceable = [coalesce_target.new_nt]
     else:
         fully_replaceable = nonterminals
 
+    # List of nonterminals that can be partially replaced (find the positions
+    # at which other replaces this one)
     partially_replaceable = [nonterm for nonterm in nonterminals
                              if len(grammar.rules[nonterm].bodies) == 1 and len(grammar.rules[nonterm].bodies[0]) == 1
                              and grammar.rules[nonterm].bodies[0][0] not in nonterminals]
@@ -575,15 +590,21 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
     trees = ParseTreeList(trees, grammar)
     for nt_to_fully_replace in fully_replaceable:
         for nt_to_partially_replace in partially_replaceable:
+
+            # Fixups because we created the lists fully_replaceable and partially_replaceable
+            # before performing replacements. So we may have some out-dated labels.
             while nt_to_fully_replace in fully_replaced and nt_to_fully_replace != START:
                 nt_to_fully_replace = fully_replaced[nt_to_fully_replace]
             while nt_to_partially_replace in fully_replaced and nt_to_partially_replace != START:
                 nt_to_partially_replace = fully_replaced[nt_to_partially_replace]
             if nt_to_fully_replace == nt_to_partially_replace:
                 continue
-            if nt_to_partially_replace == 't9' and nt_to_fully_replace == 't0':
-                pass
+
+            # Delegate to helper to find of if (a) nt_to_fully_replace can be replaced by nt_to_partially_replace
+            # everywhere, and if so (b) return the positions at which nt_to_partially_replace can be replaced
+            # by nt_to_fully_replace
             replacement_positions = partially_coalescable(nt_to_fully_replace, nt_to_partially_replace, trees)
+
             if len(replacement_positions) > 0:
                 print(f"we found that {nt_to_partially_replace} could replace {nt_to_fully_replace} everywhere, "
                       f"and {nt_to_fully_replace} could replace {nt_to_partially_replace} at : {replacement_positions}")
@@ -592,6 +613,7 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
                     new_nt = START
                 else:
                     new_nt = allocate_tid()
+
                 grammar = get_updated_grammar(grammar, replacement_positions, nt_to_fully_replace,
                                               nt_to_partially_replace, new_nt)
                 inner_trees = get_updated_trees(trees, replacement_positions, nt_to_fully_replace, new_nt)
@@ -603,10 +625,10 @@ def coalesce_partial(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
     return grammar, trees, replacement_happened
 
 
-def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
+def coalesce(oracle, trees: List[ParseNode], grammar: Grammar,
              coalesce_target: Bubble = None):
     """
-    ORACLE is a Lark parser for the grammar we seek to find. We ask the oracle
+    ORACLE is a Oracle for the grammar we seek to find. We ask the oracle
     yes or no replacement questions in this method.
 
     TREES is a list of fully constructed parse trees.
@@ -625,7 +647,6 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
     """
 
 
-
     def replacement_valid(replacer_derivable_strings, replacee, trees : ParseTreeList) -> Tuple[bool, Set[str]]:
         """
         Returns true if every string derivable from `replacee` in `trees` can be replaced
@@ -639,7 +660,7 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
             replaced_strings.update(get_strings_with_replacement(tree, replacee, replacer_derivable_strings))
 
         if len(replaced_strings) == 0:
-            # TODO: See the failing doctest in bubble.py
+            # TODO: See the failing doctest in bubble.py. Pickle below for a "real" example
             #import pickle
             #pickle.dump(coalesce_target, open('overlap-bug.pkl', "wb"))
             print(f"Oopsie with {coalesce_target}.\nPretty sure this is an overlap bug that I know of.... so let's just skip it")
@@ -790,19 +811,21 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
     tree_list = ParseTreeList(trees, grammar)
     for pair in pairs:
         first, second = pair
-        ### update the pair for the new grammar
+        # update the pair for the new grammar, because the pair was created before
+        # we performed any merges. If one of the labels was merged, replace it with
+        # its new label.
         while first in coalesced_into and first != START:
             first = coalesced_into[first]
         while second in coalesced_into and second != START:
             second = coalesced_into[second]
-        ### and check that it's still valid
+        # and check that it's still valid
         if first == second:
             continue
         if (first, second) in checked:
             continue
         else:
             checked.add((first, second))
-        ###
+
         # If the nonterminals can replace each other in every context, they are replaceable
         if replacement_valid_and_expanding(first, second, tree_list):
             if first == START or second == START:
@@ -825,9 +848,7 @@ def coalesce(oracle: Lark, trees: List[ParseNode], grammar: Grammar,
 def minimize(grammar):
     """
     Mutative method that deletes repeated rules from GRAMMAR and removes
-    unnecessary layers of indirection.
-
-    CONFIG is the required configuration options for GrammarGenerator classes.
+    unnecessary layers of indirection..
     """
 
     def remove_repeated_rules(grammar: Grammar):
@@ -915,17 +936,3 @@ def minimize(grammar):
     remove_repeated_rules(grammar)
 
     return grammar
-
-# Example:
-# from input import parse_input
-# from parse_tree import ParseTree
-# file_name = 'examples/arithmetic/arithmetic.json'
-# CONFIG, ORACLE_GEN, ORACLE = parse_input(file_name)
-# POS_EXAMPLES, MAX_TREE_DEPTH = CONFIG['POS_EXAMPLES'], CONFIG['MAX_TREE_DEPTH']
-# oracle_parse_tree = ParseTree(ORACLE_GEN)
-# positive_examples, positive_nodes = oracle_parse_tree.sample_strings(POS_EXAMPLES, MAX_TREE_DEPTH)
-# positive_examples = ['int', '( int )', 'int + int', 'int * int']
-# positive_nodes = [[ParseNode(tok, True, []) for tok in s.split()] for s in positive_examples]
-#
-# gen = build_start_grammar(ORACLE.parser(), CONFIG, positive_nodes)
-# print(gen.generate_grammar())

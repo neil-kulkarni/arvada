@@ -1,6 +1,10 @@
 import json
 from grammar import *
 
+"""
+Utilities for creating a json grammar file from an internal grammar rep. No longer used. 
+"""
+
 def parse_input(file_name):
     # Load the JSON dictionary
     f = open(file_name, 'r')

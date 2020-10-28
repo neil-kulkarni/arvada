@@ -1,3 +1,7 @@
+"""
+No longer used.
+"""
+
 class UnionFind():
     """
     WeightedQuickUnion data structure for connectivity that also supplies a

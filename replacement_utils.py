@@ -11,8 +11,19 @@ from parse_tree import ParseNode
 REPLACE_CONST = '[[:REPLACEME]]'
 MAX_SAMPLES = 10
 
+"""
+Utilities to sample strings that are in the grammar induced when two nodes in a parse tree are merged. 
+"""
+
 def get_overlaps(larger: List[str], smaller: List[str]):
     """
+    ASSUMES: `smaller` is not explicitly contained in `larger`.
+
+    Returns a list of overlaps between the front/back of `larger`
+    and the front/back of `smaller`. Each overlap list is a list
+    of tuples of (l, s), where l is an index in `larger` and s
+    is an index in `smaller` s.t. larger[l] == smaller[s]
+
     >>> get_overlaps(["a", "b", "c", "d"], ["c", "d", "e"])
     [[(2, 0), (3, 1)]]
     >>> get_overlaps(["a", "b", "c", "d"], ["e", "d", "e"])
@@ -28,7 +39,6 @@ def get_overlaps(larger: List[str], smaller: List[str]):
     >>> get_overlaps(["a", "b", "c"], ["d", "a"])
     [[(0, 1)]]
     """
-    # Assumes that smaller is not contained in larger
     smaller_idx_1 = 0
     match_1_idxs = []
     for i in range(len(larger)):
@@ -54,8 +64,6 @@ def get_overlaps(larger: List[str], smaller: List[str]):
             if larger[i] == smaller[smaller_idx_2]:
                 match_2_idxs.insert(0, (i, smaller_idx_2))
                 smaller_idx_2 -= 1
-
-
     ret = []
     if match_1_idxs:
         ret.append(match_1_idxs)
@@ -71,6 +79,9 @@ def fixup_terminal(payload):
     return payload
 
 def muh_product(lst):
+    """
+    Because numpy product is really slow for some reason.
+    """
     prod = 1
     for e in lst:
         prod *= e
@@ -79,7 +90,37 @@ def muh_product(lst):
 #@functools.lru_cache()
 def lvl_n_derivable(trees, target_nt, n, max_samples=1000):
     """
-    Get the strings that are level n derivable from `trees`
+    Get the strings that are level-n derivable from the nonterminal `target_nt` in `trees`.
+    - Level-0 derivable: strings that are directly derivable from `target_nt` (i.e. that
+      literally occur in `trees`
+    - Level-n derivable: product of Level-(n-1) derivable strings for each child of `target_nt`
+
+    tree_1:
+       t0
+       |
+       t3
+       |
+       3
+
+    tree_2:
+          t0
+        / |  \
+      t1  t0  t2
+      |   |   |
+      (   t3  )
+          |
+          3
+
+    tree_3:
+          t0
+        / |  \
+      t0  t4  t0
+      |   |   |
+      t3   *  t3
+      |       |
+      3       3
+
+
     >>> tree_1 = ParseNode('t0', False, [ParseNode('t3', False, [ParseNode('3', True, [])])])
     >>> tree_2 = ParseNode('t0', False, [ParseNode('t1', False, [ParseNode('(', True, [])]), tree_1, ParseNode('t2', False, [ParseNode(')', True, [])])])
     >>> tree_3 = ParseNode('t0', False, [tree_1, ParseNode('t4', False, [ParseNode('*', True, [])]), tree_1])

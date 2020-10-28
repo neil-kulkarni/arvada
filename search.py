@@ -6,8 +6,27 @@ from start import build_start_grammar
 from lark import Lark
 from oracle import CachingOracle, ExternalOracle
 
+"""
+High-level command line to launch Arvada search. Currently assumes the benchmark is structured
+as created by sample_lark. TODO: allow for general specification of guide examples + oracle command
+
+See __main__ dispatch at the bottom for usage. 
+"""
+
 
 def main_external(external_folder, log_file, fast = False, random_guides=False):
+    """
+    `external_folder`: the base folder for the benchmark, which contains:
+      - random-guides: dir of random guide examples
+      - guides: dir of minimal guide examples
+      - test_set: dir of held-out test examples
+      - parse_bench_name: the parser command (oracle). assume bench_name is the
+        base (i.e. without parent directories) name of external_folder
+    `log_file`: where to write results
+    `fast`: use internal caching oracle created with the Lark grammar, instead
+            of the external command
+    `random_guides`: learn from the guide examples in random-guides instead of guides
+    """
     import os
     bench_name = os.path.basename(external_folder)
     if random_guides:

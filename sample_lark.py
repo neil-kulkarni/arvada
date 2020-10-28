@@ -12,6 +12,21 @@ import random
 
 INFINITY = 1_000_000
 
+"""
+Utility program to, from a Lark representation of a grammar, either
+ (1) create an ANTLR benchmark + guide examples from the grammar
+ (2) sample (to stdout) from the grammar, both random and minimal
+     guide examples 
+     
+*** WARNING ***
+For proper behavior, requires that regexes occur in nonterminals as 
+opposed to terminals. In this case, Lark creates a sub-grammar for 
+each regex, and we can sample from the grammar properly. There are
+some assumptions in here that terminals are just plain characters
+(or maybe, at most, ranges) rather than regexes. 
+"""
+
+
 class GenericRule:
     def __init__(self, start, expansion, is_terminal):
         self.start = start
@@ -545,7 +560,16 @@ def sample_grammar(grammar_contents: str):
         print("=====")
         print(sample)
 
-def main(folder_root, grammar_contents_name, antlr_mode):
+def main(folder_root, grammar_contents_name, antlr_mode : bool):
+    """
+    Does all the benchmark-creation work:
+    - `folder_root` is where to put the benchmark
+    - `grammar_contents_name` is the Lark file containing the grammar (we'll
+      check for a _no_lr version (one w/o LR recursion) if it exists)
+    - `antlr_mode`: if True, create an efficient c++ ANTLR parser. otherwise
+       just a python parser.
+    """
+
     import os
 
     if "ANTLR_RUNTIME" not in os.environ:
@@ -721,10 +745,22 @@ if __name__ == '__main__':
 
 
 if __name__ == "__main__":
+    """
+    Two usage modes:
+    """
     if len(sys.argv) == 3:
+        """
+        Creates a benchmark in BENCHMARK_FOLDER_ROOT/GRAMMAR_FILE, which
+        includes an ANTLR C++ parser, guide examples, and a test set. 
+          $ python sample_lark.py BENCHMARK_FOLDER_ROOT GRAMMAR_FILE.LARK
+        """
         folder_root = sys.argv[1]
         grammar_contents_name = sys.argv[2]
         main(folder_root, grammar_contents_name, True)
     else:
+        """
+        Just print out guide examples to stdout:
+          $ python sample_lark.py GRAMMAR_FILE.LARK
+        """
         grammar_contents = open(sys.argv[1]).read()
         examples = sample_grammar(grammar_contents)

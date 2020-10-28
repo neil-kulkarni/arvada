@@ -7,7 +7,18 @@ from input import clean_terminal
 START = 't0'
 
 
+
+
 class ParseTreeList:
+    """
+    A list of parse trees, also encapsulating the grammar induced byt the parse trees.
+    Can be used just as a list but provides additional methods to check whether strings
+    can be derived by the induced grammar of the list of parse trees.
+
+    TODO: This is currently a fragile data structure as it does not automatically
+    update the grammar when there are changes to the list of parse trees.
+    """
+
     def __init__(self, start_list=None, grammar=None):
         self.inner_list = [] if start_list is None else start_list
         if self.inner_list and grammar is None:
@@ -53,13 +64,15 @@ class ParseTreeList:
 
     def represented_by_derived_grammar(self, candidates: Iterable[str]):
         """
-        !!!ASSUMES: grammar and tree_list are in sync. Help me.!!!
-           Don't use this if you don't know what that means.
+        ASSUMES: grammar and the underlying tree list are in sync. That is,
+        `self.grammar` is the induced grammar of the tree list represented
+        by this object (`self.inner_list`).
 
-        Returns true if all the candidates are already representable by our grammar
+        Returns true if all the strings in `candidates` are derivable in the
+        grammar induced by this tree list.
         """
         candidates = set(candidates)
-        represented_strings = self.represented_strings();
+        represented_strings = self.represented_strings()
         if candidates.issubset(represented_strings):
             return True
         else:
@@ -73,12 +86,14 @@ class ParseTreeList:
 
         return True
 
-    def in_my_grammar(self, candidate):
+    def in_my_grammar(self, candidate: str):
         """
-        !!!ASSUMES: grammar and tree_list are in sync. Help me.!!!
-           Don't use this if you don't know what that means.
+        ASSUMES: grammar and the underlying tree list are in sync. That is,
+        `self.grammar` is the induced grammar of the tree list represented
+        by this object (`self.inner_list`).
 
-        Returns true if candidate is already representable by our grammar
+        Returns true if `candidate` is derivable by the grammar induced
+        by this tree list.
         """
         if candidate in self.represented_strings():
             return True
@@ -93,6 +108,11 @@ class ParseTreeList:
 
 
 class ParseTree():
+
+    """
+    A ParseTree, which wraps a ParseNode with methods to sample from the
+    grammar induced by the tree.
+    """
     MAX_TREE_DEPTH = 100
 
     def __init__(self, gen):
@@ -186,6 +206,11 @@ class ParseTree():
 
 
 class ParseNode():
+    """
+    A ParseNode, which represents the current state of the "trees" we are building
+    up in the Arvada algorithm.
+    """
+
     def __init__(self, payload, is_terminal, children):
         """
         Payload is a string representing either a terminal or a nonterminal.

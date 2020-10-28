@@ -8,14 +8,26 @@ from parse_tree import ParseNode
 from replacement_utils import get_overlaps
 
 
+
 @functools.lru_cache()
 def side_similarity(side, other_side):
+    """
+    Helper which computes the similarity of two lists, assumed to be the sides of contexts.
+
+    - If the two lists are identical, returns 1/2
+    - Else, adds 1/(2^(i+2)) to the match score for each ith element in the list that matches
+        - Includes if both lists have empty ith element (i.e. are of len 2)
+        - Excludes if both lists have "DUMMY" as an element at ith position
+
+    Hardcoded with k = 4.
+
+    TODO: no idea if the lru_cache() is actually helpful to the performance of this function.
+    """
     if side == other_side:
         return 0.5
     score = 0
     for i in range(4):
         match_score = 1 / (2 ** (i + 2))
-        # Give it mat
         if i < len(side) and i < len(other_side):
             if side[i] == 'DUMMY' or other_side[i] == 'DUMMY':
                 continue
@@ -29,7 +41,9 @@ def side_similarity(side, other_side):
 
 
 class Context:
-
+    """
+    Encapsulates the k-context (hard-coded for k=4) of a bubble.
+    """
     def __init__(self, lhs : Tuple[str], rhs: Tuple[str]):
         self.lhs = lhs[-4:]
         self.rhs = rhs[:4]
@@ -52,7 +66,10 @@ class Context:
         return self.__str__()
 
     def similarity(self, other):
-
+        """
+        Compute the similarity of two contexts are the sum of their two side similarities.
+        Ref. to function at top of file for `side_similarity`.
+        """
         assert(isinstance(other, Context))
         if self == other:
             return 1
@@ -63,6 +80,12 @@ class Context:
 
 
 class Bubble:
+    """
+    Represents a `bubble`, that is, a sequence of terminals/nonterminals that are to be
+    bubbled up into a new nonterminal. Provides utility methods to track occurrence of
+    the sequence, the context in which it occurs, and its overlap with other sequences.
+    """
+
     def __init__(self, new_nt: str, bubbled_elems: List[ParseNode]):
         self.new_nt = new_nt
         self.bubbled_elems = bubbled_elems
@@ -115,8 +138,18 @@ class Bubble:
 
     def application_breaks_other(self, other):
         """
-        If we apply self first, does that break the ability to bubble up other? If we apply other first, does that
-        break the ability to bubble up self?
+        The point of this function is to calculate whether `self` and `other` are overlapping,
+        so whether we must apply these bubbles in a certain order. All this complication is
+        to avoid having to explicitly track overlapping bubbles while constructing the subsequences,
+        and in hindsight, that may have been a simpler and more robust thing to do.
+
+        Returns a tuple of two boolean values:
+        - If we apply self first, does that break the ability to bubble up other?
+        - If we apply other first, does that break the ability to bubble up self?
+
+        TODO: There is a known bug, which is exposed by one of the doctests.
+
+
         >>> c = ParseNode("c", False, [])
         >>> o = ParseNode("o", False, [])
         >>> r = ParseNode("r", False, [])

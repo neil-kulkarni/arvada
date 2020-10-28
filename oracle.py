@@ -3,16 +3,35 @@ import tempfile
 import subprocess
 import os
 
+"""
+This file gives  classes to use as "Oracles" in the Arvada algorithm.
+"""
+
 class ParseException(Exception):
     pass
 
 class ExternalOracle:
+    """
+    An ExternalOracle is a wrapper around an oracle that takes the form of a shell
+    command accepting a file as input. We assume the oracle returns True if the
+    exit code is 0 (no error). If the external oracle takes >3 seconds to execute,
+    we conservatively assume the oracle returns True.
+    """
+
     def __init__(self, command):
+        """
+        `command` is a string representing the oracle command, i.e. `command` = "readpng"
+        in the oracle call:
+            $ readpng <MY_FILE>
+        """
         self.command = command
         self.cache_set = {}
         self.parse_calls = 0
 
     def _parse_internal(self, string):
+        """
+        Does the work of calling the subprocess.
+        """
         FNULL = open(os.devnull, 'w')
         f = tempfile.NamedTemporaryFile()
         f.write(bytes(string, 'utf-8'))
@@ -35,6 +54,9 @@ class ExternalOracle:
             return True
 
     def parse(self, string):
+        """
+        Caching wrapper around _parse_internal
+        """
         self.parse_calls += 1
         if string in self.cache_set:
             if self.cache_set[string]:
@@ -50,6 +72,10 @@ class ExternalOracle:
                 raise ParseException(f"doesn't parse: {string}")
 
 class CachingOracle:
+    """
+    Wraps a "Lark" parser object to provide caching of previous calls.
+    """
+
     def __init__(self, oracle: Lark):
         self.oracle = oracle
         self.cache_set = {}
