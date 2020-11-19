@@ -44,19 +44,13 @@ def compute_stats(grammar):
 
 	for rule_start, rule_obj in grammar.rules.items():
 		nonterminals.add(rule_start)
-		num_bodies = 0
 		for body in rule_obj.bodies:
-			if not (len(body) == 1 and '"' in body[0]):
-				num_bodies += 1
+			rule_count += 1
 			for sym in body:
 				if '"' in sym:
 					terminals.add(sym)
 				else:
 					nonterminals.add(sym)
-		if num_bodies == 0:
-			rule_count += 1
-		else:
-			rule_count += num_bodies
 
 	print('Rules:', rule_count - 1)
 	print('Terms:', len(terminals))
