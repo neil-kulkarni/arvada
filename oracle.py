@@ -1,3 +1,4 @@
+import time
 from lark import Lark
 import tempfile
 import subprocess
@@ -27,11 +28,13 @@ class ExternalOracle:
         self.command = command
         self.cache_set = {}
         self.parse_calls = 0
+        self.real_calls = 0
 
     def _parse_internal(self, string):
         """
         Does the work of calling the subprocess.
         """
+        self.real_calls +=1
         FNULL = open(os.devnull, 'w')
         f = tempfile.NamedTemporaryFile()
         f.write(bytes(string, 'utf-8'))

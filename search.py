@@ -112,8 +112,8 @@ def main_external(external_folder, log_file, fast = False, random_guides=False):
         print(f'Recall: {num_recall_parsed/len(real_recall_set)}, Precision: {num_precision_parsed/len(precision_set)}')
         print(f'Time spent building grammar: {build_time}s', file = f)
         print(f'Time spent building + scoring grammar: {time.time() - start_time}s', file = f)
-        print(f'Parse calls: {oracle.parse_calls}')
-        print(f'Parse calls: {oracle.parse_calls}', file = f)
+        print(f'Parse calls: {oracle.parse_calls}, {oracle.real_calls}')
+        print(f'Parse calls: {oracle.parse_calls}, {oracle.real_calls}', file = f)
         print(f'Pickling grammar...')
         import pickle
         pickle.dump(start_grammar, open(log_file + ".gram", "wb"))
