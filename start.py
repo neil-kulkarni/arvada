@@ -214,8 +214,7 @@ def score_and_sort_bubbles(bubbles: Dict[str, Bubble]) -> List[Union[Bubble, Tup
                 bubbles[pair[0]] = score
         else:
             bubbles[pair] = score
-
-    bubbles = list(bubbles.keys())
+    bubbles = list(bubbles.items())
     if len(bubbles) > 100:
         bubbles = bubbles[:100]
     random.shuffle(bubbles)
@@ -346,7 +345,7 @@ def build_trees(oracle, leaves):
         count = 1
         updated = True
         while updated:
-            all_groupings = group(best_trees, group_size)
+            all_groupings, scores = zip(*group(best_trees, group_size))
             updated, nlg = False, len(all_groupings)
             for i, grouping in enumerate(all_groupings):
                 print(('[Group len %d] Bubbling iteration %d (%d/%d)...' % (group_size, count, i + 1, nlg)).ljust(50), end='\r')
@@ -354,7 +353,8 @@ def build_trees(oracle, leaves):
                 if isinstance(grouping, Bubble):
                     new_trees = apply(grouping, best_trees)
                     new_score, new_trees = score(new_trees, grouping)
-                    grouping_str = f"Successful grouping (single): {grouping.bubbled_elems}"
+                    grouping_str = f"Successful grouping (single): {grouping.bubbled_elems}\n    (aka {[e.derived_string() for e in grouping.bubbled_elems]}"
+                    grouping_str += f"\n     [score of {scores[i]}]"
                 else:
                     bubble_one = grouping[0]
                     bubble_two = grouping[1]
@@ -362,6 +362,8 @@ def build_trees(oracle, leaves):
                     new_trees = apply(bubble_two, new_trees)
                     new_score, new_trees = score(new_trees, grouping)
                     grouping_str = f"Successful grouping (double): {bubble_one.bubbled_elems}, {bubble_two.bubbled_elems}"
+                    grouping_str += f"\n     (aka {[e.derived_string() for e in bubble_one.bubbled_elems]}, {[e.derived_string() for e in bubble_two.bubbled_elems]}))"
+                    grouping_str += f"\n     [score of {scores[i]}]"
                 ### Score
                 if new_score > 0:
                     print()
@@ -403,29 +405,6 @@ def coalesce_partial(oracle, trees: List[ParseNode], grammar: Grammar,
 
     """
 
-    def get_all_derivable_strings(tree: ParseNode, replacer_nt: str) -> Set[str]:
-        """
-        Returns all those strings derivable from REPLACER_NT in TREE.
-        TODO: shouldn't this be replaced by stuff in replacement_utils? Should be identical.
-        """
-
-        def derived_string(tree: ParseNode):
-            """
-            Returns the string derived from the leaves of this tree.
-            """
-            if tree.is_terminal:
-                return tree.payload
-            return ''.join([derived_string(c) for c in tree.children])
-
-        if tree.is_terminal:
-            return set()
-        elif tree.payload == replacer_nt:
-            return {derived_string(tree)}
-        else:
-            derivable = set()
-            for child in tree.children:
-                derivable.update(get_all_derivable_strings(child, replacer_nt))
-            return derivable
 
     def partially_coalescable(replaceable_everywhere: str, replaceable_in_some_rules: str, trees: ParseTreeList) -> Dict[
         Tuple[str, Tuple[str]], List[int]]:
@@ -446,14 +425,10 @@ def coalesce_partial(oracle, trees: List[ParseNode], grammar: Grammar,
                     partial_replacement_locs.append(((rule_start, body), idx))
 
         # Get the set of strings derivable from `replaceable_everywhere`
-        everywhere_derivable_strings = set()
-        for tree in trees:
-            everywhere_derivable_strings.update(get_all_derivable_strings(tree, replaceable_everywhere))
+        everywhere_derivable_strings = lvl_n_derivable(trees, replaceable_everywhere, 0 )
 
         # Get the set of strings derivable from `replaceable_in_some_rules`
-        in_some_derivable_strings = set()
-        for tree in trees:
-            in_some_derivable_strings.update(get_all_derivable_strings(tree, replaceable_in_some_rules))
+        in_some_derivable_strings = lvl_n_derivable(trees, replaceable_in_some_rules, 0)
 
         # Check whether `replaceable_everywhere` is replaceable by `replaceable_in_some_rules` everywhere.
         everywhere_by_some_candidates = []
@@ -497,13 +472,14 @@ def coalesce_partial(oracle, trees: List[ParseNode], grammar: Grammar,
                 continue
 
             try:
+                candidate_index = 0
                 for candidate in candidate_strs:
+                    candidate_index += 1
                     oracle.parse(candidate)
                 replacing_positions[(rule[0], tuple(rule[1]))].append(posn)
                 language_expanded = True
             except ParseException as e:
                 continue
-
 
         if MUST_EXPAND_IN_PARTIAL and coalesce_target is not None and not language_expanded:
             return []

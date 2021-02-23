@@ -1,6 +1,7 @@
 import functools
 import itertools
 import random
+import time
 from typing import Tuple, List, Set
 import sys
 
@@ -72,7 +73,7 @@ def get_overlaps(larger: List[str], smaller: List[str]):
 
     return ret
 
-
+@functools.lru_cache(maxsize=None)
 def fixup_terminal(payload):
     if len(payload) >= 3 and payload.startswith('"') and payload.endswith('"'):
         payload = payload[1:-1]
@@ -196,6 +197,7 @@ def sample_from_product(strings_per_child, num_samples, lens_per_child, prod_siz
         ret_strings.append(''.join(children_choice))
     return ret_strings
 
+@functools.lru_cache()
 def get_all_replacement_strings(tree: ParseNode, nt_to_replace: str):
     """
     Get all the possible strings derived from `tree` where all possible combinations
@@ -239,6 +241,8 @@ def get_all_replacement_strings(tree: ParseNode, nt_to_replace: str):
 
     return list(set(replacement_strings))
 
+
+#@functools.lru_cache()
 def get_all_rule_replacement_strs(tree: ParseNode, replacee_rule: Tuple[str, List[str]], replacee_posn: int):
     """
     Get all the possible strings derived from `tree` where all possible combinations

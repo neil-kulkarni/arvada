@@ -231,6 +231,12 @@ class ParseNode():
     def pretty_payload(self):
         return '  ' + (self.payload if len(self.payload) > 0 else '\u03B5') + '  '
 
+    def derived_string(self):
+        if self.is_terminal:
+            return self.payload
+        else:
+            return ''.join([c.derived_string() for c in self.children])
+
     def copy(self):
         """
         Produces a new object that is logically equal to this ParseNode, but

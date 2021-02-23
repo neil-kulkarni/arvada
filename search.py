@@ -5,6 +5,7 @@ from grammar import Grammar, Rule
 from start import build_start_grammar
 from lark import Lark
 from oracle import CachingOracle, ExternalOracle
+import string
 
 """
 High-level command line to launch Arvada search. Currently assumes the benchmark is structured
@@ -12,6 +13,37 @@ as created by sample_lark. TODO: allow for general specification of guide exampl
 
 See __main__ dispatch at the bottom for usage. 
 """
+
+
+def approx_tokenize(guide_raw:str):
+    def get_category(c):
+        if c in string.ascii_letters:
+            return "LETTER"
+        if c in string.digits:
+            return "DIGIT"
+        if c in string.punctuation:
+            return "PUNCTUATION"
+        if c in string.whitespace:
+            return "WHITESPACE"
+        else:
+            return None
+    prev_category = None
+    cur_token = ""
+    start = True
+    tokens = []
+    for c in guide_raw:
+        cur_category = get_category(c)
+        if cur_category == prev_category:
+            cur_token += c
+        else:
+            if not start:
+                tokens.append(ParseNode(cur_token, True, []))
+            cur_token = c
+        prev_category = cur_category
+        start = False
+    if cur_token != "":
+        tokens.append(ParseNode(cur_token, True, []))
+    return tokens
 
 
 def main_external(external_folder, log_file, fast = False, random_guides=False):
@@ -41,7 +73,8 @@ def main_external(external_folder, log_file, fast = False, random_guides=False):
         if filename.endswith(".ex"):
             full_filename = os.path.join(guide_folder, filename)
             guide_raw = open(full_filename).read()
-            guide = [ParseNode(tok, True, []) for tok in guide_raw]
+            #guide = [ParseNode(tok, True, []) for tok in guide_raw]
+            guide = approx_tokenize(guide_raw)
             guide_examples.append(guide)
 
     real_recall_set = []

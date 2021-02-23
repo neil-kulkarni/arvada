@@ -10,7 +10,7 @@ from replacement_utils import get_overlaps
 
 
 @functools.lru_cache()
-def side_similarity(side, other_side):
+def side_similarity(side, other_side, reversed = False):
     """
     Helper which computes the similarity of two lists, assumed to be the sides of contexts.
 
@@ -28,10 +28,11 @@ def side_similarity(side, other_side):
     score = 0
     for i in range(4):
         match_score = 1 / (2 ** (i + 2))
+        pos = -(i+1) if reversed else i
         if i < len(side) and i < len(other_side):
-            if side[i] == 'DUMMY' or other_side[i] == 'DUMMY':
+            if side[pos] == 'DUMMY' or other_side[pos] == 'DUMMY':
                 continue
-            elif side[i] == other_side[i]:
+            elif side[pos] == other_side[pos]:
                 score += match_score
         elif len(side) == len(other_side):
             score += match_score
@@ -74,7 +75,7 @@ class Context:
         if self == other:
             return 1
         else:
-            lhs_score = side_similarity(tuple(reversed(self.lhs)), tuple(reversed(other.lhs)))
+            lhs_score = side_similarity(self.lhs, other.lhs, reversed = True)
             rhs_score = side_similarity(self.rhs, other.rhs)
             return lhs_score + rhs_score
 
