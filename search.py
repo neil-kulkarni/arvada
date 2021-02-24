@@ -149,8 +149,10 @@ def main_external(external_folder, log_file, fast = False, random_guides=False):
         print(f'Parse calls: {oracle.parse_calls}, {oracle.real_calls}', file = f)
         print(f'Pickling grammar...')
         import pickle
+        start_grammar.parser = None
         pickle.dump(start_grammar, open(log_file + ".gram", "wb"))
 
+        print(f'Time spent in oracle calls: {oracle.time_spent}', file = f)
         print(f'Time spent in oracle calls: {oracle.time_spent}')
 
 

@@ -60,7 +60,6 @@ def allocate_tid():
 # Globally unique nonterminal number
 next_tid = 1
 
-
 def build_start_grammar(oracle, leaves):
     """
     ORACLE is a CachingOracle or ExternalOracle with a .parse method, which
@@ -82,7 +81,6 @@ def build_start_grammar(oracle, leaves):
     return grammar
 
 
-
 def build_naive_parse_trees(leaves: List[List[ParseNode]]):
     """
     Builds naive parse trees for each leaf in `leaves`, assigning each unique
@@ -93,6 +91,29 @@ def build_naive_parse_trees(leaves: List[List[ParseNode]]):
     get_class = {t: allocate_tid() for t in terminals}
     trees = [ParseNode(START, False, [ParseNode(get_class[leaf.payload], False, [leaf]) for leaf in leaf_lst])
              for leaf_lst in leaves]
+    return trees
+
+
+def build_naive_parse_trees_2(leaves: List[List[ParseNode]]):
+    """
+    Builds naive parse trees for each leaf in `leaves`, assigning each unique
+    character to its own nonterminal, and uniting them all under the START
+    nonterminal.
+    """
+    class_map = defaultdict(allocate_tid)
+    trees = []
+    for leaf_lst in leaves:
+        children = []
+        for leaf in leaf_lst:
+            payload = leaf.payload
+            if len(payload) == 1:
+                children.append(ParseNode(class_map[payload], False, [leaf]))
+            else:
+                grandchildren = [ParseNode(class_map[c], False, [ParseNode(c, True, [])])for c in payload]
+                children.append(ParseNode(class_map[payload], False, grandchildren))
+        trees.append(ParseNode(START, False, children))
+    # trees = [ParseNode(START, False, [ParseNode(get_class[leaf.payload], False, [leaf]) for leaf in leaf_lst])
+    #          for leaf_lst in leaves]
     return trees
 
 
