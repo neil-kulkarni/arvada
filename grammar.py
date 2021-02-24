@@ -5,6 +5,24 @@ import random
 
 #random.seed(0)
 
+def elem_fixup(elem: str):
+    """
+    >>> elem_fixup('"-""')
+    '"-\""'
+    >>> elem_fixup('"="="')
+    '"=\"="'
+    """
+    if len(elem) >= 3 and elem.startswith('"') and elem.endswith('"'):
+        for i in reversed(range(1, len(elem) - 1)):
+            term_char = elem[i]
+            if term_char == '"':
+                elem = elem[:i] + '\\"' + elem[i + 1:]
+            elif term_char == '\\':
+                elem = elem[:i] + '\\\\' + elem[i + 1:]
+            elif term_char == '\n':
+                elem = elem[:i] + '\\n' + elem[i + 1:]
+    return elem
+
 class Grammar():
     """
     Object representing a string-representation of a context-free grammar.
@@ -203,16 +221,6 @@ class Rule():
         return self.cached_str
 
     def _body_str(self, body):
-        def elem_fixup(elem: str):
-            if len(elem) == 3 and elem.startswith('"') and elem.endswith('"'):
-                term_char = elem[1]
-                if term_char == '"':
-                    return '"\\""'
-                elif term_char == '\\':
-                    return '"\\\\"'
-                elif term_char == '\n':
-                    return '"\\n"'
-            return elem
 
         return ' '.join([elem_fixup(b) if len(b) > 0 else '\u03B5' for b in body])
 
