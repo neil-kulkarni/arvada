@@ -151,6 +151,8 @@ def main_external(external_folder, log_file, fast = False, random_guides=False):
         import pickle
         pickle.dump(start_grammar, open(log_file + ".gram", "wb"))
 
+        print(f'Time spent in oracle calls: {oracle.time_spent}')
+
 
 if __name__ == '__main__':
     if len(sys.argv) != 4 or not os.path.exists(sys.argv[2]) :

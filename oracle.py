@@ -29,6 +29,7 @@ class ExternalOracle:
         self.cache_set = {}
         self.parse_calls = 0
         self.real_calls = 0
+        self.time_spent = 0
 
     def _parse_internal(self, string):
         """
@@ -67,7 +68,9 @@ class ExternalOracle:
             else:
                 raise ParseException(f"doesn't parse: {string}")
         else:
+            s = time.time()
             res = self._parse_internal(string)
+            self.time_spent += time.time() - s
             self.cache_set[string] = res
             if res:
                 return True
