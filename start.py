@@ -357,7 +357,7 @@ def build_trees(oracle, leaves):
 
     best_trees = build_naive_parse_trees(leaves)
     grammar = build_grammar(best_trees)
-    print("Beginning coalescing...")
+    print("Beginning coalescing...".ljust(50))
     grammar, best_trees, _ = coalesce(oracle, best_trees, grammar)
     grammar, best_trees, _ = coalesce_partial(oracle, best_trees, grammar)
 
