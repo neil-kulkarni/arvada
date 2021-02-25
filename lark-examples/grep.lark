@@ -1,3 +1,4 @@
+// still causes errors. ignoring for now.
 start: regex
 
 regex : single | regex single
@@ -10,7 +11,7 @@ char : nbchar | "\\" npchar
 
 nums :  | nums numall
 tok :  tok char
-    |
+    | char
 
 single : single tok
         | single "\\" "{" nums "\\" "}"

@@ -24,5 +24,5 @@ A bunch of examples written in the lark grammar format. Ideas pulled from variou
 - grep
 - ip
 - xml: example with 5 allowed tags (ours, recreated as per descriptions)
-- lisp: siinspired by [this one](https://iamwilhelm.github.io/bnf-examples/lisp)
+- lisp: inspired by [this one](https://iamwilhelm.github.io/bnf-examples/lisp)
 
