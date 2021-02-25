@@ -133,7 +133,7 @@ def parser_contents(gram_name: str, mode :str):
 #include "!!!REPLACEME!!!Lexer.h"
 #include "!!!REPLACEME!!!Parser.h"
 
-class MyParserErrorListener: public antlr4::BaseErrorListener {
+class MyErrorListener: public antlr4::BaseErrorListener {
   virtual void syntaxError(
       antlr4::Recognizer *recognizer,
       antlr4::Token *offendingSymbol,
@@ -150,9 +150,10 @@ class MyParserErrorListener: public antlr4::BaseErrorListener {
 int main(int argc, char *argv[]) {
   !!!INPUT_MODE!!!
   !!!REPLACEME!!!Lexer lexer(&input);
+  MyErrorListener errorListener;
+  lexer.removeErrorListeners();
+  lexer.addErrorListener(&errorListener);
   antlr4::CommonTokenStream tokens(&lexer);
-
-  MyParserErrorListener errorListener;
 
   !!!REPLACEME!!!Parser parser(&tokens);
   parser.removeErrorListeners();
