@@ -1,17 +1,17 @@
 start: sexpression
 
 sexpression : atomicsymbol
-               | "(" sexpression empty "." empty sexpression ")"
+               | "(" sexpression EMPTY "." EMPTY sexpression ")"
                | list 
    
-list : "(" sexpression (empty sexpression)* ")"
+list : "(" sexpression (EMPTY sexpression)* ")"
 
-atomicsymbol : letter atompart
+atomicsymbol : LETTER | LETTER atompart
 
-atompart :  | letter atompart | number atompart
+atompart :  LETTER | NUMBER | LETTER atompart | NUMBER atompart
 
-letter : "a".."z"
+LETTER : "a".."z"
 
-number : "1".."9"
+NUMBER : "0".."9"
 
-empty : " "
+EMPTY : " "
