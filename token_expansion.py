@@ -36,6 +36,36 @@ def rules_to_add(rule_start):
         for i in range(1, 10):
             nz.add_body([f'"{i}"'])
         return [r, nz] + rules_to_add("tdigits")
+    if rule_start == "tletter":
+        r = Rule(rule_start)
+        for c in string.ascii_letters:
+            r.add_body(([f'"{c}"']))
+        return [r]
+    if rule_start == "tlower":
+        r = Rule(rule_start)
+        for c in string.ascii_lowercase:
+            r.add_body(([f'"{c}"']))
+        return [r]
+    if rule_start == "tupper":
+        r = Rule(rule_start)
+        for c in string.ascii_uppercase:
+            r.add_body(([f'"{c}"']))
+        return [r]
+    if rule_start == "tuppers":
+        r = Rule(rule_start)
+        r.add_body(['tupper'])
+        r.add_body((['tupper', 'tuppers']))
+        return [r] + rules_to_add('tupper')
+    if rule_start == "tlowers":
+        r = Rule(rule_start)
+        r.add_body(['tlower'])
+        r.add_body((['tlower', 'tlowers']))
+        return [r] + rules_to_add('tlower')
+    if rule_start == "tletters":
+        r = Rule(rule_start)
+        r.add_body(['tletter'])
+        r.add_body((['tletter', 'tletters']))
+        return [r] + rules_to_add('tletter')
     return []
 
 
@@ -78,6 +108,7 @@ def generalize_digits_in_rule(oracle: ExternalOracle, grammar: Grammar, trees: L
                 digit_ok = False
                 ints_ok = False
                 digits_ok = False
+                break
         if ints_ok:
             candidates = get_strings_with_replacement(tree, rule_start, integer_candidates)
             if not try_strings(oracle, candidates):
@@ -101,6 +132,59 @@ def generalize_digits_in_rule(oracle: ExternalOracle, grammar: Grammar, trees: L
         return body_idxs, replace_str
 
 
+def generalize_letters_in_rule(oracle: ExternalOracle, grammar: Grammar, trees: List[ParseNode], rule_start: str, body_idxs: List[int], expansion_type):
+
+    existing_bodies = [fixup_terminal(body[0]) for idx, body in enumerate(grammar.rules[rule_start].bodies) if idx in body_idxs]
+
+    if expansion_type == lowercase_type:
+        expansion_set = string.ascii_lowercase
+    elif expansion_type == uppercase_type:
+        expansion_set = string.ascii_uppercase
+    else:
+        expansion_set = string.ascii_letters
+
+
+    if all(len(body) == 1 for body in existing_bodies):
+        single_candidates = [s for s in expansion_set if s not in existing_bodies]
+        if len(single_candidates) > MAX_SAMPLES:
+            single_candidates = random.sample(single_candidates, MAX_SAMPLES - 1)
+    else:
+        single_candidates = []
+
+    multi_candidates = [''.join(random.sample(expansion_set, random.randint(2, 10))) for _ in range(MAX_SAMPLES)]
+
+    expand_1_ok = True
+    expand_multi_ok = True
+
+    for tree in [tree for tree in trees if nt_in_tree(tree, rule_start)]:
+        if expand_1_ok and single_candidates:
+            candidates = get_strings_with_replacement(tree, rule_start, single_candidates)
+            if not try_strings(oracle, candidates):
+                expand_1_ok = False
+                expand_multi_ok = False
+                break
+        if expand_multi_ok and single_candidates:
+            candidates = get_strings_with_replacement(tree, rule_start, multi_candidates)
+            if not try_strings(oracle, candidates):
+                expand_multi_ok = False
+
+    if expand_multi_ok:
+        if expansion_type == lowercase_type:
+            return body_idxs, 'tlowers'
+        elif expansion_type == uppercase_type:
+            return body_idxs, 'tuppers'
+        else:
+            return body_idxs, 'tletters'
+    elif expand_1_ok:
+        if expansion_type == lowercase_type:
+            return body_idxs, 'tlower'
+        elif expansion_type == uppercase_type:
+            return body_idxs, 'tupper'
+        else:
+            return body_idxs, 'tletter'
+    else:
+        return [], ""
+
 
 def expand_tokens(oracle : ExternalOracle, grammar : Grammar, trees: List[ParseNode]):
     """
@@ -117,7 +201,7 @@ def expand_tokens(oracle : ExternalOracle, grammar : Grammar, trees: List[ParseN
         bodies = rule.bodies
         terminal_body_idxs = [idx for idx, body in enumerate(bodies) if len(body) == 1 and is_terminal(body[0])]
         if len(terminal_body_idxs) == 0:
-            # Nothing to expand here, folks
+            # Nothing <t>o expand here, folks
             continue
         idxs_by_type = classify_terminals_by_type(bodies, terminal_body_idxs)
 
@@ -126,6 +210,12 @@ def expand_tokens(oracle : ExternalOracle, grammar : Grammar, trees: List[ParseN
             digit_bodies_to_replace, replace_str = generalize_digits_in_rule(oracle, grammar, trees, rule_start, idxs_by_type[digit_type])
             idxs_to_replace.update(digit_bodies_to_replace)
             bodies_to_add.add(replace_str)
+
+        for l_type in [uppercase_type, lowercase_type, letter_type]:
+            if idxs_by_type[l_type]:
+                letter_bodies_to_replace, replace_str = generalize_letters_in_rule(oracle, grammar, trees, rule_start, idxs_by_type[l_type], l_type)
+                idxs_to_replace.update(letter_bodies_to_replace)
+                bodies_to_add.add(replace_str)
 
         for body_idx in sorted(idxs_to_replace, reverse = True):
             rule.bodies.pop(body_idx)
