@@ -14,14 +14,20 @@ as created by sample_lark. TODO: allow for general specification of guide exampl
 See __main__ dispatch at the bottom for usage. 
 """
 
+GROUP_PUNCTUATION = False
+SPLIT_UPPER_AND_LOWER = False
 
 def approx_tokenize(guide_raw:str):
     def get_category(c):
-        if c in string.ascii_letters:
+        if not SPLIT_UPPER_AND_LOWER and c in string.ascii_letters:
             return "LETTER"
+        if SPLIT_UPPER_AND_LOWER and c in string.ascii_uppercase:
+            return "UPPER"
+        if SPLIT_UPPER_AND_LOWER and c in string.ascii_lowercase:
+            return "LOWER"
         if c in string.digits:
             return "DIGIT"
-        if c in string.punctuation:
+        if GROUP_PUNCTUATION and c in string.punctuation:
             return "PUNCTUATION"
         if c in string.whitespace:
             return "WHITESPACE"
@@ -33,7 +39,7 @@ def approx_tokenize(guide_raw:str):
     tokens = []
     for c in guide_raw:
         cur_category = get_category(c)
-        if cur_category == prev_category:
+        if cur_category is not None and cur_category == prev_category:
             cur_token += c
         else:
             if not start:
