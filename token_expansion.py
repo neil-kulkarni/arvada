@@ -1,4 +1,5 @@
 import random
+import sys
 from typing import List
 
 from grammar import Grammar, Rule
@@ -18,6 +19,9 @@ whitespace_type = 4
 MAX_SAMPLES = 10
 
 def rules_to_add(rule_start):
+    if rule_start == "":
+        print("WARNING: Calling rules_to_add with the empty string",file= sys.stderr)
+        exit(1)
     if rule_start == "tdigit":
         r = Rule(rule_start)
         for i in range(10):
@@ -210,14 +214,16 @@ def expand_tokens(oracle : ExternalOracle, grammar : Grammar, trees: List[ParseN
         # Digit expansion...
         if idxs_by_type[digit_type]:
             digit_bodies_to_replace, replace_str = generalize_digits_in_rule(oracle, grammar, trees, rule_start, idxs_by_type[digit_type])
-            idxs_to_replace.update(digit_bodies_to_replace)
-            bodies_to_add.add(replace_str)
+            if replace_str != "":
+                idxs_to_replace.update(digit_bodies_to_replace)
+                bodies_to_add.add(replace_str)
 
         for l_type in [uppercase_type, lowercase_type, letter_type]:
             if idxs_by_type[l_type]:
                 letter_bodies_to_replace, replace_str = generalize_letters_in_rule(oracle, grammar, trees, rule_start, idxs_by_type[l_type], l_type)
-                idxs_to_replace.update(letter_bodies_to_replace)
-                bodies_to_add.add(replace_str)
+                if replace_str != "":
+                    idxs_to_replace.update(letter_bodies_to_replace)
+                    bodies_to_add.add(replace_str)
 
         for body_idx in sorted(idxs_to_replace, reverse = True):
             rule.bodies.pop(body_idx)
