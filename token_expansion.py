@@ -97,12 +97,12 @@ def generalize_digits_in_rule(oracle: ExternalOracle, grammar: Grammar, trees: L
         integer_candidates.append(first_dig + ''.join(other_digs))
         digits_candidates.append('0' + ''.join(other_digs))
 
-    digit_ok = True
+    digit_ok = True if single_digit_candidates else False
     ints_ok = True
     digits_ok = True
 
     for tree in [tree for tree in trees if nt_in_tree(tree, rule_start)]:
-        if digit_ok and single_digit_candidates:
+        if digit_ok:
             candidates = get_strings_with_replacement(tree, rule_start, single_digit_candidates)
             if not try_strings(oracle, candidates):
                 digit_ok = False
@@ -153,20 +153,22 @@ def generalize_letters_in_rule(oracle: ExternalOracle, grammar: Grammar, trees: 
 
     multi_candidates = [''.join(random.sample(expansion_set, random.randint(2, 10))) for _ in range(MAX_SAMPLES)]
 
-    expand_1_ok = True
+    expand_1_ok = True if single_candidates else False
     expand_multi_ok = True
 
     for tree in [tree for tree in trees if nt_in_tree(tree, rule_start)]:
-        if expand_1_ok and single_candidates:
+        if expand_1_ok:
+            # we only get in here if we have
             candidates = get_strings_with_replacement(tree, rule_start, single_candidates)
             if not try_strings(oracle, candidates):
                 expand_1_ok = False
                 expand_multi_ok = False
                 break
-        if expand_multi_ok and single_candidates:
+        if expand_multi_ok:
             candidates = get_strings_with_replacement(tree, rule_start, multi_candidates)
             if not try_strings(oracle, candidates):
                 expand_multi_ok = False
+                if not expand_1_ok: break
 
     if expand_multi_ok:
         if expansion_type == lowercase_type:
