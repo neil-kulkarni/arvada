@@ -114,46 +114,56 @@ def main_external(external_folder, log_file, fast = False, random_guides=False):
 
         # Score the start grammar we arrived at earlier, which will add it to the
         # "interesting" set for future iterations
+        oracle_time_spent = oracle.time_spent
+        oracle_parse_calls = oracle.parse_calls
+        oracle_real_calls = oracle.real_calls
 
-        print('Scoring grammar....'.ljust(50), end='\r')
         precision_set = start_grammar.sample_positives(100, 5)
         parser : Lark = start_grammar.parser()
 
+
+
+
+        print('Scoring grammar....'.ljust(50), end='\r')
+
         num_precision_parsed = 0
+
         print(f"Precision set (size {len(precision_set)}):", file=f)
         for example in precision_set:
             try:
-                print("   ", example, file=f)
                 oracle.parse(example)
+                print("   ", example, file=f)
                 num_precision_parsed += 1
             except Exception as e:
+                print("   ", example, " <----- FAILURE", file=f)
                 continue
 
         num_recall_parsed = 0
 
+
         print(f"Recall set (size {len(real_recall_set)}):", file=f)
         for example in real_recall_set:
             try:
-                print("   ", example, file=f)
                 parser.parse(example)
+                print("   ", example, file=f)
                 num_recall_parsed += 1
             except Exception as e:
+                print("   ", example, " <----- FAILURE", file=f)
                 continue
 
         print(f'Recall: {num_recall_parsed/len(real_recall_set)}, Precision: {num_precision_parsed/len(precision_set)}', file=f)
-        print(f"Build_time: {build_time}")
         print(f'Recall: {num_recall_parsed/len(real_recall_set)}, Precision: {num_precision_parsed/len(precision_set)}')
-        print(f'Time spent building grammar: {build_time}s', file = f)
-        print(f'Time spent building + scoring grammar: {time.time() - start_time}s', file = f)
-        print(f'Parse calls: {oracle.parse_calls}, {oracle.real_calls}')
-        print(f'Parse calls: {oracle.parse_calls}, {oracle.real_calls}', file = f)
+        print(f'Time spent in oracle calls: {oracle_time_spent}', file = f)
+        print(f'Time spent in oracle calls: {oracle_time_spent}')
+        print(f'Time spent building grammar: {build_time}s', file=f)
+        print(f'Time spent building grammar: {build_time}s', file=f)
+        print(f'Parse calls: {oracle_parse_calls}, {oracle_real_calls}')
+        print(f'Parse calls: {oracle_parse_calls}, {oracle_real_calls}', file = f)
         print(f'Pickling grammar...')
         import pickle
         start_grammar.parser = None
         pickle.dump(start_grammar, open(log_file + ".gram", "wb"))
 
-        print(f'Time spent in oracle calls: {oracle.time_spent}', file = f)
-        print(f'Time spent in oracle calls: {oracle.time_spent}')
 
 
 if __name__ == '__main__':

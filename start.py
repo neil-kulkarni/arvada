@@ -5,6 +5,7 @@ from bubble import Bubble
 from oracle import ParseException
 from parse_tree import ParseNode, ParseTreeList, build_grammar, START
 from grammar import *
+from token_expansion import expand_tokens
 from union import UnionFind
 from replacement_utils import get_strings_with_replacement, get_strings_with_replacement_in_rule, \
     lvl_n_derivable
@@ -76,6 +77,7 @@ def build_start_grammar(oracle, leaves):
     print('Coalescing nonterminals...'.ljust(50), end='\r')
     grammar, new_trees, coalesce_caused = coalesce(oracle, trees, grammar)
     grammar, new_trees, partial_coalesces = coalesce_partial(oracle, new_trees, grammar)
+    grammar = expand_tokens(oracle, grammar, new_trees)
     print('Minimizing initial grammar...'.ljust(50), end='\r')
     grammar = minimize(grammar)
     return grammar
@@ -366,16 +368,17 @@ def build_trees(oracle, leaves):
         count = 1
         updated = True
         while updated:
-            all_groupings, scores = zip(*group(best_trees, group_size))
+
+            all_groupings =group(best_trees, group_size)
             updated, nlg = False, len(all_groupings)
-            for i, grouping in enumerate(all_groupings):
+            for i, (grouping, the_score) in enumerate(all_groupings):
                 print(('[Group len %d] Bubbling iteration %d (%d/%d)...' % (group_size, count, i + 1, nlg)).ljust(50), end='\r')
                 ### Perform the bubble
                 if isinstance(grouping, Bubble):
                     new_trees = apply(grouping, best_trees)
                     new_score, new_trees = score(new_trees, grouping)
                     grouping_str = f"Successful grouping (single): {grouping.bubbled_elems}\n    (aka {[e.derived_string() for e in grouping.bubbled_elems]}"
-                    grouping_str += f"\n     [score of {scores[i]}]"
+                    grouping_str += f"\n     [score of {the_score}]"
                 else:
                     bubble_one = grouping[0]
                     bubble_two = grouping[1]
@@ -384,7 +387,7 @@ def build_trees(oracle, leaves):
                     new_score, new_trees = score(new_trees, grouping)
                     grouping_str = f"Successful grouping (double): {bubble_one.bubbled_elems}, {bubble_two.bubbled_elems}"
                     grouping_str += f"\n     (aka {[e.derived_string() for e in bubble_one.bubbled_elems]}, {[e.derived_string() for e in bubble_two.bubbled_elems]}))"
-                    grouping_str += f"\n     [score of {scores[i]}]"
+                    grouping_str += f"\n     [score of {the_score}]"
                 ### Score
                 if new_score > 0:
                     print()

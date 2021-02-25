@@ -16,6 +16,20 @@ MAX_SAMPLES = 10
 Utilities to sample strings that are in the grammar induced when two nodes in a parse tree are merged. 
 """
 
+def nt_in_tree(tree: ParseNode, nt: str):
+    """
+    >>> tree_1 = ParseNode('t0', False, [ParseNode('t3', False, [ParseNode('3', True, [])])])
+    >>> tree_2 = ParseNode('t0', False, [ParseNode('t1', False, [ParseNode('(', True, [])]), tree_1, ParseNode('t2', False, [ParseNode(')', True, [])])])
+    >>> tree_3 = ParseNode('t0', False, [tree_1, ParseNode('t4', False, [ParseNode('*', True, [])]), tree_1])
+    >>> nt_in_tree(tree_2, 't1')
+    True
+    >>> nt_in_tree(tree_1, 't1')
+    False
+    """
+    if tree.payload == nt:
+        return True
+    return any([nt_in_tree(c, nt) for c in tree.children])
+
 def get_overlaps(larger: List[str], smaller: List[str]):
     """
     ASSUMES: `smaller` is not explicitly contained in `larger`.
