@@ -94,6 +94,12 @@ class Bubble:
         self.direct_parents = []
         self.occ_count = 1
         self.contexts = defaultdict(int)
+        # sources is a map of (tree idx, (child_idxs)) -> range which allows us to map back
+        # to the range that was bubbled
+        self.sources = defaultdict(list)
+
+    def add_source(self, tree_idx: int, child_idxs: List[int], seq_range: Tuple[int,int]):
+        self.sources[(tree_idx, tuple(child_idxs))].append(seq_range)
 
     def add_direct_parent(self, parent):
         self.direct_parents.append(parent)
@@ -140,6 +146,79 @@ class Bubble:
     def application_breaks_other(self, other):
         """
         The point of this function is to calculate whether `self` and `other` are overlapping,
+        so whether we must apply these bubbles in a certain order.
+
+        Returns a tuple of two boolean values:
+        - If we apply self first, does that break the ability to bubble up other?
+        - If we apply other first, does that break the ability to bubble up self?
+        >>> c = ParseNode("c", False, [])
+        >>> o = ParseNode("o", False, [])
+        >>> r = ParseNode("r", False, [])
+        >>> e = ParseNode("e", False, [])
+        >>> t = ParseNode("t", False, [])
+        >>> n = ParseNode("n", False, [])
+        >>> bubble_0 = Bubble('t0', [c, o , r ])
+        >>> bubble_1 = Bubble('t1', [c, o, r ,e])
+        >>> bubble_0.add_source(0, [], (0, 2))
+        >>> bubble_1.add_source(0, [], (0, 3))
+        >>> bubble_1.application_breaks_other(bubble_0)
+        (False, True)
+        >>> bubble_0.application_breaks_other(bubble_1)
+        (True, False)
+        >>> bubble_2 = Bubble('t2', [r ,e, c, t])
+        >>> bubble_2.add_source(0, [], (2,5))
+        >>> bubble_1.application_breaks_other(bubble_2)
+        (True, True)
+        >>> bubble_2.add_source(1, [2], (0, 3))
+        >>> bubble_2.application_breaks_other(bubble_1)
+        (True, False)
+        >>> bubble_1.application_breaks_other(bubble_2)
+        (False, True)
+        >>> bubble_1.add_source(2, [1], (2,5))
+        >>> bubble_3 = Bubble('t3', [e, c, t])
+        >>> bubble_3.add_source(0, [], (4, 6))
+        >>> bubble_0.application_breaks_other(bubble_3)
+        (False, False)
+        """
+
+        my_sources = self.sources
+        their_sources = other.sources
+        self_breaks_other = True
+        other_breaks_self = True
+
+        for my_path in my_sources:
+            if my_path in their_sources:
+                my_ranges = my_sources[my_path]
+                their_ranges = their_sources[my_path]
+                for my_range in my_ranges:
+                    for their_range in their_ranges:
+                        if my_range[1] < their_range[0] or  my_range[0] > their_range[1]:
+                            # in this case there's a location where they're not overlapping,
+                            # so the other one will always exist
+                           #  print(f"case1: {my_range}, {their_range}") covered
+                            self_breaks_other = False
+                            other_breaks_self = False
+                        elif my_range[0] <= their_range[0] and their_range[1] <= my_range[1]:
+                            # In this case, they are contained in us, so they break us but we don't break them
+                            #print(f"case2: {my_range}, {their_range}") covered
+                            self_breaks_other = False
+                        elif their_range[0] <= my_range[0] and my_range[1] <= their_range[1]:
+                            #print("case3: {my_range}, {their_range}") covered
+                            other_breaks_self = False
+            else:
+                other_breaks_self = False
+
+        if self_breaks_other:
+            for their_path in their_sources:
+                if their_path not in my_sources:
+                    self_breaks_other = False
+
+        return (self_breaks_other, other_breaks_self)
+
+
+    def old_application_breaks_other(self, other):
+        """
+        The point of this function is to calculate whether `self` and `other` are overlapping,
         so whether we must apply these bubbles in a certain order. All this complication is
         to avoid having to explicitly track overlapping bubbles while constructing the subsequences,
         and in hindsight, that may have been a simpler and more robust thing to do.
@@ -159,55 +238,55 @@ class Bubble:
         >>> n = ParseNode("n", False, [])
         >>> start = ParseNode("START", False, [])
         >>> end = ParseNode("END", False, [])
-        >>> bubble_0 = Bubble('t0', [c,o,r])
+        >>> bubble_0 = Bubble('t0', [c, o , r ])
         >>> bubble_1 = Bubble('t1', [c, o, r ,e])
-        >>> bubble_1.application_breaks_other(bubble_0)
+        >>> bubble_1.old_application_breaks_other(bubble_0)
         (False, False)
         >>> bubble_0 = Bubble('t0', [t,t])
-        >>> bubble_1.application_breaks_other(bubble_0)
+        >>> bubble_1.old_application_breaks_other(bubble_0)
         (False, False)
         >>> bubble_0 = Bubble('t0', [o, r, c])
-        >>> bubble_1.application_breaks_other(bubble_0)
+        >>> bubble_1.old_application_breaks_other(bubble_0)
         (False, False)
         >>> bubble_1.add_context([start], [c, t, end]) # ^corect$
         >>> bubble_2 = Bubble('t2', [r ,e, c, t])
         >>> bubble_2.add_context([c, o], [end]) # ^corect$
-        >>> bubble_1.application_breaks_other(bubble_2)
+        >>> bubble_1.old_application_breaks_other(bubble_2)
         (True, True)
-        >>> bubble_2.application_breaks_other(bubble_1)
+        >>> bubble_2.old_application_breaks_other(bubble_1)
         (True, True)
         >>> bubble_1.add_context([e, n], [end]) # ^encore$, ^corect$
-        >>> bubble_1.application_breaks_other(bubble_2)   #bubble_2 still only occurs in corect, so we'll have issues if we bubble it up
+        >>> bubble_1.old_application_breaks_other(bubble_2)   #bubble_2 still only occurs in corect, so we'll have issues if we bubble it up
         (True, False)
-        >>> bubble_2.application_breaks_other(bubble_1)  # but core occurs in encore, so ok
+        >>> bubble_2.old_application_breaks_other(bubble_1)  # but core occurs in encore, so ok
         (False, True)
         >>> bubble_2.add_context([start], [e, n, end]) # ^corect$, ^recten$
-        >>> bubble_1.application_breaks_other(bubble_2)   # ok now; bubble_2 still happens in recten
+        >>> bubble_1.old_application_breaks_other(bubble_2)   # ok now; bubble_2 still happens in recten
         (False, False)
         >>> bubble_1 = Bubble('t1', [c, o, r ,e])
         >>> bubble_1.add_context([start], [c, t, end]) # ^corect$
-        >>> bubble_1.application_breaks_other(bubble_2)   # core will bubble up in corect, rect in recten
+        >>> bubble_1.old_application_breaks_other(bubble_2)   # core will bubble up in corect, rect in recten
         (False, True)
-        >>> bubble_2.application_breaks_other(bubble_1)   # core only occurs in correct, so doesn't work the other way
+        >>> bubble_2.old_application_breaks_other(bubble_1)   # core only occurs in correct, so doesn't work the other way
         (True, False)
         >>> bubble_3 = Bubble('t1', [c, o])   #cottc
         >>> bubble_3.add_context([start], [t, t, c, end])
         >>> bubble_4 = Bubble('t2', [o, t, t, c])
         >>> bubble_4.add_context([start, c], [end])
-        >>> bubble_4.application_breaks_other(bubble_3)
+        >>> bubble_4.old_application_breaks_other(bubble_3)
         (True, True)
         >>> bubble_3 = Bubble('t1', [c, o]) #ottco
         >>> bubble_3.add_context([start, o, t, t], [end])
         >>> bubble_4 = Bubble('t2', [o, t, t, c])
         >>> bubble_4.add_context([start], [o, end])
-        >>> bubble_4.application_breaks_other(bubble_3)
+        >>> bubble_4.old_application_breaks_other(bubble_3)
         (True, True)
         >>> bubble_5 = Bubble('t1', [c,o]) #cottco
         >>> bubble_5.add_context([start], [t,t,c,o, end])
         >>> bubble_5.add_context([start,c,o,t,t], [end])
         >>> bubble_6 = Bubble('t2', [o,t,t,c])
         >>> bubble_6.add_context([start, c], [o, end])
-        >>> bubble_6.application_breaks_other(bubble_5)
+        >>> bubble_6.old_application_breaks_other(bubble_5)
         (True, True)
         """
 

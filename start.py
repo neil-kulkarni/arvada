@@ -132,7 +132,7 @@ def group(trees, max_group_size) -> List[Bubble]:
     # I.e. t2 t3 t4 in t1 -> t2 t3 t4, but not in t1 -> t2 t2 t3 t4
     full_bubbles = defaultdict(int)
 
-    def add_groups_for_tree(tree: ParseNode, bubbles: Dict[str, Bubble], left_context="START", right_context ="END"):
+    def add_groups_for_tree(tree: ParseNode, bubbles: Dict[str, Bubble], tree_idx, child_idxs, left_context="START", right_context ="END"):
         """
         Add all groups possible groupings derived from the parse tree `tree` to `groups`.
         """
@@ -163,12 +163,12 @@ def group(trees, max_group_size) -> List[Bubble]:
             lhs = left_context if i == 0 else 'DUMMY'
             rhs = right_context if i == len(tree.children) else 'DUMMY'
             if not child.is_terminal:
-                add_groups_for_tree(child, bubbles, lhs, rhs)
+                add_groups_for_tree(child, bubbles, tree_idx, child_idxs + [i], lhs, rhs)
 
     # Compute a set of all possible groupings
     bubbles = {}
-    for tree in trees:
-        add_groups_for_tree(tree, bubbles)
+    for tree_num, tree in enumerate(trees):
+        add_groups_for_tree(tree, bubbles, tree_num, [])
 
     # Remove sequences if they're the full list of children of a rule and don't appear anywhere else.
     # Prevents us from adding ridiculous layers of indirection.
