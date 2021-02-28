@@ -179,6 +179,14 @@ class Bubble:
         >>> bubble_3.add_source(0, [], (4, 6))
         >>> bubble_0.application_breaks_other(bubble_3)
         (False, False)
+        >>> bubble_4 = Bubble('t4', [e, t, c])
+        >>> bubble_4.add_source(0, [], (0,2))
+        >>> bubble_5 = Bubble('t5', [c, t, c])
+        >>> bubble_5.add_source(0, [], (2,4))
+        >>> bubble_5.application_breaks_other(bubble_4)
+        (True, True)
+        >>> bubble_4.application_breaks_other(bubble_5)
+        (True, True)
         """
 
         my_sources = self.sources

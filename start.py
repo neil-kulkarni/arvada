@@ -137,6 +137,9 @@ def group(trees, max_group_size) -> List[Bubble]:
         Add all groups possible groupings derived from the parse tree `tree` to `groups`.
         """
         children_lst = tree.children
+        # if not re.match("t([0-9]+)", tree.payload):
+        #     print("skipping subtree:" tree)
+        #     return
 
         for i in range(len(children_lst)):
             for j in range(i + 1, min(len(children_lst) + 1, i + max_group_size + 1)):
@@ -362,6 +365,7 @@ def build_trees(oracle, leaves):
     print("Beginning coalescing...".ljust(50))
     grammar, best_trees, _ = coalesce(oracle, best_trees, grammar)
     grammar, best_trees, _ = coalesce_partial(oracle, best_trees, grammar)
+
 
     max_example_size = max([len(leaf_lst) for leaf_lst in leaves])
 
