@@ -153,10 +153,12 @@ def group(trees, max_group_size) -> List[Bubble]:
                     bubble = Bubble(allocate_tid(), tree_sublist)
                     bubble.add_context(lhs_context, rhs_context)
                     bubbles[tree_substr] = bubble
+                    bubble.add_source(tree_idx, child_idxs, (i, j-1))
                 else:
                     bubble: Bubble = bubbles[tree_substr]
                     bubble.add_occurrence()
                     bubble.add_context(lhs_context, rhs_context)
+                    bubble.add_source(tree_idx, child_idxs, (i, j-1))
 
         # Recurse down in the other layers
         for i, child in enumerate(tree.children):

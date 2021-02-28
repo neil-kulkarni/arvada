@@ -116,7 +116,7 @@ class Bubble:
         SUCCESSFULLY_BUBBLED.add(self.bubbled_str)
 
     def __str__(self):
-        return f"Bubble({self.new_nt}->{self.bubbled_elems}, occs={self.occ_count}, contexts= {dict(self.contexts)})"
+        return f"Bubble({self.new_nt}->{self.bubbled_elems}, occs={self.occ_count}, contexts= {dict(self.contexts)}, sources={self.sources})"
 
     def __repr__(self):
         return self.__str__()
@@ -183,6 +183,11 @@ class Bubble:
 
         my_sources = self.sources
         their_sources = other.sources
+
+        if not my_sources and not their_sources:
+            print("ERROR: bubbles without sources")
+            exit(1)
+
         self_breaks_other = True
         other_breaks_self = True
 
