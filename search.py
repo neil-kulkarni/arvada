@@ -15,7 +15,7 @@ See __main__ dispatch at the bottom for usage.
 """
 
 GROUP_PUNCTUATION = False
-SPLIT_UPPER_AND_LOWER = False
+SPLIT_UPPER_AND_LOWER = True
 
 def approx_tokenize(guide_raw:str):
     def get_category(c):
@@ -173,15 +173,7 @@ def main_external(external_folder, log_file, fast = False, random_guides=False):
 
 
 if __name__ == '__main__':
-
-    if len(sys.argv) == 5:
-        setting = sys.argv[4]
-        if "gp" in setting:
-            GROUP_PUNCTUATION = True
-        if "sp" in setting:
-            SPLIT_UPPER_AND_LOWER = True
-
-    if len(sys.argv) < 4 or not os.path.exists(sys.argv[2]) :
+    if len(sys.argv) != 4 or not os.path.exists(sys.argv[2]) :
         print(f'Usage: python3 {sys.argv[0]} <mode> <input_file/folder> <log_file>')
         print('where mode is one of {external, external-r}')
         if not os.path.exists(sys.argv[2]):
