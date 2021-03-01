@@ -4,11 +4,11 @@ from typing import List
 
 from grammar import Grammar, Rule
 from oracle import ExternalOracle, ParseException
-from parse_tree import ParseNode
+from parse_tree import ParseNode, fixup_terminal
 
 import string
 
-from replacement_utils import get_strings_with_replacement, nt_in_tree, fixup_terminal
+from replacement_utils import get_strings_with_replacement, nt_in_tree
 
 """
 I'm sorry this code is so so so ugly. 

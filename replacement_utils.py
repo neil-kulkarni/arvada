@@ -8,7 +8,7 @@ import sys
 import numpy as np
 
 from grammar import Grammar
-from parse_tree import ParseNode
+from parse_tree import ParseNode, fixup_terminal
 REPLACE_CONST = '[[:REPLACEME]]'
 MAX_SAMPLES = 10
 
@@ -26,9 +26,7 @@ def nt_in_tree(tree: ParseNode, nt: str):
     >>> nt_in_tree(tree_1, 't1')
     False
     """
-    if tree.payload == nt:
-        return True
-    return any([nt_in_tree(c, nt) for c in tree.children])
+    return nt in tree.all_nts()
 
 def get_overlaps(larger: List[str], smaller: List[str]):
     """
@@ -87,11 +85,6 @@ def get_overlaps(larger: List[str], smaller: List[str]):
 
     return ret
 
-@functools.lru_cache(maxsize=None)
-def fixup_terminal(payload):
-    if len(payload) >= 3 and payload.startswith('"') and payload.endswith('"'):
-        payload = payload[1:-1]
-    return payload
 
 def muh_product(lst):
     """
@@ -151,15 +144,10 @@ def lvl_n_derivable(trees, target_nt, n, max_samples=1000):
     """
     ret_strs = set()
     for tree in trees:
-        def get_str(pn: ParseNode):
-            if pn.is_terminal:
-                return fixup_terminal(pn.payload)
-            else:
-                return ''.join([get_str(c) for c in pn.children])
         def process_tree(tree: ParseNode):
              if tree.payload == target_nt:
                 if n == 0 or tree.is_terminal:
-                    ret_strs.add(get_str(tree))
+                    ret_strs.add(tree.derived_string())
                 else:
                     child_strs = [lvl_n_derivable(trees, c.payload, n-1, max_samples) for c in tree.children]
                     ret_strs.update(sample_from_product_ext(child_strs, max_samples))
@@ -211,7 +199,7 @@ def sample_from_product(strings_per_child, num_samples, lens_per_child, prod_siz
         ret_strings.append(''.join(children_choice))
     return ret_strings
 
-@functools.lru_cache()
+
 def get_all_replacement_strings(tree: ParseNode, nt_to_replace: str):
     """
     Get all the possible strings derived from `tree` where all possible combinations
@@ -242,8 +230,13 @@ def get_all_replacement_strings(tree: ParseNode, nt_to_replace: str):
     if tree.is_terminal:
         return [fixup_terminal(tree.payload)]
 
+    if not nt_in_tree(tree, nt_to_replace):
+        return [tree.derived_string()]
+
     if tree.payload == nt_to_replace:
         replacement_strings.append(REPLACE_CONST)
+
+
 
     strings_per_child = [get_all_replacement_strings(c, nt_to_replace) for c in tree.children]
     lens_per_child = [len(spc) for spc in strings_per_child]
@@ -256,7 +249,7 @@ def get_all_replacement_strings(tree: ParseNode, nt_to_replace: str):
     return list(set(replacement_strings))
 
 
-#@functools.lru_cache()
+
 def get_all_rule_replacement_strs(tree: ParseNode, replacee_rule: Tuple[str, List[str]], replacee_posn: int):
     """
     Get all the possible strings derived from `tree` where all possible combinations
@@ -289,6 +282,8 @@ def get_all_rule_replacement_strs(tree: ParseNode, replacee_rule: Tuple[str, Lis
     body = [fixup_terminal(elem) for elem in replacee_rule[1]]
     if tree.is_terminal:
         return [fixup_terminal(tree.payload)]
+    if not nt_in_tree(tree, start):
+        return [tree.derived_string()]
     strings_per_child = [get_all_rule_replacement_strs(c, replacee_rule, replacee_posn) for c in tree.children]
     if tree.payload == start:
         tree_body = [fixup_terminal(c.payload) for c in tree.children]

@@ -1,3 +1,4 @@
+import functools
 import random
 from collections import defaultdict
 from typing import List, Iterable
@@ -6,7 +7,11 @@ from grammar import Rule, Grammar
 from input import clean_terminal
 START = 't0'
 
-
+@functools.lru_cache(maxsize=None)
+def fixup_terminal(payload):
+    if len(payload) >= 3 and payload.startswith('"') and payload.endswith('"'):
+        payload = payload[1:-1]
+    return payload
 
 
 class ParseTreeList:
@@ -221,6 +226,26 @@ class ParseNode():
         self.payload = payload
         self.children = children
         self.is_terminal = is_terminal
+        self.cache_valid = False
+        self.cached_string = None
+        self.cached_nts = None
+
+    def update_cache_info(self):
+        for child in self.children:
+            child.update_cache_info()
+        self.cached_string = self.derived_string()
+        self.cached_nts = self.all_nts()
+        self.cache_valid = True
+
+    def all_nts(self):
+        if self.cache_valid:
+            return self.cached_nts
+        if self.is_terminal:
+            return set()
+        my_nts = {self.payload}
+        for child in self.children:
+            my_nts.update(child.all_nts())
+        return my_nts
 
     def add_child(self, child):
         self.children.append(child)
@@ -232,8 +257,11 @@ class ParseNode():
         return '  ' + (self.payload if len(self.payload) > 0 else '\u03B5') + '  '
 
     def derived_string(self):
+        if self.cache_valid:
+            return self.cached_string
+
         if self.is_terminal:
-            return self.payload
+            return fixup_terminal(self.payload)
         else:
             return ''.join([c.derived_string() for c in self.children])
 
