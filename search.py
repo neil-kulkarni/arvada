@@ -52,7 +52,7 @@ def approx_tokenize(guide_raw:str):
     return tokens
 
 
-def main_external(external_folder, log_file, fast = False, random_guides=False):
+def main_internal(external_folder, log_file, random_guides=False):
     """
     `external_folder`: the base folder for the benchmark, which contains:
       - random-guides: dir of random guide examples
@@ -74,47 +74,48 @@ def main_external(external_folder, log_file, fast = False, random_guides=False):
     test_folder = os.path.join(external_folder, "test_set")
     parser_command = os.path.join(external_folder, f"parse_{bench_name}")
 
-    guide_examples = []
-    for filename in os.listdir(guide_folder):
-        if filename.endswith(".ex"):
-            full_filename = os.path.join(guide_folder, filename)
-            guide_raw = open(full_filename).read()
-            #guide = [ParseNode(tok, True, []) for tok in guide_raw]
-            guide = approx_tokenize(guide_raw)
-            guide_examples.append(guide)
+    main(parser_command, guide_folder, log_file, test_folder)
 
-    real_recall_set = []
-    for filename in os.listdir(test_folder):
-        if filename.endswith(".ex"):
-            full_filename = os.path.join(test_folder, filename)
+
+def main(oracle_cmd, guide_examples_folder,  log_file_name, test_examples_folder = None):
+    oracle = ExternalOracle(oracle_cmd)
+
+    guide_examples = []
+    for filename in os.listdir(guide_examples_folder):
+        full_filename = os.path.join(guide_examples_folder, filename)
+        guide_raw = open(full_filename).read()
+        guide = approx_tokenize(guide_raw)
+        guide_examples.append(guide)
+
+    if test_examples_folder is not None:
+        real_recall_set = []
+        for filename in os.listdir(test_examples_folder):
+            full_filename = os.path.join(test_examples_folder, filename)
             test_raw = open(full_filename).read()
             real_recall_set.append(test_raw)
-
-    if fast:
-        grammar_contents = open(os.path.join("lark-examples", f"{bench_name}.lark")).read()
-        oracle = CachingOracle(Lark(grammar_contents))
+        # TODO: make an option to try
+        # try:
+        #     oracle.parse(test_raw)
+        # except Exception as e:
+        #     print(f"Woops! The oracle can't parse the test set: {full_filename}")
+        #     exit(1)
     else:
-        oracle = ExternalOracle(parser_command)
-    try:
-        oracle.parse(real_recall_set[0])
-    except Exception as e:
-        print("Woops! The oracle can't parse the precision set.")
-        exit(1)
+        real_recall_set = None
 
     # Create the log file and write positive and negative examples to it
     # Also write the initial starting grammar to the file
-    with open(log_file, 'w+') as f:
+    with open(log_file_name, 'w+') as f:
 
         # Build the starting grammars and test them for compilation
         print('Building the starting grammar...'.ljust(50), end='\r')
         start_time = time.time()
-        start_grammar : Grammar = build_start_grammar(oracle, guide_examples)
+        start_grammar: Grammar = build_start_grammar(oracle, guide_examples)
         try:
             start_grammar.parser()
             print('\n\nInitial Grammar Created:\n%s' % str(start_grammar), file=f)
         except Exception as e:
             print('\n\nInitial grammar does not compile! %s' % str(e), file=f)
-            print(start_grammar, file = f)
+            print(start_grammar, file=f)
             exit()
         build_time = time.time() - start_time
 
@@ -125,10 +126,7 @@ def main_external(external_folder, log_file, fast = False, random_guides=False):
         oracle_real_calls = oracle.real_calls
 
         precision_set = start_grammar.sample_positives(100, 5)
-        parser : Lark = start_grammar.parser()
-
-
-
+        parser: Lark = start_grammar.parser()
 
         print('Scoring grammar....'.ljust(50), end='\r')
 
@@ -137,7 +135,7 @@ def main_external(external_folder, log_file, fast = False, random_guides=False):
         print(f"Precision set (size {len(precision_set)}):", file=f)
         for example in precision_set:
             try:
-                oracle.parse(example)
+                oracle.parse(example, timeout=10)
                 print("   ", example, file=f)
                 num_precision_parsed += 1
             except Exception as e:
@@ -146,45 +144,68 @@ def main_external(external_folder, log_file, fast = False, random_guides=False):
 
         num_recall_parsed = 0
 
+        if real_recall_set is not None:
+            print(f"Recall set (size {len(real_recall_set)}):", file=f)
+            for example in real_recall_set:
+                try:
+                    parser.parse(example)
+                    print("   ", example, file=f)
+                    num_recall_parsed += 1
+                except Exception as e:
+                    print("   ", example, " <----- FAILURE", file=f)
+                    continue
 
-        print(f"Recall set (size {len(real_recall_set)}):", file=f)
-        for example in real_recall_set:
-            try:
-                parser.parse(example)
-                print("   ", example, file=f)
-                num_recall_parsed += 1
-            except Exception as e:
-                print("   ", example, " <----- FAILURE", file=f)
-                continue
+            print(
+                f'Recall: {num_recall_parsed / len(real_recall_set)}, Precision: {num_precision_parsed / len(precision_set)}',
+                file=f)
+            print(
+                f'Recall: {num_recall_parsed / len(real_recall_set)}, Precision: {num_precision_parsed / len(precision_set)}')
+        else:
+            print(
+                f'Recall: [no test set provided], Precision: {num_precision_parsed / len(precision_set)}',
+                file=f)
+            print(
+                f'Recall: [no test set provided], Precision: {num_precision_parsed / len(precision_set)}')
 
-        print(f'Recall: {num_recall_parsed/len(real_recall_set)}, Precision: {num_precision_parsed/len(precision_set)}', file=f)
-        print(f'Recall: {num_recall_parsed/len(real_recall_set)}, Precision: {num_precision_parsed/len(precision_set)}')
-        print(f'Time spent in oracle calls: {oracle_time_spent}', file = f)
+        print(f'Time spent in oracle calls: {oracle_time_spent}', file=f)
         print(f'Time spent in oracle calls: {oracle_time_spent}')
         print(f'Time spent building grammar: {build_time}s', file=f)
         print(f'Time spent building grammar: {build_time}s', )
         print(f'Time breakdown: {get_times()}', file=f)
         print(f'Time breakdown: {get_times()}')
         print(f'Parse calls: {oracle_parse_calls}, {oracle_real_calls}')
-        print(f'Parse calls: {oracle_parse_calls}, {oracle_real_calls}', file = f)
+        print(f'Parse calls: {oracle_parse_calls}, {oracle_real_calls}', file=f)
         print(f'Pickling grammar...')
         import pickle
         start_grammar.parser = None
-        pickle.dump(start_grammar, open(log_file + ".gram", "wb"))
+        pickle.dump(start_grammar, open(log_file_name + ".gram", "wb"))
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 4 or not os.path.exists(sys.argv[2]) :
-        print(f'Usage: python3 {sys.argv[0]} <mode> <input_file/folder> <log_file>')
-        print('where mode is one of {external, external-r}')
-        if not os.path.exists(sys.argv[2]):
-            print(f"err: {sys.argv[2]} not found")
-    elif sys.argv[1] == "internal":
-        print("NO LONGER SUPPORTED")
+    if len(sys.argv) < 2:
+        print(f'Usage: python3 {sys.argv[0]} <mode>')
+        print('where mode is one of {internal, internal-r, external}')
+        print(f'run with python3 {sys.argv[0]} <mode> to see detailed help')
+        exit(1)
     elif sys.argv[1] == "external":
-        main_external(sys.argv[2], sys.argv[3], False)
-    elif sys.argv[1] == "external-r":
-        main_external(sys.argv[2], sys.argv[3], False, random_guides=True)
+        if len(sys.argv) < 5 or not os.path.exists(sys.argv[3]):
+            print(f'Usage: python3 {sys.argv[0]} external <oracle_cmd> <training_example_dir> <log_file> (<test_example_dir>)')
+            print('<oracle_cmd> should be a string which can be invoked with `<oracle_cmd> filename` (so can include options)')
+            exit(1)
+        main(sys.argv[2], sys.argv[3], sys.argv[4], None if len(sys.argv) == 5 else sys.argv[5])
+    elif sys.argv[1] == "internal":
+        if len(sys.argv) != 4 or not os.path.exists(sys.argv[2]):
+            print(f'Usage: python3 {sys.argv[0]} <mode> <input_file> <log_file>')
+            print('where mode is one of {internal, internal-r}')
+            exit(1)
+        main_internal(sys.argv[2], sys.argv[3], random_guides=False)
+    elif sys.argv[1] == "internal-r":
+        if len(sys.argv) != 4 or not os.path.exists(sys.argv[2]):
+            print(f'Usage: python3 {sys.argv[0]} <mode> <input_file> <log_file>')
+            print('where mode is one of {internal, internal-r}')
+            exit(1)
+        main_internal(sys.argv[2], sys.argv[3], random_guides=True)
     else:
-        print(f'Usage: python3 {sys.argv[0]} <mode> <input_file> <log_file>')
-        print('where mode is one of {external, internal}')
+        print(f'Usage: python3 {sys.argv[0]} <mode> [other args...]')
+        print('where mode is one of {internal, internal-r, external}')
+        print(f'run with python3 {sys.argv[0]} <mode> to see detailed help')

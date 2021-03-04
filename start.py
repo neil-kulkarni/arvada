@@ -328,7 +328,6 @@ def coalesce_partial(oracle, trees: List[ParseNode], grammar: Grammar,
     be in the situation where (nt1, nt2) can partially coalesce and (nt2, nt1) can partially coalesce.
 
     """
-    global TIME_GENERATING_EXAMPLES
 
     def partially_coalescable(replaceable_everywhere: str, replaceable_in_some_rules: str, trees: ParseTreeList) -> Dict[
         Tuple[str, Tuple[str]], List[int]]:
@@ -339,6 +338,8 @@ def coalesce_partial(oracle, trees: List[ParseNode], grammar: Grammar,
         occurrence of `replaceable_everywhere`, returns the rules (expansions) in which
         `replaceable_in_some_rules` can be replaced by `replaceable_everywhere`
         """
+
+        global TIME_GENERATING_EXAMPLES
         language_expanded = not MUST_EXPAND_IN_PARTIAL
         # Get all the expansions where `replaceable_in_some_rules` appears
         partial_replacement_locs: List[Tuple[Tuple[str, List[str]], int]] = []
@@ -559,7 +560,6 @@ def coalesce(oracle, trees: List[ParseNode], grammar: Grammar,
     and whether any nonterminals were actually coalesced with each other
     (found equivalent).
     """
-    global TIME_GENERATING_EXAMPLES
 
     def replacement_valid(replacer_derivable_strings, replacee, trees : ParseTreeList) -> Tuple[bool, Set[str]]:
         """
@@ -600,6 +600,8 @@ def coalesce(oracle, trees: List[ParseNode], grammar: Grammar,
         Returns true if nt1 and nt2 can be merged in the grammar while expanding the set of inputs accepted
         by the grammar, and not admitting any invalid inputs.
         """
+
+        global TIME_GENERATING_EXAMPLES
         nt1_derivable_strings = set()
         nt2_derivable_strings = set()
 
