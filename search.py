@@ -2,7 +2,7 @@ import random, sys, os, time
 from input import parse_input
 from parse_tree import ParseTree, ParseNode
 from grammar import Grammar, Rule
-from start import build_start_grammar
+from start import build_start_grammar, get_times
 from lark import Lark
 from oracle import CachingOracle, ExternalOracle
 import string
@@ -162,14 +162,15 @@ def main_external(external_folder, log_file, fast = False, random_guides=False):
         print(f'Time spent in oracle calls: {oracle_time_spent}', file = f)
         print(f'Time spent in oracle calls: {oracle_time_spent}')
         print(f'Time spent building grammar: {build_time}s', file=f)
-        print(f'Time spent building grammar: {build_time}s', file=f)
+        print(f'Time spent building grammar: {build_time}s', )
+        print(f'Time breakdown: {get_times()}', file=f)
+        print(f'Time breakdown: {get_times()}')
         print(f'Parse calls: {oracle_parse_calls}, {oracle_real_calls}')
         print(f'Parse calls: {oracle_parse_calls}, {oracle_real_calls}', file = f)
         print(f'Pickling grammar...')
         import pickle
         start_grammar.parser = None
         pickle.dump(start_grammar, open(log_file + ".gram", "wb"))
-
 
 
 if __name__ == '__main__':

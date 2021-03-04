@@ -12,6 +12,8 @@ from parse_tree import ParseNode, fixup_terminal
 REPLACE_CONST = '[[:REPLACEME]]'
 MAX_SAMPLES = 10
 
+TIME_GENERATING_EXAMPLES_INTERNAL = 0
+
 """
 Utilities to sample strings that are in the grammar induced when two nodes in a parse tree are merged. 
 """
@@ -318,6 +320,8 @@ def get_strings_with_replacement(tree: ParseNode, nt_to_replace: str, replacemen
     >>> sorted(get_strings_with_replacement(big_tree, 't2', {"3", "2"}))
     ['2*2', '2*4', '22*2', '22*4', '24*2', '24*4', '3*3', '3*4', '33*3', '33*4', '34*3', '34*4', '42*2', '42*4', '43*3', '43*4', '44*2', '44*3']
     """
+    global TIME_GENERATING_EXAMPLES_INTERNAL
+    s = time.time()
     placeholder_strings = get_all_replacement_strings(tree, nt_to_replace)
     placeholder_strings = [s for s in placeholder_strings if REPLACE_CONST in s]
 
@@ -328,7 +332,7 @@ def get_strings_with_replacement(tree: ParseNode, nt_to_replace: str, replacemen
     if len(ret_strings) > MAX_SAMPLES:
         random.shuffle(ret_strings)
         ret_strings = ret_strings[:MAX_SAMPLES]
-
+    TIME_GENERATING_EXAMPLES_INTERNAL += time.time() - s
     return ret_strings
 
 
@@ -351,6 +355,8 @@ def get_strings_with_replacement_in_rule(tree: ParseNode, replacee_rule: Tuple[s
     >>> sorted(get_strings_with_replacement_in_rule(big_tree, ('t0', ['t2']), 0, {"3", "2"}))
     ['2*2', '2*4', '3*3', '3*4', '44*2', '44*3']
     """
+    global TIME_GENERATING_EXAMPLES_INTERNAL
+    s = time.time()
     placeholder_strings = get_all_rule_replacement_strs(tree, replacee_rule, replacee_posn)
     placeholder_strings = [s for s in placeholder_strings if REPLACE_CONST in s]
 
@@ -361,7 +367,7 @@ def get_strings_with_replacement_in_rule(tree: ParseNode, replacee_rule: Tuple[s
     if len(ret_strings) > MAX_SAMPLES:
         random.shuffle(ret_strings)
         ret_strings = ret_strings[:MAX_SAMPLES]
-
+    TIME_GENERATING_EXAMPLES_INTERNAL += time.time() - s
     return ret_strings
 
 if __name__ == "__main__":

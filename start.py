@@ -1,3 +1,4 @@
+import time
 from collections import defaultdict
 from typing import List, Tuple, Set, Dict, Optional, Union
 
@@ -38,6 +39,23 @@ MAX_GROUP_LEN = 10
 MUST_EXPAND_IN_COALESCE = False
 MUST_EXPAND_IN_PARTIAL= False
 
+ORIGINAL_COALESCE_TIME = 0
+BUILD_TIME = 0
+LAST_COALESCE_TIME = 0
+EXPAND_TIME = 0
+MINIMIZE_TIME = 0
+
+TIME_GENERATING_EXAMPLES = 0
+TIME_GROUPING = 0
+
+
+def get_times():
+    from replacement_utils import TIME_GENERATING_EXAMPLES_INTERNAL
+    return {'FIRST_COALESCE' : ORIGINAL_COALESCE_TIME, 'BUILD': BUILD_TIME,
+            'LAST_COALESCE' : LAST_COALESCE_TIME, 'EXPAND': EXPAND_TIME, 'MINIMIZE': MINIMIZE_TIME,
+            'OVERALL_EXAMPLE_GEN': TIME_GENERATING_EXAMPLES + TIME_GENERATING_EXAMPLES_INTERNAL,
+            'OVERALL_GROUPING': TIME_GROUPING}
+
 def check_recall(oracle, grammar: Grammar):
     """
     Helper function to check whether grammar is consistent with oracle.
@@ -59,16 +77,25 @@ def build_start_grammar(oracle, leaves):
 
     Returns a grammar that maximally expands LEAVES w.r.t. ORACLE.
     """
+    global LAST_COALESCE_TIME
+    global EXPAND_TIME
+    global MINIMIZE_TIME
     print('Building the starting trees...'.ljust(50), end='\r')
     trees, classes = build_trees(oracle, leaves)
     print('Building initial grammar...'.ljust(50), end='\r')
     grammar = build_grammar(trees)
     print('Coalescing nonterminals...'.ljust(50), end='\r')
+    s = time.time()
     grammar, new_trees, coalesce_caused = coalesce(oracle, trees, grammar)
     grammar, new_trees, partial_coalesces = coalesce_partial(oracle, new_trees, grammar)
+    LAST_COALESCE_TIME += time.time() - s
+    s = time.time()
     grammar = expand_tokens(oracle, grammar, new_trees)
+    EXPAND_TIME += time.time() - s
     print('Minimizing initial grammar...'.ljust(50), end='\r')
+    s = time.time()
     grammar = minimize(grammar)
+    MINIMIZE_TIME += time.time() - s
     return grammar
 
 
@@ -190,6 +217,9 @@ def build_trees(oracle, leaves):
             b. perform replacement if possible
         2. If a replacement was possible, repeat (1)
     """
+    global ORIGINAL_COALESCE_TIME
+    global BUILD_TIME
+    global TIME_GROUPING
 
     def score(trees: List[ParseNode], new_bubble: Optional[Bubble]) \
             -> Tuple[int, List[ParseNode]]:
@@ -222,20 +252,24 @@ def build_trees(oracle, leaves):
 
     best_trees = build_naive_parse_trees(leaves)
     grammar = build_grammar(best_trees)
+    s = time.time()
     print("Beginning coalescing...".ljust(50))
     grammar, best_trees, _ = coalesce(oracle, best_trees, grammar)
     grammar, best_trees, _ = coalesce_partial(oracle, best_trees, grammar)
+    ORIGINAL_COALESCE_TIME +=  time.time() -s
 
 
     max_example_size = max([len(leaf_lst) for leaf_lst in leaves])
 
+    s = time.time()
     # Main algorithm loop. Iteratively increase the length of groups allowed from 3 to MAX_GROUP_LEN
     for group_size in range(3, MAX_GROUP_LEN):
         count = 1
         updated = True
         while updated:
-
+            s = time.time()
             all_groupings = group(best_trees, group_size)
+            TIME_GROUPING += time.time() - s
             updated, nlg = False, len(all_groupings)
             for i, (grouping, the_score) in enumerate(all_groupings):
                 print(('[Group len %d] Bubbling iteration %d (%d/%d)...' % (group_size, count, i + 1, nlg)).ljust(50), end='\r')
@@ -243,7 +277,7 @@ def build_trees(oracle, leaves):
                 if isinstance(grouping, Bubble):
                     new_trees = apply(grouping, best_trees)
                     new_score, new_trees = score(new_trees, grouping)
-                    grouping_str = f"Successful grouping (single): {grouping.bubbled_elems}\n    (aka {[e.derived_string() for e in grouping.bubbled_elems]}"
+                    grouping_str = f"Successful grouping (single): {grouping.bubbled_elems}"#\n    (aka {[e.derived_string() for e in grouping.bubbled_elems]}"
                     grouping_str += f"\n     [score of {the_score}]"
                 else:
                     bubble_one = grouping[0]
@@ -267,6 +301,7 @@ def build_trees(oracle, leaves):
         if group_size > max_example_size:
             break
 
+    BUILD_TIME += time.time() -s
     return best_trees, {}
 
 
@@ -293,7 +328,7 @@ def coalesce_partial(oracle, trees: List[ParseNode], grammar: Grammar,
     be in the situation where (nt1, nt2) can partially coalesce and (nt2, nt1) can partially coalesce.
 
     """
-
+    global TIME_GENERATING_EXAMPLES
 
     def partially_coalescable(replaceable_everywhere: str, replaceable_in_some_rules: str, trees: ParseTreeList) -> Dict[
         Tuple[str, Tuple[str]], List[int]]:
@@ -313,17 +348,21 @@ def coalesce_partial(oracle, trees: List[ParseNode], grammar: Grammar,
                 for idx in replacement_indices:
                     partial_replacement_locs.append(((rule_start, body), idx))
 
+        s = time.time()
         # Get the set of strings derivable from `replaceable_everywhere`
         everywhere_derivable_strings = lvl_n_derivable(trees, replaceable_everywhere, 0 )
 
         # Get the set of strings derivable from `replaceable_in_some_rules`
         in_some_derivable_strings = lvl_n_derivable(trees, replaceable_in_some_rules, 0)
 
+        TIME_GENERATING_EXAMPLES += time.time() - s
+
         # Check whether `replaceable_everywhere` is replaceable by `replaceable_in_some_rules` everywhere.
         everywhere_by_some_candidates = []
         for tree in trees:
             everywhere_by_some_candidates.extend(
                 get_strings_with_replacement(tree, replaceable_everywhere, in_some_derivable_strings))
+
 
         if len(everywhere_by_some_candidates) > MAX_SAMPLES_PER_COALESCE:
             everywhere_by_some_candidates = random.sample(everywhere_by_some_candidates, MAX_SAMPLES_PER_COALESCE)
@@ -520,7 +559,7 @@ def coalesce(oracle, trees: List[ParseNode], grammar: Grammar,
     and whether any nonterminals were actually coalesced with each other
     (found equivalent).
     """
-
+    global TIME_GENERATING_EXAMPLES
 
     def replacement_valid(replacer_derivable_strings, replacee, trees : ParseTreeList) -> Tuple[bool, Set[str]]:
         """
@@ -564,13 +603,14 @@ def coalesce(oracle, trees: List[ParseNode], grammar: Grammar,
         nt1_derivable_strings = set()
         nt2_derivable_strings = set()
 
+        s = time.time()
         if isinstance(coalesce_target, tuple):
             nt1_derivable_strings.update(lvl_n_derivable(trees, nt1, 1))
             nt2_derivable_strings.update(lvl_n_derivable(trees, nt2, 1))
         else:
             nt1_derivable_strings.update(lvl_n_derivable(trees, nt1, 0))
             nt2_derivable_strings.update(lvl_n_derivable(trees, nt2, 0))
-
+        TIME_GENERATING_EXAMPLES += time.time() - s
 
         # First check if the replacement is expanding
         if MUST_EXPAND_IN_COALESCE and coalesce_target is not None and nt1_derivable_strings == nt2_derivable_strings:
