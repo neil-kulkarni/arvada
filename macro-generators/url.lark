@@ -1,0 +1,65 @@
+start: url
+url: httpurl | httpsurl | ftpurl | ftpsurl  | telneturl | gopherurl | fileurl
+scheme: (lowalpha | digit | "+" | "-" | ".")+
+schemepart: xchar* | ipschemepart
+ipschemepart: "//" login ("/" urlpath)?
+
+login: ( user ( ":" password )? "@" )? hostport
+hostport: host ( ":" port )?
+host: hostname | hostnumber
+hostname: ( domainlabel "." )* toplabel
+domainlabel: alphadigit | alphadigit ( alphadigit | "-" )* alphadigit
+toplabel: alpha | alpha ( alphadigit | "-" )* alphadigit
+alphadigit: alpha | digit
+hostnumber: digits "." digits "." digits "." digits
+port: digits
+user: (uchar | ";" | "?" | "&" | "=" )*
+password: (uchar | ";" | "?" | "&" | "=" )*
+urlpath: xchar*
+
+ftpurl: "ftp://" login ( "/" fpath (";type=" ftptype )?)?
+
+ftpsurl: "ftp://" login ( "/" fpath (";type=" ftptype )?)?
+fpath: fsegment ( "/" fsegment )*
+fsegment: ( uchar | "?" | ":" | "@" | "&" | "=" )*
+ftptype: "A" | "I" | "D" | "a" | "i" | "d"
+
+fileurl: "file://" ( host | "localhost" )? "/" fpath
+
+
+httpurl: "http://" hostport ( "/" hpath ( "?" search )?)?
+httpsurl: "https://" hostport ( "/" hpath ( "?" search )?)?
+hpath: hsegment ( "/" hsegment )*
+hsegment: ( uchar | ";" | ":" | "@" | "&" | "=" )*
+search: ( uchar | ";" | ":" | "@" | "&" | "=" )*
+
+
+gopherurl: "gopher://" hostport ( "/"( gtype ( selector ( "%09" search ( "%09" gopherplusstring )? )? )? )? )?
+gtype: xchar
+selector: xchar*
+gopherplusstring: xchar*
+
+
+
+telneturl: "telnet://" login ( "/" )?
+
+
+lowalpha: "a".."z"
+hialpha: "A".."Z"
+
+alpha: lowalpha | hialpha
+digit: "0".."9"
+safe: "$" | "-" | "_" | "." | "+"
+extra: "!" | "*" | "'" | "(" | ")" | ","
+national: "{" | "}" | "|" | "\\" | "^" | "~" | "[" | "]" | "`"
+punctuation: "<" | ">" | "#" | "%" | "\""
+
+
+reserved: ";" | "/" | "?" | ":" | "@" | "&" | "="
+hex: digit | "A" | "B" | "C" | "D" | "E" | "F" | "a" | "b" | "c" | "d" | "e" | "f"
+escape: "%" hex hex
+
+unreserved: alpha | digit | safe | extra
+uchar: unreserved | escape
+xchar: unreserved | reserved | escape
+digits: digit+

@@ -463,6 +463,7 @@ def sample_n_random(start: str, generic_rules: Set[GenericRule], n) -> Set[str]:
         else:
             bound = 15
         try:
+            # for generating urls I set bound to 30
             sample = one_random_sample('start', bound)
             samples.add(sample)
         except RecursionError as e:
@@ -763,4 +764,8 @@ if __name__ == "__main__":
           $ python sample_lark.py GRAMMAR_FILE.LARK
         """
         grammar_contents = open(sys.argv[1]).read()
-        examples = sample_grammar(grammar_contents)
+        #examples = sample_grammar(grammar_contents)
+        generic_rules = GenericRuleCreator(grammar_contents).get_rules()
+        examples =  sample_n_random('start', generic_rules, 2000)
+        for example in examples:
+            print(example)
