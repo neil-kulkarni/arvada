@@ -5,8 +5,6 @@ import time
 from typing import Tuple, List, Set
 import sys
 
-import numpy as np
-
 from grammar import Grammar
 from parse_tree import ParseNode, fixup_terminal
 REPLACE_CONST = '[[:REPLACEME]]'
