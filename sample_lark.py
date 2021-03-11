@@ -729,7 +729,7 @@ if __name__ == '__main__':
         print(f"[!!!] Couldn't create {test_set_folder}. Underlying error above.")
         exit(1)
 
-    test_samples = sample_n_random('start', generic_rules, 100)
+    test_samples = sample_n_random('start', generic_rules, 1000)
     print_stats(test_samples, "Test set")
 
     for i, test_sample in enumerate(test_samples):

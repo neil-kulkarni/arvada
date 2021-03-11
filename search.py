@@ -125,7 +125,7 @@ def main(oracle_cmd, guide_examples_folder,  log_file_name, test_examples_folder
         oracle_parse_calls = oracle.parse_calls
         oracle_real_calls = oracle.real_calls
 
-        precision_set = start_grammar.sample_positives(100, 5)
+        precision_set = start_grammar.sample_positives(1000, 5)
         parser: Lark = start_grammar.parser()
 
         print('Scoring grammar....'.ljust(50), end='\r')
