@@ -178,7 +178,7 @@ def main(oracle_cmd, guide_examples_folder,  log_file_name, test_examples_folder
         print(f'Pickling grammar...')
         import pickle
         start_grammar.parser = None
-        pickle.dump(start_grammar, open(log_file_name + ".gram", "wb"))
+        pickle.dump(start_grammar.rules, open(log_file_name + ".gramdict", "wb"))
 
 
 if __name__ == '__main__':
