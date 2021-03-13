@@ -337,6 +337,7 @@ def fix_direct_derivability(nt, rule_map, directly_derivable: Dict[str, Set[str]
     for rule in my_rules:
         if is_direct_derivable_from_rule(nt, rule):
             print(f"BAD: {rule}")
+    exit(1)
 
     new_rules = {}
     _, at_least_one_rule = expansions_minus_derivable_to(nt, nt, new_rules, [])
@@ -376,7 +377,7 @@ def main(gram_file_name: str):
     smaller = aggressively_minimize(generic_rules)
     while fix_all_directly_derivable(smaller):
         pass
-    #print_nicely(smaller, open(gram_file_name).readlines())
+    print_nicely(smaller, open(gram_file_name).readlines())
 
 
 if __name__ == '__main__':

@@ -125,10 +125,15 @@ def main(oracle_cmd, guide_examples_folder,  log_file_name, test_examples_folder
         oracle_parse_calls = oracle.parse_calls
         oracle_real_calls = oracle.real_calls
 
+        print(f'Pickling grammar...')
+        import pickle
+        pickle.dump(start_grammar.rules, open(log_file_name + ".gramdict", "wb"))
+
+
         precision_set = start_grammar.sample_positives(1000, 5)
         parser: Lark = start_grammar.parser()
 
-        print('Scoring grammar....'.ljust(50), end='\r')
+        print('Scoring grammar....'.ljust(50))
 
         num_precision_parsed = 0
 
@@ -171,14 +176,11 @@ def main(oracle_cmd, guide_examples_folder,  log_file_name, test_examples_folder
         print(f'Time spent in oracle calls: {oracle_time_spent}')
         print(f'Time spent building grammar: {build_time}s', file=f)
         print(f'Time spent building grammar: {build_time}s', )
+        print(f'Scoring time: {time.time() - build_time - start_time}', file=f)
         print(f'Time breakdown: {get_times()}', file=f)
         print(f'Time breakdown: {get_times()}')
         print(f'Parse calls: {oracle_parse_calls}, {oracle_real_calls}')
         print(f'Parse calls: {oracle_parse_calls}, {oracle_real_calls}', file=f)
-        print(f'Pickling grammar...')
-        import pickle
-        start_grammar.parser = None
-        pickle.dump(start_grammar.rules, open(log_file_name + ".gramdict", "wb"))
 
 
 if __name__ == '__main__':
