@@ -47,11 +47,6 @@ def aggressively_minimize(generic_rules: Set[GenericRule]):
     while True:
         it += 1
 
-
-        print(f"Hello at the start of iteration {it}")
-        print(rule_map.get('__m0_star_70'))
-        print([rule for rule in rule_map['m0'] if 'n977' in rule.expansion])
-
         """
         (1) If there is any nonterminal that is defined by a single rule
         with a single token, delete the key from the grammar and
@@ -248,6 +243,127 @@ def tag_unproductive(rule_map):
     # print(rule_map[])
 
 
+def directly_derivable_relationships(rule_map: Dict[str, List[GenericRule]]):
+    nullable = set()
+    new_nullables = True
+    while new_nullables:
+        old_len = len(nullable)
+        new_nullables = False
+        for nt in rule_map.keys():
+            if nt in nullable:
+                continue
+            for expansion in [rule.expansion for rule in rule_map[nt]]:
+                if expansion == []:
+                    nullable.add(nt)
+                elif all(elem in nullable for elem in expansion):
+                    nullable.add(nt)
+        new_len = len(nullable)
+        if new_len > old_len:
+            new_nullables = True
+
+    directly_derivable = defaultdict(set)
+    updated_derivables = True
+    while updated_derivables:
+        old_len = sum([len(v) for v in directly_derivable.values()])
+        for nt in [key for key in rule_map.keys() if key.islower()]:
+            for expansion in [rule.expansion for rule in rule_map[nt]]:
+                if len(expansion) == 1:
+                    if expansion[0] in rule_map.keys() and expansion[0].islower():
+                        directly_derivable[nt].add(expansion[0])
+                        directly_derivable[nt].update(directly_derivable[expansion[0]])
+                else:
+                    for i in range(len(expansion)):
+                        if all(elem in nullable for elem in expansion[:i] + expansion[i+1:]):
+                            if expansion[i] in rule_map.keys() and expansion[i].islower():
+                                directly_derivable[nt].add(expansion[i])
+                                directly_derivable[nt].update(directly_derivable[expansion[i]])
+
+        new_len = sum([len(v) for v in directly_derivable.values()])
+        updated_derivables = new_len > old_len
+
+    return directly_derivable, nullable
+
+def fix_direct_derivability(nt, rule_map, directly_derivable: Dict[str, Set[str]], nullable: Set[str]):
+
+    def is_direct_derivable_from_rule(nt: str, rule):
+        expansion = rule.expansion
+        derivable_posns = set()
+        for i in range(len(expansion)):
+            if all(elem in nullable for elem in expansion[:i] + expansion[i + 1:]):
+                if nt in directly_derivable[expansion[i]]:
+                    derivable_posns.add(i)
+        return derivable_posns
+
+    def expansions_minus_derivable_to(nt: str, nt_we_dont_want_derived: str, rule_map_so_far, queue):
+        new_name = f"{nt}_minus_{nt_we_dont_want_derived}"
+        if new_name in queue:
+            return new_name, True
+        else:
+            queue.append(new_name)
+        # Let's make new rules with nt replaced with nt_minus_nt_we_dont_want_derived
+        my_rules = rule_map[nt]
+        at_least_one_rule = False
+        for rule in my_rules:
+            positions_where_directly_derivable = is_direct_derivable_from_rule(nt_we_dont_want_derived, rule)
+            if positions_where_directly_derivable:
+                for posn in positions_where_directly_derivable:
+                    derivable_elem = rule.expansion[posn]
+                    if derivable_elem == nt_we_dont_want_derived:
+                        # this is exactly what we want to get rid of
+                        continue
+                    else:
+                        new_nt_name, there_was_something = expansions_minus_derivable_to(derivable_elem,
+                                                                                         nt_we_dont_want_derived,
+                                                                                         rule_map_so_far,
+                                                                                         queue)
+                        if there_was_something:
+                            new_expansion = rule.expansion[:posn] + [new_nt_name] + rule.expansion[posn+1:]
+                            at_least_one_rule = True
+                            if new_name not in rule_map_so_far:
+                                rule_map_so_far[new_name] = []
+                            rule_map_so_far[new_name].append(GenericRule(new_name, new_expansion, False))
+            else:
+                # this rule is totally ok, so we can just add it back
+                if new_name not in rule_map_so_far:
+                    rule_map_so_far[new_name] = []
+                rule_map_so_far[new_name].append(GenericRule(new_name, rule.expansion, rule.is_terminal))
+                at_least_one_rule = True
+
+        return new_name, at_least_one_rule
+
+    print(f"Woops, {nt} is directly derivable from itself. Who is bad?")
+
+    my_rules = rule_map[nt]
+    for rule in my_rules:
+        if is_direct_derivable_from_rule(nt, rule):
+            print(f"BAD: {rule}")
+
+    new_rules = {}
+    _, at_least_one_rule = expansions_minus_derivable_to(nt, nt, new_rules, [])
+    if not at_least_one_rule:
+        print("this means this nonterminal can only expand to itself in an infinite loop. You're in trouble+++")
+        exit(1)
+    rule_map.pop(nt)
+    print(new_rules)
+    for rule_start, rule_lst in new_rules.items():
+        if rule_start == f"{nt}_minus_{nt}":
+            rule_map[nt] = [GenericRule(nt, r.expansion, r.is_terminal) for r in rule_lst]
+        else:
+            rule_map[rule_start] = rule_lst
+
+
+def fix_all_directly_derivable(rule_map):
+
+    directly_derivable, nullable = directly_derivable_relationships(rule_map)
+
+    for nt in rule_map.keys():
+        derivables = directly_derivable[nt]
+        if nt in derivables:
+            fix_direct_derivability(nt, rule_map, directly_derivable, nullable)
+            return True
+
+    return False
+
 
 
 
@@ -258,10 +374,13 @@ def main(gram_file_name: str):
     sys.setrecursionlimit(10000)
     generic_rules = GenericRuleCreator(grammar_contents).get_rules()
     smaller = aggressively_minimize(generic_rules)
-    #tag_unproductive(smaller)
-    exit(1)
-    print_nicely(smaller, open(gram_file_name).readlines())
+    while fix_all_directly_derivable(smaller):
+        pass
+    #print_nicely(smaller, open(gram_file_name).readlines())
 
 
 if __name__ == '__main__':
-    main("tinyc-gram.lark")
+    if len(sys.argv) < 2:
+        main("tinyc-gram.lark")
+    else:
+        main(sys.argv[1])
