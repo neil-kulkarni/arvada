@@ -222,7 +222,6 @@ def get_rule_map(rules: Iterable[GenericRule]) -> Dict[str, List[GenericRule]]:
 class GenericRuleCreator:
     def __init__(self, grammar_contents):
         grammar_contents = fixup_nts(grammar_contents)
-        print(grammar_contents)
         grammar = load_grammar(grammar_contents, "?")
         all_rules = [rdef[0] for rdef in grammar.rule_defs]
         terms, rules, ignore = grammar.compile(all_rules)
@@ -232,7 +231,6 @@ class GenericRuleCreator:
             self.generic_rules.extend(self.make_generic_terminal(term))
         for rule in rules:
             self.generic_rules.extend(self.make_generic_rule(rule))
-        print(self.generic_rules)
 
     def get_range(self, range_str: str):
         ranges = []
