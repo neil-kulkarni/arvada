@@ -31,6 +31,8 @@ whitespace_type = 4
 
 MAX_SAMPLES = 10
 
+whitsepace_map = []
+
 def rules_to_add(rule_start):
     if rule_start == "":
         print("WARNING: Calling rules_to_add with the empty string",file= sys.stderr)
@@ -93,6 +95,25 @@ def rules_to_add(rule_start):
         r.add_body(['talphanum'])
         r.add_body((['talphanum', 'talphanums']))
         return [r] + rules_to_add('talphanum')
+    if rule_start.startswith("twhitespaces"):
+        idx = int(rule_start[12:])
+        single = f"twhitespace{idx}"
+        r = Rule(rule_start)
+        r.add_body([single])
+        r.add_body(([single, rule_start]))
+        return [r] + rules_to_add(single)
+    if rule_start.startswith("twhitespace"):
+        idx = int(rule_start[11:])
+        r = Rule(rule_start)
+        for charset, charset_idx in whitsepace_map:
+            if charset_idx == idx:
+                for c in charset:
+                    r.add_body(([f'"{c}"']))
+                return [r]
+        else:
+            print("I didn't find the right rules to add for whitespace!!!!")
+            exit(1)
+
     return []
 
 
@@ -104,6 +125,54 @@ def try_strings(oracle: ExternalOracle, candidates: List[str]):
         except ParseException:
             return False
     return True
+
+
+def generalize_whitespace_in_rule(oracle: ExternalOracle, grammar: Grammar, trees: List[ParseNode], rule_start: str, body_idxs: List[int]):
+
+    existing_bodies = [fixup_terminal(body[0]) for idx, body in enumerate(grammar.rules[rule_start].bodies) if idx in body_idxs]
+
+    ok_chars = set([c for body in existing_bodies for c in body])
+    other_chars = set([c for c in string.whitespace if c not in ok_chars])
+
+    for c in other_chars:
+        c_ok = True
+        for tree in [tree for tree in trees if nt_in_tree(tree, rule_start)]:
+            candidates = get_strings_with_replacement(tree, rule_start, c)
+            if not try_strings(oracle, candidates):
+                c_ok = False
+                break
+        if c_ok:
+            ok_chars.add(c)
+
+    longer_whitespaces = []
+
+    for i in range(MAX_SAMPLES):
+        leng = random.randint(2, 10)
+        ws_str = random.sample(ok_chars, leng)
+        longer_whitespaces.append(ws_str)
+
+
+    for tree in [tree for tree in trees if nt_in_tree(tree, rule_start)]:
+        candidates = get_strings_with_replacement(tree, rule_start, longer_whitespaces)
+        if not try_strings(oracle, candidates):
+            expand_ok = False
+            break
+
+    if len(ok_chars) == 1 and not expand_ok:
+        return [], ""
+
+    charset_idx = len(whitsepace_map)
+    for charset, idx in whitsepace_map:
+        if charset == ok_chars:
+            charset_idx = idx
+            break
+
+    if expand_ok:
+        replace_str = f'twhitespaces{charset_idx}'
+    else:
+        replace_str = f'twhitespace{charset_idx}'
+
+    return body_idxs, replace_str
 
 
 def generalize_digits_in_rule(oracle: ExternalOracle, grammar: Grammar, trees: List[ParseNode], rule_start: str, body_idxs: List[int]):
@@ -309,6 +378,13 @@ def expand_tokens(oracle : ExternalOracle, grammar : Grammar, trees: List[ParseN
                                 replace_str = r_str
 
                     idxs_to_replace.update(letter_bodies_to_replace)
+                    bodies_to_add.add(replace_str)
+
+            if idxs_by_type[whitespace_type]:
+                whitespace_bodies_to_replace, replace_str = generalize_to_alphanum(oracle, grammar, trees, rule_start,
+                                                                                 idxs_by_type[whitespace_type])
+                if replace_str != "":
+                    idxs_to_replace.update(whitespace_bodies_to_replace)
                     bodies_to_add.add(replace_str)
 
         for body_idx in sorted(idxs_to_replace, reverse = True):
