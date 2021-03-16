@@ -256,7 +256,7 @@ def build_trees(oracle, leaves):
     print("Beginning coalescing...".ljust(50))
     grammar, best_trees, _ = coalesce(oracle, best_trees, grammar)
     grammar, best_trees, _ = coalesce_partial(oracle, best_trees, grammar)
-    ORIGINAL_COALESCE_TIME +=  time.time() -s
+    ORIGINAL_COALESCE_TIME += time.time() - s
 
 
     max_example_size = max([len(leaf_lst) for leaf_lst in leaves])
@@ -267,9 +267,9 @@ def build_trees(oracle, leaves):
         count = 1
         updated = True
         while updated:
-            s = time.time()
+            group_start = time.time()
             all_groupings = group(best_trees, group_size)
-            TIME_GROUPING += time.time() - s
+            TIME_GROUPING += time.time() - group_start
             updated, nlg = False, len(all_groupings)
             for i, (grouping, the_score) in enumerate(all_groupings):
                 print(('[Group len %d] Bubbling iteration %d (%d/%d)...' % (group_size, count, i + 1, nlg)).ljust(50), end='\r')
@@ -301,7 +301,7 @@ def build_trees(oracle, leaves):
         if group_size > max_example_size:
             break
 
-    BUILD_TIME += time.time() -s
+    BUILD_TIME += time.time() - s
     return best_trees, {}
 
 
