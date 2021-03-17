@@ -67,7 +67,7 @@ def main(oracle_cmd, log_file_name, test_examples_folder ):
             print(learned_grammar, file=f)
             exit()
 
-        precision_set = learned_grammar.sample_positives(100, 5)
+        precision_set = learned_grammar.sample_positives(1000, 5)
         parser: Lark = learned_grammar.parser()
 
         example_gen_time = time.time()
