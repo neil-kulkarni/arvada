@@ -333,6 +333,8 @@ def fix_direct_derivability(nt, rule_map, directly_derivable: Dict[str, Set[str]
 
     print(f"Woops, {nt} is directly derivable from itself. Who is bad?")
 
+    print(nullable)
+
     my_rules = rule_map[nt]
     for rule in my_rules:
         if is_direct_derivable_from_rule(nt, rule):
@@ -375,9 +377,9 @@ def main(gram_file_name: str):
     sys.setrecursionlimit(10000)
     generic_rules = GenericRuleCreator(grammar_contents).get_rules()
     smaller = aggressively_minimize(generic_rules)
+    print_nicely(smaller, open(gram_file_name).readlines())
     while fix_all_directly_derivable(smaller):
         pass
-    print_nicely(smaller, open(gram_file_name).readlines())
 
 
 if __name__ == '__main__':

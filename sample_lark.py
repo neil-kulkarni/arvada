@@ -1,7 +1,7 @@
 from collections import defaultdict
 from typing import List, Dict, Tuple, Set, Iterable
 
-from lark.load_grammar import GrammarLoader, load_grammar
+from lark.load_grammar import load_grammar
 from lark.grammar import *
 from lark.lexer import TerminalDef
 import re
@@ -222,9 +222,9 @@ def get_rule_map(rules: Iterable[GenericRule]) -> Dict[str, List[GenericRule]]:
 class GenericRuleCreator:
     def __init__(self, grammar_contents):
         grammar_contents = fixup_nts(grammar_contents)
-        grammar = load_grammar(grammar_contents, "?")
+        grammar = load_grammar(grammar_contents, "?", None, False)
         all_rules = [rdef[0] for rdef in grammar.rule_defs]
-        terms, rules, ignore = grammar.compile(all_rules)
+        terms, rules, ignore = grammar.compile(all_rules, set())
 
         self.generic_rules: List[GenericRule] = []
         for term in terms:
