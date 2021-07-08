@@ -8,8 +8,7 @@ from oracle import CachingOracle, ExternalOracle
 import string
 
 """
-High-level command line to launch Arvada search. Currently assumes the benchmark is structured
-as created by sample_lark. TODO: allow for general specification of guide examples + oracle command
+High-level command line to launch Arvada search.
 
 See __main__ dispatch at the bottom for usage. 
 """
@@ -118,7 +117,7 @@ def main(oracle_cmd, guide_examples_folder,  log_file_name):
 if __name__ == '__main__':
     if len(sys.argv) < 2:
         print(f'Usage: python3 {sys.argv[0]} <mode>')
-        print('where mode is one of {internal, internal-r, external}')
+        print('where mode is one of {internal, external}')
         print(f'run with python3 {sys.argv[0]} <mode> to see detailed help')
         exit(1)
     elif sys.argv[1] == "external":
@@ -129,16 +128,9 @@ if __name__ == '__main__':
         main(sys.argv[2], sys.argv[3], sys.argv[4])
     elif sys.argv[1] == "internal":
         if len(sys.argv) != 4 or not os.path.exists(sys.argv[2]):
-            print(f'Usage: python3 {sys.argv[0]} <mode> <input_file> <log_file>')
-            print('where mode is one of {internal, internal-r}')
+            print(f'Usage: python3 {sys.argv[0]} internal <input_file> <log_file>')
             exit(1)
         main_internal(sys.argv[2], sys.argv[3], random_guides=False)
-    elif sys.argv[1] == "internal-r":
-        if len(sys.argv) != 4 or not os.path.exists(sys.argv[2]):
-            print(f'Usage: python3 {sys.argv[0]} <mode> <input_file> <log_file>')
-            print('where mode is one of {internal, internal-r}')
-            exit(1)
-        main_internal(sys.argv[2], sys.argv[3], random_guides=True)
     else:
         print(f'Usage: python3 {sys.argv[0]} <mode> [other args...]')
         print('where mode is one of {internal, internal-r, external}')

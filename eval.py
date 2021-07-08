@@ -117,7 +117,7 @@ def main(oracle_cmd, log_file_name, test_examples_folder ):
 if __name__ == '__main__':
     if len(sys.argv) < 2:
         print(f'Usage: python3 {sys.argv[0]} <mode>')
-        print('where mode is one of {internal, internal-r, external}')
+        print('where mode is one of {internal, external}')
         print(f'run with python3 {sys.argv[0]} <mode> to see detailed help')
         exit(1)
     elif sys.argv[1] == "external":
@@ -129,7 +129,6 @@ if __name__ == '__main__':
     elif sys.argv[1] == "internal":
         if len(sys.argv) != 4 or not os.path.exists(sys.argv[2]):
             print(f'Usage: python3 {sys.argv[0]} internal <input_file> <log_file>')
-            print('where mode is one of {internal, internal-r}')
             exit(1)
         main_internal(sys.argv[2], sys.argv[3])
     else:
