@@ -15,7 +15,7 @@ High-level command line to launch Arvada evaluation.
  
 See __main__ dispatch at the bottom for usage. 
 """
-
+PRECISION_SIZE=1000
 
 def main_internal(external_folder, log_file, random_guides=False):
     """
@@ -67,7 +67,7 @@ def main(oracle_cmd, log_file_name, test_examples_folder ):
             print(learned_grammar, file=f)
             exit()
 
-        precision_set = learned_grammar.sample_positives(1000, 5)
+        precision_set = learned_grammar.sample_positives(PRECISION_SIZE, 5)
         parser: Lark = learned_grammar.parser()
 
         example_gen_time = time.time()
@@ -121,10 +121,13 @@ if __name__ == '__main__':
         print(f'run with python3 {sys.argv[0]} <mode> to see detailed help')
         exit(1)
     elif sys.argv[1] == "external":
-        if len(sys.argv) != 5 or not os.path.exists(sys.argv[3]):
-            print(f'Usage: python3 {sys.argv[0]} external <oracle_cmd> <test_example_dir> <log_file>')
-            print('<oracle_cmd> should be a string which can be invoked with `<oracle_cmd> filename` (so can include options)')
+        if len(sys.argv) < 5 or len(sys.argv) > 6 or not os.path.exists(sys.argv[3]):
+            print(f'Usage: python3 {sys.argv[0]} external <oracle_cmd> <test_example_dir> <log_file> [size_precision_set]')
+            print('<oracle_cmd> should be a string which can be invoked with `<oracle_cmd> filename` (so can include options).')
+            print('The last optional argument [size_precision_set] gives the size of the precision set. It is 1000 by default.')
             exit(1)
+        if len(sys.argv) == 6:
+            PRECISION_SIZE = int(sys.argv[5])
         main(sys.argv[2], sys.argv[4], sys.argv[3])
     elif sys.argv[1] == "internal":
         if len(sys.argv) != 4 or not os.path.exists(sys.argv[2]):

@@ -9,4 +9,4 @@ fi
 filename=$1
 result=$(printf "\nquit\n"| cat $filename - | bc -q 2>&1)
 echo $result | grep "syntax error" >&2
-exit $?
+exit $((1-$?))

@@ -577,7 +577,7 @@ def coalesce(oracle, trees: List[ParseNode], grammar: Grammar,
             # TODO: See the failing doctest in bubble.py. Pickle below for a "real" example
             #import pickle
             #pickle.dump(coalesce_target, open('overlap-bug.pkl', "wb"))
-            print(f"Oopsie with {coalesce_target}.\nPretty sure this is an overlap bug that I know of.... so let's just skip it")
+            #print(f"Oopsie with {coalesce_target}.\nPretty sure this is an overlap bug that I know of.... so let's just skip it")
             return False, set()
         #assert (replaced_strings)
 
