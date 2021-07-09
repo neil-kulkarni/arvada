@@ -56,4 +56,4 @@ $ python3 search.py external .bc-example/bc-wrapper.sh bc-example/test_set bc-ex
 ```
 over 5 runs, we witnessed recall of 0.03, 0.06, 0.07, 0.16, 0.61, and precision consistently around 0.9. 
 
-*Note:* the behavior of this minimal example differs from the arith example in the paper because (1) the set of training examples is small for fast runtime and (2) the language accepted by the oracle (`bc`) is a large superset of that in the training and testing set.  
+*Note:* the behavior of this minimal example differs from the arith example in the paper because (1) the set of training examples has been made smaller for illustration purposes and (2) the language accepted by the oracle (`bc`) is a large superset of that in the training and testing set.  
