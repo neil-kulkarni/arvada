@@ -56,4 +56,4 @@ The grammar is stored as a pickled object in `bc-example.log.gramdict`. The `eva
 $ python3 search.py external .bc-example/bc-wrapper.sh bc-example/test_set bc-example.log 100
 ```
 
-Over 5 runs, we witnessed 4 runs with 1.0 Recall and 1.0 Precision, and 1 run with 0.95 Recall and 0.95 Precision.
+Over 5 runs, we witnessed 4 runs with 1.0 Recall and 1.0 Precision, and 1 run with 0.95 Recall and 1.0 Precision.
