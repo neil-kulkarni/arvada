@@ -13,6 +13,8 @@ High-level command line to launch Arvada search.
 See __main__ dispatch at the bottom for usage. 
 """
 
+USE_PRETOKENIZATION = True
+
 GROUP_PUNCTUATION = False
 SPLIT_UPPER_AND_LOWER = True
 
@@ -75,14 +77,24 @@ def main_internal(external_folder, log_file, random_guides=False):
 
 def main(oracle_cmd, guide_examples_folder,  log_file_name):
     oracle = ExternalOracle(oracle_cmd)
+    if USE_PRETOKENIZATION:
+       print("Using approximate pre-tokenization stage")
 
     guide_examples = []
     for filename in os.listdir(guide_examples_folder):
         full_filename = os.path.join(guide_examples_folder, filename)
         guide_raw = open(full_filename).read()
-        guide = approx_tokenize(guide_raw)
+        if USE_PRETOKENIZATION:
+            guide = approx_tokenize(guide_raw)
+        else:
+            guide = [c for c in guide_raw]
         guide_examples.append(guide)
 
+    average_guide_len = sum([len(g) for g in guide_examples])/len(guide_examples)
+    if average_guide_len > 40:
+        bbl_bounds = (6, 20)
+    else:
+        bbl_bounds = (3, 10)
 
     # Create the log file and write positive and negative examples to it
     # Also write the initial starting grammar to the file
@@ -91,7 +103,7 @@ def main(oracle_cmd, guide_examples_folder,  log_file_name):
         # Build the starting grammars and test them for compilation
         print('Building the starting grammar...'.ljust(50), end='\r')
         start_time = time.time()
-        start_grammar: Grammar = build_start_grammar(oracle, guide_examples)
+        start_grammar: Grammar = build_start_grammar(oracle, guide_examples, bbl_bounds)
         build_time = time.time() - start_time
 
         oracle_time_spent = oracle.time_spent

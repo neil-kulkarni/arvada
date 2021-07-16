@@ -18,7 +18,7 @@ from next_tid import allocate_tid
 Bulk of the Arvada algorithm.
 """
 
-###################### Settings for ICSE'21 Submission ########################
+###################### Settings for ASE'21 Submission #########################
 # MAX_SAMPLES_PER_COALESCE = 50   << number of strings to sample from the     #
 #                                   grammar induced by a marge. Increase to   #
 #                                   increase chance of catching unsound       #
@@ -34,6 +34,7 @@ Bulk of the Arvada algorithm.
 ###############################################################################
 
 MAX_SAMPLES_PER_COALESCE = 50
+MIN_GROUP_LEN = 3
 MAX_GROUP_LEN = 10
 
 MUST_EXPAND_IN_COALESCE = False
@@ -68,7 +69,7 @@ def check_recall(oracle, grammar: Grammar):
             return False
     return True
 
-def build_start_grammar(oracle, leaves):
+def build_start_grammar(oracle, leaves, bbl_bounds = (3,10)):
     """
     ORACLE is a CachingOracle or ExternalOracle with a .parse method, which
     returns True if the example given is in the ORACLE's language
@@ -80,6 +81,9 @@ def build_start_grammar(oracle, leaves):
     global LAST_COALESCE_TIME
     global EXPAND_TIME
     global MINIMIZE_TIME
+    global MIN_GROUP_LEN 
+    global MAX_GROUP_LEN
+    MIN_GROUP_LEN, MAX_GROUP_LEN = bbl_bounds
     print('Building the starting trees...'.ljust(50), end='\r')
     trees, classes = build_trees(oracle, leaves)
     print('Building initial grammar...'.ljust(50), end='\r')
@@ -262,8 +266,8 @@ def build_trees(oracle, leaves):
     max_example_size = max([len(leaf_lst) for leaf_lst in leaves])
 
     s = time.time()
-    # Main algorithm loop. Iteratively increase the length of groups allowed from 3 to MAX_GROUP_LEN
-    for group_size in range(3, MAX_GROUP_LEN):
+    # Main algorithm loop. Iteratively increase the length of groups allowed from MIN_GROUP_LEN to MAX_GROUP_LEN
+    for group_size in range(MIN_GROUP_LEN, MAX_GROUP_LEN):
         count = 1
         updated = True
         while updated:
