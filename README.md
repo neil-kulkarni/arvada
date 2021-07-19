@@ -2,6 +2,10 @@
 
 A tool to infer grammars from an example set and a correctness oracle, that can be used for both generation and parsing tasks.
 
+## Artifact for Replication
+
+We provide a docker container that contains replication instructions for the experiments from Learning Highly Recursive Input Grammars, submitted to ASE'21, at [this link](https://drive.google.com/file/d/1DfPd0eb9YPUkPo4hsr35PQC6ChzZ7ob0/view?usp=sharing). The README in the docker container describes how to use the run scripts, as well as expected time to replicate the experiments
+
 ## Building
 
 Requires python3 to run. Install the following two packages via pip to make sure everything runs:
