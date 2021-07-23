@@ -87,7 +87,7 @@ def main(oracle_cmd, guide_examples_folder,  log_file_name):
         if USE_PRETOKENIZATION:
             guide = approx_tokenize(guide_raw)
         else:
-            guide = [c for c in guide_raw]
+            guide = [ParseNode(c, True, []) for c in guide_raw]
         guide_examples.append(guide)
 
     average_guide_len = sum([len(g) for g in guide_examples])/len(guide_examples)
