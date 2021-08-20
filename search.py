@@ -1,129 +1,149 @@
 import random, sys, os, time
-from score import Scorer
 from input import parse_input
 from parse_tree import ParseTree, ParseNode
 from grammar import Grammar, Rule
-from generator import GrammarGenerator
-from start import build_start_grammar
+from start import build_start_grammar, get_times
+from lark import Lark
+from oracle import CachingOracle, ExternalOracle
+import string
 
-def main(file_name, log_file, max_iters):
-    start_time = time.time() # To compute elapsed time
+"""
+High-level command line to launch Arvada search.
 
-    # Generate configuration options and oracle grammar
-    CONFIG, ORACLE_GEN, ORACLE = parse_input(file_name)
-    POS_EXAMPLES, NEG_EXAMPLES = CONFIG['POS_EXAMPLES'], CONFIG['NEG_EXAMPLES']
-    MAX_ITERS, MAX_NEG_EXAMPLE_SIZE = max_iters, CONFIG['MAX_NEG_EXAMPLE_SIZE']
-    TERMINALS, MAX_TREE_DEPTH = CONFIG['TERMINALS'], CONFIG['MAX_TREE_DEPTH']
-    GUIDE_EXAMPLES = CONFIG['GUIDE']
+See __main__ dispatch at the bottom for usage. 
+"""
 
-    # Test to make sure that the oracle at least compiles, and throws an exception if not
-    try:
-        OR_PARSER = ORACLE.parser()
-    except Exception as e:
-        print(f"Oops! The Lark parser couldn't compile. Here's the error:\n {e.__str__()}\n")
-        print('Fix your grammar. Exiting now.')
-        exit(1)
+USE_PRETOKENIZATION = True
 
-    # Generate positive examples
-    oracle_parse_tree = ParseTree(ORACLE_GEN)
-    print('Generating positive examples...'.ljust(50), end='\r')
-    positive_examples, positive_nodes = oracle_parse_tree.sample_strings(POS_EXAMPLES, MAX_TREE_DEPTH)
-    print('Generating negative examples...'.ljust(50), end='\r')
-    negative_examples = ORACLE.sample_negatives(NEG_EXAMPLES, TERMINALS, MAX_NEG_EXAMPLE_SIZE)
-    DATA = {'positive_examples': positive_examples, 'negative_examples': negative_examples}
+GROUP_PUNCTUATION = False
+SPLIT_UPPER_AND_LOWER = True
 
-    # Generate guiding examples and corresponding ParseNodes
-    guide_nodes = [[ParseNode(tok, True, []) for tok in ex.split()] for ex in GUIDE_EXAMPLES]
-    if len(guide_nodes) == 0: guide_nodes = positive_nodes
+def approx_tokenize(guide_raw:str):
+    def get_category(c):
+        if not SPLIT_UPPER_AND_LOWER and c in string.ascii_letters:
+            return "LETTER"
+        if SPLIT_UPPER_AND_LOWER and c in string.ascii_uppercase:
+            return "UPPER"
+        if SPLIT_UPPER_AND_LOWER and c in string.ascii_lowercase:
+            return "LOWER"
+        if c in string.digits:
+            return "DIGIT"
+        if GROUP_PUNCTUATION and c in string.punctuation:
+            return "PUNCTUATION"
+        if c in string.whitespace:
+            return "WHITESPACE"
+        else:
+            return None
+    prev_category = None
+    cur_token = ""
+    start = True
+    tokens = []
+    for c in guide_raw:
+        cur_category = get_category(c)
+        if cur_category is not None and cur_category == prev_category:
+            cur_token += c
+        else:
+            if not start:
+                tokens.append(ParseNode(cur_token, True, []))
+            cur_token = c
+        prev_category = cur_category
+        start = False
+    if cur_token != "":
+        tokens.append(ParseNode(cur_token, True, []))
+    return tokens
+
+
+def main_internal(external_folder, log_file, random_guides=False):
+    """
+    `external_folder`: the base folder for the benchmark, which contains:
+      - random-guides: dir of random guide examples
+      - guides: dir of minimal guide examples
+      - test_set: dir of held-out test examples
+      - parse_bench_name: the parser command (oracle). assume bench_name is the
+        base (i.e. without parent directories) name of external_folder
+    `log_file`: where to write results
+    `random_guides`: learn from the guide examples in random-guides instead of guides
+    """
+    import os
+    bench_name = os.path.basename(external_folder)
+    if random_guides:
+        guide_folder = os.path.join(external_folder, "random-guides")
+    else:
+        guide_folder = os.path.join(external_folder, "guides")
+    parser_command = os.path.join(external_folder, f"parse_{bench_name}")
+
+    main(parser_command, guide_folder, log_file)
+
+
+def main(oracle_cmd, guide_examples_folder,  log_file_name):
+    oracle = ExternalOracle(oracle_cmd)
+    if USE_PRETOKENIZATION:
+       print("Using approximate pre-tokenization stage")
+
+    guide_examples = []
+    for filename in os.listdir(guide_examples_folder):
+        full_filename = os.path.join(guide_examples_folder, filename)
+        guide_raw = open(full_filename).read()
+        if USE_PRETOKENIZATION:
+            guide = approx_tokenize(guide_raw)
+        else:
+            guide = [ParseNode(c, True, []) for c in guide_raw]
+        guide_examples.append(guide)
+
+    average_guide_len = sum([len(g) for g in guide_examples])/len(guide_examples)
+    if average_guide_len > 40:
+        bbl_bounds = (6, 20)
+    else:
+        bbl_bounds = (3, 10)
 
     # Create the log file and write positive and negative examples to it
     # Also write the initial starting grammar to the file
-    with open(log_file, 'w+') as f:
-        # Print the positive and negative examples
-        print('\n\nPositive Examples:\n', file=f)
-        for pos in positive_examples:
-            print(pos, file=f)
-
-        print('\n\nNegative Examples:\n', file=f)
-        for neg in negative_examples:
-            print(neg, file=f)
+    with open(log_file_name, 'w+') as f:
 
         # Build the starting grammars and test them for compilation
         print('Building the starting grammar...'.ljust(50), end='\r')
-        start_gen = build_start_grammar(OR_PARSER, CONFIG, DATA, guide_nodes)
-        try:
-            start_gen.generate_grammar().parser()
-            print('\n\nInitial Grammar Created:\n%s' % str(start_gen.generate_grammar()), file=f)
-        except Exception as e:
-            print('\n\nInitial grammar does not compile! %s' % str(e), file=f)
-            exit()
+        start_time = time.time()
+        start_grammar: Grammar = build_start_grammar(oracle, guide_examples, bbl_bounds)
+        build_time = time.time() - start_time
 
-    # Generate random intial grammar and score it. Then, score the start grammar
-    # we arrived at earlier, which will add it to the "interesting" set for
-    # future iterations. Then, sample many more random grammars so that overall
-    # variance is reduced.
-    print('Scoring initial grammars...'.ljust(50), end='\r')
-    gen = GrammarGenerator(CONFIG)
-    grammar = gen.generate_grammar()
-    scorer = Scorer(CONFIG, DATA, grammar, gen)
-    scorer.score(grammar, gen)
+        oracle_time_spent = oracle.time_spent
+        oracle_parse_calls = oracle.parse_calls
+        oracle_real_calls = oracle.real_calls
 
-    start_grammar = start_gen.generate_grammar()
-    scorer.score(start_grammar, start_gen)
+        print(f'Pickling grammar...')
+        import pickle
+        pickle.dump(start_grammar.rules, open(log_file_name + ".gramdict", "wb"))
 
-    for _ in range(len(positive_examples)):
-        gen = GrammarGenerator(CONFIG)
-        grammar = gen.generate_grammar()
-        scorer.score(grammar, gen)
 
-    # Prints iteration information to the log file
-    def log_results(scorer, log_file):
-        f = open(log_file, 'a')
+        print(f'Time spent in oracle calls: {oracle_time_spent}', file=f)
+        print(f'Time spent in oracle calls: {oracle_time_spent}')
+        print(f'Time spent building grammar: {build_time}s', file=f)
+        print(f'Time spent building grammar: {build_time}s', )
+        print(f'Scoring time: {time.time() - build_time - start_time}', file=f)
+        print(f'Time breakdown: {get_times()}', file=f)
+        print(f'Time breakdown: {get_times()}')
+        print(f'Parse calls: {oracle_parse_calls}, {oracle_real_calls}')
+        print(f'Parse calls: {oracle_parse_calls}, {oracle_real_calls}', file=f)
 
-        # Print the target grammar
-        print('\n\nTarget Grammar:\n{}'.format(ORACLE.__str__()), file=f)
-
-        # Print the current score maximizing grammars
-        print('\n\nScore Maximizing Grammars\n', file=f)
-        for category in scorer.score_map:
-            score, grammar, gen = scorer.score_map[category]
-            print('Category:', category, file=f)
-            print('Grammar:', file=f)
-            print(grammar, file=f)
-            print('Score:', score, file=f)
-            print(file=f)
-
-        # Print the total time elapsed
-        print(f'\nTime elapsed: %.2f seconds, Iterations: %d' % (time.time()-start_time, iterations), file=f)
-
-        # Print a delimeter for the next time information is logged
-        print('\n\n==========', file=f)
-
-    # Main Program Loop
-    print(''.ljust(50), end='\r')
-    iterations = 0
-    while iterations < MAX_ITERS:
-        if iterations % 500 == 0:
-            log_results(scorer, log_file)
-
-        good_grammar, good_gen = scorer.sample_grammar()
-        gen = good_gen.copy()
-        gen.mutate()
-        grammar = gen.generate_grammar()
-        scorer.score(grammar, gen)
-        print('Iters:', iterations, '\tScores:', ', '.join(['{:.2f}'.format(v[0]) for v in scorer.score_map.values()]), end='\r')
-        iterations += 1
-
-    # Print final results to the log
-    log_results(scorer, log_file)
 
 if __name__ == '__main__':
-    if len(sys.argv) != 4 or not os.path.exists(sys.argv[1]):
-        print('Usage: python3 generational_search.py <input_file> <log_file> <max_iters>')
+    if len(sys.argv) < 2:
+        print(f'Usage: python3 {sys.argv[0]} <mode>')
+        print('where mode is one of {internal, external}')
+        print(f'run with python3 {sys.argv[0]} <mode> to see detailed help')
+        exit(1)
+    elif sys.argv[1] == "external":
+        if len(sys.argv) < 5 or not os.path.exists(sys.argv[3]):
+            print(f'Usage: python3 {sys.argv[0]} external <oracle_cmd> <training_example_dir> <log_file>')
+            print('<oracle_cmd> should be a string which can be invoked with `<oracle_cmd> filename` (so can include options)')
+            exit(1)
+        main(sys.argv[2], sys.argv[3], sys.argv[4])
+    elif sys.argv[1] == "internal":
+        if len(sys.argv) != 4 or not os.path.exists(sys.argv[2]):
+            print(f'Usage: python3 {sys.argv[0]} internal <input_file> <log_file>')
+            exit(1)
+        main_internal(sys.argv[2], sys.argv[3], random_guides=False)
     else:
-        try:
-            max_iters = int(sys.argv[3])
-        except:
-            print('Usage: python3 generational_search.py <input_file> <log_file> <max_iters>')
-            exit()
-        main(sys.argv[1], sys.argv[2], max_iters)
+        print(f'Usage: python3 {sys.argv[0]} <mode> [other args...]')
+        print('where mode is one of {internal, internal-r, external}')
+        print(f'run with python3 {sys.argv[0]} <mode> to see detailed help')

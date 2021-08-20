@@ -1,3 +1,7 @@
+"""
+No longer used.
+"""
+
 class Graph():
     """
     Represents a standard directed graph that allows cycle detection.
