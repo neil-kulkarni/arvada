@@ -1,3 +1,4 @@
+import argparse
 import random, sys, os, time
 from typing import Dict
 
@@ -115,27 +116,25 @@ def main(oracle_cmd, log_file_name, test_examples_folder ):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print(f'Usage: python3 {sys.argv[0]} <mode>')
-        print('where mode is one of {internal, external}')
-        print(f'run with python3 {sys.argv[0]} <mode> to see detailed help')
-        exit(1)
-    elif sys.argv[1] == "external":
-        if len(sys.argv) < 5 or len(sys.argv) > 6 or not os.path.exists(sys.argv[3]):
-            print(f'Usage: python3 {sys.argv[0]} external <oracle_cmd> <test_example_dir> <log_file> [size_precision_set]')
-            print('<oracle_cmd> should be a string which can be invoked with `<oracle_cmd> filename` (so can include options).')
-            print('The last optional argument [size_precision_set] gives the size of the precision set. It is 1000 by default.')
-            exit(1)
-        if len(sys.argv) == 6:
-            PRECISION_SIZE = int(sys.argv[5])
-        main(sys.argv[2], sys.argv[4], sys.argv[3])
-    elif sys.argv[1] == "internal":
-        if len(sys.argv) != 4 or not os.path.exists(sys.argv[2]):
-            print(f'Usage: python3 {sys.argv[0]} internal <input_file> <log_file>')
-            exit(1)
-        main_internal(sys.argv[2], sys.argv[3])
+    parser = argparse.ArgumentParser()
+    subparser = parser.add_subparsers(dest='mode', help='benchmark mode (probably external unless you match the internal format)')
+    internal_parser = subparser.add_parser('internal')
+    external_parser = subparser.add_parser('external')
+
+    internal_parser.add_argument('bench_folder', help='folder containing the benchmark', type=str)
+    internal_parser.add_argument('log_file', help='log file output from search.py', type=str)
+    external_parser.add_argument('oracle_cmd', help='the oracle command; should be invocable on a filename via `oracle_cmd filename`, and return a non-zero exit code on invalid inputs', type=str)
+    external_parser.add_argument('examples_dir', help='folder containing the test (recall) examples', type=str)
+    external_parser.add_argument('log_file', help='log file output from search.py', type=str)
+    external_parser.add_argument('-n', '--precision_set_size', help='size of precision set to sample from learned grammar (default 1000)', type=int, default=1000)
+
+    args = parser.parse_args()
+    if args.mode == 'internal':
+        main_internal(args.bench_folder, args.log_file)
+    elif args.mode == 'external':
+        if args.precision_set_size is not None:
+            PRECISION_SIZE = args.precision_set_size
+        main(args.oracle_cmd, args.log_file, args.examples_dir)
     else:
-        print(f'Evaluates an arvada-learned grammar')
-        print(f'Usage: python3 {sys.argv[0]} <mode> [other args...]')
-        print('where mode is one of {internal, external}')
-        print(f'run with python3 {sys.argv[0]} <mode> to see detailed help')
+        parser.print_help()
+        exit(1)

@@ -1,3 +1,4 @@
+import argparse
 import random, sys, os, time
 from input import parse_input
 from parse_tree import ParseTree, ParseNode
@@ -127,23 +128,34 @@ def main(oracle_cmd, guide_examples_folder,  log_file_name):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print(f'Usage: python3 {sys.argv[0]} <mode>')
-        print('where mode is one of {internal, external}')
-        print(f'run with python3 {sys.argv[0]} <mode> to see detailed help')
-        exit(1)
-    elif sys.argv[1] == "external":
-        if len(sys.argv) < 5 or not os.path.exists(sys.argv[3]):
-            print(f'Usage: python3 {sys.argv[0]} external <oracle_cmd> <training_example_dir> <log_file>')
-            print('<oracle_cmd> should be a string which can be invoked with `<oracle_cmd> filename` (so can include options)')
-            exit(1)
-        main(sys.argv[2], sys.argv[3], sys.argv[4])
-    elif sys.argv[1] == "internal":
-        if len(sys.argv) != 4 or not os.path.exists(sys.argv[2]):
-            print(f'Usage: python3 {sys.argv[0]} internal <input_file> <log_file>')
-            exit(1)
-        main_internal(sys.argv[2], sys.argv[3], random_guides=False)
+    parser = argparse.ArgumentParser()
+    subparser = parser.add_subparsers(dest='mode', help='benchmark mode (probably external unless you match the internal format)')
+    internal_parser = subparser.add_parser('internal')
+    external_parser = subparser.add_parser('external')
+
+    internal_parser.add_argument('bench_folder', help='folder containing the benchmark', type=str)
+    internal_parser.add_argument('log_file', help='name of file to write output log to', type=str)
+
+    external_parser.add_argument('oracle_cmd', help='the oracle command; should be invocable on a filename via `oracle_cmd filename`, and return a non-zero exit code on invalid inputs', type=str)
+    external_parser.add_argument('examples_dir', help='folder containing the training examples', type=str)
+    external_parser.add_argument('log_file', help='name of file to write output log to', type=str)
+    external_parser.add_argument('--no_pretokenize',  help=f'assign each character to its own leaf node, rather than grouping characters of same lassc', action='store_true')
+    external_parser.add_argument('--group_punctuation', help=f'group sequences of punctuation during pretokenization', action='store_true')
+    external_parser.add_argument('--group_upper_lower',
+                                 help=f'group uppercase characters with lowerchase characters during pretokenization', action='store_true')
+    #TODO: what is this error?
+    args = parser.parse_args()
+    if args.mode == 'internal':
+        main_internal(args.bench_folder, args.log_file, random_guides=False)
+    elif args.mode == 'external':
+        if args.no_pretokenize:
+            USE_PRETOKENIZATION = False
+        if args.group_punctuation:
+            GROUP_PUNCTUATION = True
+        if args.group_upper_lower:
+            SPLIT_UPPER_AND_LOWER = False
+        main(args.oracle_cmd, args.examples_dir, args.log_file)
     else:
-        print(f'Usage: python3 {sys.argv[0]} <mode> [other args...]')
-        print('where mode is one of {internal, internal-r, external}')
-        print(f'run with python3 {sys.argv[0]} <mode> to see detailed help')
+        parser.print_help()
+        exit(1)
+
