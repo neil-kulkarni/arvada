@@ -139,7 +139,7 @@ if __name__ == '__main__':
     external_parser.add_argument('oracle_cmd', help='the oracle command; should be invocable on a filename via `oracle_cmd filename`, and return a non-zero exit code on invalid inputs', type=str)
     external_parser.add_argument('examples_dir', help='folder containing the training examples', type=str)
     external_parser.add_argument('log_file', help='name of file to write output log to', type=str)
-    external_parser.add_argument('--no_pretokenize',  help=f'assign each character to its own leaf node, rather than grouping characters of same lassc', action='store_true')
+    external_parser.add_argument('--no-pretokenize',  help=f'assign each character to its own leaf node, rather than grouping characters of same lassc', action='store_true', dest='no_pretokenize')
     external_parser.add_argument('--group_punctuation', help=f'group sequences of punctuation during pretokenization', action='store_true')
     external_parser.add_argument('--group_upper_lower',
                                  help=f'group uppercase characters with lowerchase characters during pretokenization', action='store_true')
