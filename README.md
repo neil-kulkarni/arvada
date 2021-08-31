@@ -1,9 +1,17 @@
-# Arvada
+<img width=600 src="Arvada_logo_text.png">
 
-A tool to infer grammars from an example set and a correctness oracle, that can be used for both generation and parsing tasks.
+# 
+
+**Arvada** is a tool to infer grammars from an example set and a correctness oracle, that can be used for both generation and parsing tasks. It uses a sequence of *bubble* and *merge* operations to generalize the example set as much as possible:
+
+![arvada_animation](https://user-images.githubusercontent.com/7470211/131531487-65382c5d-0570-4855-bb35-1d7ce963cf4e.gif)
+
+
+You can read more in our [ASE'21 paper](https://www.carolemieux.com/arvada_ase21.pdf).
 
 To reference Arvada in your research, we request you to cite our ASE'21 paper:
 > Neil Kulkarni*, Caroline Lemieux*, and Koushik Sen. 2021. Learning Highly Recursive Grammars. In Proceedings of the 36th ACM/IEEE International Conference on Automated Software Engineering (ASE'21).
+
 
 ## Artifact for Replication
 
