@@ -2,9 +2,16 @@
 
 A tool to infer grammars from an example set and a correctness oracle, that can be used for both generation and parsing tasks.
 
+To reference Arvada in your research, we request you to cite our ASE'21 paper:
+> Neil Kulkarni*, Caroline Lemieux*, and Koushik Sen. 2021. Learning Highly Recursive Grammars. In Proceedings of the 36th ACM/IEEE International Conference on Automated Software Engineering (ASE'21).
+
 ## Artifact for Replication
 
-We provide a docker container that contains replication instructions for the experiments from Learning Highly Recursive Input Grammars, submitted to ASE'21, at [this link](https://drive.google.com/file/d/1DfPd0eb9YPUkPo4hsr35PQC6ChzZ7ob0/view?usp=sharing). The README in the docker container describes how to use the run scripts, as well as expected time to replicate the experiments
+We provide a docker container that contains replication instructions for the experiments from the technical research paper describing Arvada, Learning Highly Recursive Input Grammars, ASE'21. The container is available from [DockerHub](https://hub.docker.com/r/carolemieux/arvada-artifact), or you can pull it via command-line:
+```
+$ docker pull carolemieux/arvada-artifact:latest
+```
+The README in the docker container describes the structure of the benchmarks, how to use the run scripts, and the expected time to replicate the experiments.
 
 ## Building
 
