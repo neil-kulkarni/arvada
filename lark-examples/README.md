@@ -32,5 +32,7 @@ While the choice of benchmark grammars was inspired by prior work [1] [2] [3], w
 - xml: this covers a subset of XML, allowing only for a limited number of tags, but arbitrary attributes and text within nodes. Orignally we tried to get the XML benchmark used in Reinam [2], but this was only available in non-human-readable binary format.
 
 [1] O. Bastani, R. Sharma, A. Aiken, and P. Liang, “Synthesizing Program Input Grammars,” in Proceedings of the 38th ACM SIGPLAN Conference on Programming Language Design and Implementation, PLDI 2017,(New York, NY, USA), p. 95–110, Association for Computing Machinery, 2017.
+
 [2] Z. Wu, E. Johnson, W. Yang, O. Bastani, D. Song, J. Peng, and T. Xie, “REINAM: Reinforcement Learning for Input-Grammar Inference,” in Proceedings of the 2019 27th ACM Joint Meeting on European Software Engineering Conference and Symposium on the Foundations of Software Engineering, ESEC/FSE 2019, (New York, NY, USA), p. 488–498, Association for Computing Machinery, 2019
+
 [3]  R. Gopinath, B. Mathis, and A. Zeller, “Mining Input Grammars from Dynamic Control Flow,” in Proceedings of the 2019 28th ACM Joint Meeting on European Software Engineering Conference and Symposium on the Foundations of Software Engineering, ESEC/FSE 2020, (New York, NY, USA), pp. 1–12, Association for Computing Machinery, 2020.
