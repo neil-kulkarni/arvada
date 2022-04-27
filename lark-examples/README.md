@@ -5,7 +5,7 @@ A bunch of examples written in the lark grammar format. Ideas pulled from variou
 
 - html: subset of the [html syntax](https://www.w3.org/TR/html52/syntax.html), based mostly off of [this](https://www2.cs.arizona.edu/~debray/Teaching/CSc453/project/html-subset-grammar.html)
 
-## From mimid (Andreas Zeller work)
+## From Mimid 
 
 - calc: basic calculator, no whitespace allowed, permissive on the zeroes
 - mathexpr: inspired from [this repo](https://github.com/louisfisch/mathematical-expressions-parser/blob/master/eval.py)
