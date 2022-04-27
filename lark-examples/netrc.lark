@@ -1,9 +1,0 @@
-char: "a".."z" | "0".."1"
-str: char | char str
-space: " "
-machinename: str | str "." machinename
-ws: " " | "\t" | "\n"
-machine: "machine" space machinename ws "login" space str ws "password" space str (ws "account" space str)? 
-default: "default" ws "login" space str ws "password" space str (ws "account" space str)? 
-netrc: machine | machine ws netrc | default
-start: netrc

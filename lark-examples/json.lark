@@ -1,15 +1,10 @@
-start: value 
-escapable: "\"" | "\\" | "\/" | "b" | "f" | "n" | "r" | "t" | "u" ("0".."9" | "A".."F")~4
-escapedchar: "\\" escapable
-char : "a".."z" | "A".."Z" | "0".."9"  | escapedchar | "_" | " " | "!" | "?" | "." | ":" | ";" | "(" | ")" | "/" | "@" | "#" | "=" | "+" | "-" | "&" | "*"
-chars : char | char chars
-string: "\"" chars "\""
-digits: ("0".."9")+
-number: ("-")? ("1".."9" digits | digits ("." digits)? (("e" | "E") ("-" | "+")? digits)?)
-whitespace: (" " | "\n" | "\r" | "\t")*
+start: value
 value: object | array | string | number | "true" | "false" | "null"
-array: "[" whitespace "]" | "[" whitespace* list whitespace* "]"
-list: value | list whitespace* "," whitespace* value
-object: "{" whitespace "}" | "{" objlist "}"
-objtuple: whitespace* string whitespace* ":" whitespace* value whitespace*
+array: "["  "]" | "["  list  "]"
+list: value | list  ","  value
+object: "{"  "}" | "{" objlist "}"
+objtuple:  string  ":"  value
 objlist: objtuple | objlist "," objtuple
+number: ("0" | ("-")?  "1".."9" ("0".."9")*) ("." ("0".."9")+)?
+string: QUOTE ("a".."z" | "A".."Z" | "0".."9")+ QUOTE
+QUOTE: "\u0022"
